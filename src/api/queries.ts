@@ -1,5 +1,5 @@
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, slashPreservingPath, unwrap } from './client';
+import { api, ApiError, slashPreservingPath, unwrap } from './client';
 import type {
   DatasourceCreate,
   ModelCreate,
@@ -16,9 +16,15 @@ export const PROVIDER_HEALTH_INTERVAL_MS = 15_000;
 /** Query keys in one place so mutations can invalidate precisely. */
 export const qk = {
   health: ['health'] as const,
+  /** Prefix of every tenant query: lists, details and per-tenant keys. */
   tenants: ['tenants'] as const,
+  // An object segment cannot collide with a tenant id in `tenant(id)`.
+  tenantList: (includeDeleted: boolean) => ['tenants', { includeDeleted }] as const,
   tenant: (id: string) => ['tenants', id] as const,
+  /** Prefix of both API key lists (with and without revoked keys). */
   apiKeys: (tenantId: string) => ['tenants', tenantId, 'api-keys'] as const,
+  apiKeyList: (tenantId: string, includeRevoked: boolean) =>
+    ['tenants', tenantId, 'api-keys', { includeRevoked }] as const,
   providerKeys: (tenantId: string) => ['tenants', tenantId, 'provider-keys'] as const,
   models: ['models'] as const,
   providers: ['providers'] as const,
@@ -40,8 +46,17 @@ export const healthQuery = () =>
     refetchInterval: 30_000,
   });
 
-export const tenantsQuery = () =>
-  queryOptions({ queryKey: qk.tenants, queryFn: () => unwrap(api.GET('/api/v1/tenants')) });
+/** Active tenants; `includeDeleted` adds tombstones (`status: 'deleted'`). */
+export const tenantsQuery = (includeDeleted = false) =>
+  queryOptions({
+    queryKey: qk.tenantList(includeDeleted),
+    queryFn: () =>
+      unwrap(
+        api.GET('/api/v1/tenants', {
+          params: { query: includeDeleted ? { include_deleted: true } : {} },
+        }),
+      ),
+  });
 
 export const tenantQuery = (tenantId: string) =>
   queryOptions({
@@ -50,11 +65,19 @@ export const tenantQuery = (tenantId: string) =>
       unwrap(api.GET('/api/v1/tenants/{tenantId}', { params: { path: { tenantId } } })),
   });
 
-export const apiKeysQuery = (tenantId: string) =>
+/** Active keys; `includeRevoked` adds revoked ones (with `revoked_at`). */
+export const apiKeysQuery = (tenantId: string, includeRevoked = false) =>
   queryOptions({
-    queryKey: qk.apiKeys(tenantId),
+    queryKey: qk.apiKeyList(tenantId, includeRevoked),
     queryFn: () =>
-      unwrap(api.GET('/api/v1/tenants/{tenantId}/api-keys', { params: { path: { tenantId } } })),
+      unwrap(
+        api.GET('/api/v1/tenants/{tenantId}/api-keys', {
+          params: {
+            path: { tenantId },
+            query: includeRevoked ? { include_revoked: true } : {},
+          },
+        }),
+      ),
   });
 
 export const providerKeysQuery = (tenantId: string) =>
@@ -140,6 +163,26 @@ export const usageQuery = (tenantId: string | undefined, limit = 100) =>
 
 // ───────────── Mutations ─────────────
 
+export type DeleteOutcome = 'deleted' | 'already-gone';
+
+/**
+ * Runs a control-plane DELETE. The server answers 404 for an id that is
+ * unknown, belongs to another tenant or was already deleted (repeat deletes
+ * are never a second 204). From the console's point of view the row is gone
+ * either way, so a 404 resolves as `already-gone` and the caller refreshes.
+ */
+export async function deleteOrGone(
+  promise: Promise<{ data?: unknown; error?: unknown; response: Response }>,
+): Promise<DeleteOutcome> {
+  try {
+    await unwrap(promise);
+    return 'deleted';
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return 'already-gone';
+    throw e;
+  }
+}
+
 export function useCreateTenant() {
   const qc = useQueryClient();
   return useMutation({
@@ -159,6 +202,44 @@ export function useMintApiKey(tenantId: string) {
         }),
       ),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.apiKeys(tenantId) }),
+  });
+}
+
+export function useRevokeApiKey(tenantId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (keyId: string) =>
+      deleteOrGone(
+        api.DELETE('/api/v1/tenants/{tenantId}/api-keys/{keyId}', {
+          params: { path: { tenantId, keyId } },
+        }),
+      ),
+    // Refreshes both lists, with and without revoked keys.
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.apiKeys(tenantId) }),
+  });
+}
+
+/**
+ * Deletes a tenant. The server cascades: keys revoked, BYOK credentials
+ * destroyed, routes removed, datasources and nodes soft-deleted.
+ */
+export function useDeleteTenant() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tenantId: string) =>
+      deleteOrGone(api.DELETE('/api/v1/tenants/{tenantId}', { params: { path: { tenantId } } })),
+    onSuccess: (_outcome, tenantId) => {
+      // Every query under the tenant (detail, API keys, provider keys,
+      // ontology) would only 404 now: drop them instead of refetching.
+      qc.removeQueries({ queryKey: qk.tenant(tenantId) });
+      qc.removeQueries({ queryKey: qk.ontology(tenantId) });
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: qk.tenantList(false) }),
+        qc.invalidateQueries({ queryKey: qk.tenantList(true) }),
+        qc.invalidateQueries({ queryKey: ['datasources'] }),
+        qc.invalidateQueries({ queryKey: ['nodes'] }),
+      ]);
+    },
   });
 }
 
@@ -259,6 +340,19 @@ export function useIntrospectDatasource() {
   });
 }
 
+export function useDeleteDatasource() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tenantId, datasourceId }: { tenantId: string; datasourceId: string }) =>
+      deleteOrGone(
+        api.DELETE('/api/v1/tenants/{tenantId}/datasources/{datasourceId}', {
+          params: { path: { tenantId, datasourceId } },
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['datasources'] }),
+  });
+}
+
 export function useReviewElement(tenantId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -277,6 +371,19 @@ export function useCreateNode() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: NodeCreate) => unwrap(api.POST('/api/v1/nodes', { body })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['nodes'] }),
+  });
+}
+
+export function useDeleteNode() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tenantId, nodeId }: { tenantId: string; nodeId: string }) =>
+      deleteOrGone(
+        api.DELETE('/api/v1/tenants/{tenantId}/nodes/{nodeId}', {
+          params: { path: { tenantId, nodeId } },
+        }),
+      ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['nodes'] }),
   });
 }

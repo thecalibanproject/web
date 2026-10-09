@@ -7,6 +7,7 @@ import {
   Badge,
   Button,
   Card,
+  Checkbox,
   Drawer,
   EmptyState,
   ErrorState,
@@ -24,6 +25,7 @@ import {
   TR,
 } from '@/components/ui';
 import { IconChevronRight, IconPlus } from '@/components/ui/icons';
+import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
 
 type Pii = NonNullable<TenantCreate['pii_default']>;
@@ -122,7 +124,8 @@ function CreateTenantDialog({ open, onClose }: { open: boolean; onClose: () => v
 }
 
 export function TenantsPage() {
-  const tenants = useQuery(tenantsQuery());
+  const [showDeleted, setShowDeleted] = useState(false);
+  const tenants = useQuery(tenantsQuery(showDeleted));
   const [creating, setCreating] = useState(false);
 
   return (
@@ -137,6 +140,13 @@ export function TenantsPage() {
         }
       />
       <Card>
+        <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
+          <Checkbox
+            label="Show deleted"
+            checked={showDeleted}
+            onChange={(e) => setShowDeleted(e.target.checked)}
+          />
+        </div>
         {tenants.isPending ? (
           <LoadingState />
         ) : tenants.isError ? (
@@ -164,45 +174,67 @@ export function TenantsPage() {
                 <TH>Region</TH>
                 <TH>PII default</TH>
                 <TH>Created</TH>
+                {showDeleted && <TH>Status</TH>}
                 <TH>
                   <span className="sr-only">Open</span>
                 </TH>
               </tr>
             </THead>
             <TBody>
-              {tenants.data.map((t) => (
-                <TR key={t.id}>
-                  <TD className="font-medium">
-                    <Link
-                      to="/tenants/$tenantId"
-                      params={{ tenantId: t.id }}
-                      className="hover:text-accent hover:underline"
-                    >
-                      {t.name}
-                    </Link>
-                  </TD>
-                  <TD className="font-mono text-[12px] text-fg-muted">{t.id}</TD>
-                  <TD>{t.region ?? <span className="text-fg-subtle">—</span>}</TD>
-                  <TD>
-                    {t.pii_default ? (
-                      <Badge>{t.pii_default}</Badge>
-                    ) : (
-                      <span className="text-fg-subtle">—</span>
+              {tenants.data.map((t) => {
+                const deleted = t.status === 'deleted';
+                return (
+                  <TR key={t.id} className={cn(deleted && 'text-fg-subtle')}>
+                    <TD className="font-medium">
+                      {deleted ? (
+                        <span className="line-through">{t.name}</span>
+                      ) : (
+                        <Link
+                          to="/tenants/$tenantId"
+                          params={{ tenantId: t.id }}
+                          className="hover:text-accent hover:underline"
+                        >
+                          {t.name}
+                        </Link>
+                      )}
+                    </TD>
+                    <TD className="font-mono text-[12px] text-fg-muted">{t.id}</TD>
+                    <TD>{t.region ?? <span className="text-fg-subtle">—</span>}</TD>
+                    <TD>
+                      {t.pii_default ? (
+                        <Badge>{t.pii_default}</Badge>
+                      ) : (
+                        <span className="text-fg-subtle">—</span>
+                      )}
+                    </TD>
+                    <TD className="text-fg-muted">{formatDate(t.created_at)}</TD>
+                    {showDeleted && (
+                      <TD>
+                        {deleted ? (
+                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                            <Badge tone="danger">Deleted</Badge>
+                            <span className="text-fg-subtle">{formatDate(t.deleted_at)}</span>
+                          </span>
+                        ) : (
+                          <span className="text-fg-muted">Active</span>
+                        )}
+                      </TD>
                     )}
-                  </TD>
-                  <TD className="text-fg-muted">{formatDate(t.created_at)}</TD>
-                  <TD className="w-8 text-right">
-                    <Link
-                      to="/tenants/$tenantId"
-                      params={{ tenantId: t.id }}
-                      aria-label={`Open ${t.name}`}
-                      className="inline-flex rounded p-1 text-fg-subtle hover:text-fg"
-                    >
-                      <IconChevronRight />
-                    </Link>
-                  </TD>
-                </TR>
-              ))}
+                    <TD className="w-8 text-right">
+                      {!deleted && (
+                        <Link
+                          to="/tenants/$tenantId"
+                          params={{ tenantId: t.id }}
+                          aria-label={`Open ${t.name}`}
+                          className="inline-flex rounded p-1 text-fg-subtle hover:text-fg"
+                        >
+                          <IconChevronRight />
+                        </Link>
+                      )}
+                    </TD>
+                  </TR>
+                );
+              })}
             </TBody>
           </Table>
         )}

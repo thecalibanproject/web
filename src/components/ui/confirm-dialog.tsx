@@ -12,6 +12,7 @@ export function ConfirmDialog({
   title,
   children,
   confirmLabel = 'Delete',
+  confirmDisabled = false,
   loading = false,
   error,
   onConfirm,
@@ -21,6 +22,8 @@ export function ConfirmDialog({
   title: ReactNode;
   children?: ReactNode;
   confirmLabel?: string;
+  /** Keeps the confirm button disabled, e.g. until a typed confirmation matches. */
+  confirmDisabled?: boolean;
   loading?: boolean;
   error?: unknown;
   onConfirm: () => void;
@@ -35,7 +38,7 @@ export function ConfirmDialog({
       footer={
         <>
           <Button onClick={onCancel}>Cancel</Button>
-          <Button variant="danger" loading={loading} onClick={onConfirm}>
+          <Button variant="danger" loading={loading} disabled={confirmDisabled} onClick={onConfirm}>
             {confirmLabel}
           </Button>
         </>

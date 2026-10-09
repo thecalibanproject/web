@@ -25,12 +25,12 @@ Every page except the login screen requires the control plane's admin token.
 | --- | --- | --- |
 | `#/login` | Sign in | Enter the admin token (`CALIBAN_ADMIN_TOKEN` on the control plane). It is checked against `GET /api/v1/tenants`. |
 | `#/` | Overview | Requests, tokens, cache efficiency and spend across all tenants, plus the most recent requests. |
-| `#/tenants` | Tenants | Create and list tenants. A tenant is the isolation boundary for keys, cache, ontology and budgets. |
-| `#/tenants/<id>` | Tenant detail | Two tabs: **API keys** (mint Caliban keys for your apps) and **Provider keys** (BYOK credentials for OpenAI, Anthropic, OpenAI-compatible servers such as vLLM, llama.cpp, Ollama and SGLang, Azure OpenAI, AWS Bedrock and Google Vertex AI). |
+| `#/tenants` | Tenants | Create and list tenants. A tenant is the isolation boundary for keys, cache, ontology and budgets. **Show deleted** adds deleted tenants, marked **Deleted** with their deletion date. |
+| `#/tenants/<id>` | Tenant detail | Two tabs: **API keys** (mint Caliban keys for your apps, revoke a key, and **Show revoked** to list revoked keys with their revocation time) and **Provider keys** (BYOK credentials for OpenAI, Anthropic, OpenAI-compatible servers such as vLLM, llama.cpp, Ollama and SGLang, Azure OpenAI, AWS Bedrock and Google Vertex AI). A **Danger zone** deletes the tenant after you type its id: its keys are revoked, provider credentials destroyed, routes removed, and datasources and nodes deleted. Audit history is kept and the id can't be reused. A deleted tenant's page says so instead of showing an error. |
 | `#/models` | Models | Two tabs: **Catalogue** (the model registry the router chooses from; a model's trust tier decides which requests it may see) and **Model servers** (shared on-prem servers for open models, with live health and model discovery). |
-| `#/datasources` | Datasources | Register a datasource for a tenant, then introspect and profile it so Caliban proposes ontology elements for review. |
+| `#/datasources` | Datasources | Register a datasource for a tenant, then introspect and profile it so Caliban proposes ontology elements for review. Delete a datasource (its connection settings are wiped). |
 | `#/ontology` | Ontology studio | Review proposed elements (entities, attributes, relations, metrics, dimensions, glossary terms, policies, verified queries), least confident first, and approve or reject each one. |
-| `#/nodes` | Nodes | Create node specs (versioned, budgeted AI sub-apps) in a JSON editor that validates live against the node schema. |
+| `#/nodes` | Nodes | Create node specs (versioned, budgeted AI sub-apps) in a JSON editor that validates live against the node schema. Delete a single node version. |
 | `#/usage` | Usage | Per-request events: tokens, cache outcome, PII entities, cost and latency, filterable by tenant and cache status. |
 | `#/settings` | Settings | Admin API and data plane endpoints, control plane status, connection snippets for apps, and console preferences. |
 

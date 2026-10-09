@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
-import { nodesQuery, tenantsQuery } from '@/api/queries';
+import { nodesQuery, tenantsQuery, useDeleteNode } from '@/api/queries';
 import type { Node } from '@/api/types';
 import { NodeEditor } from '@/components/nodes/node-editor';
 import { TenantFilter } from '@/components/tenant-select';
@@ -10,6 +10,7 @@ import {
   Button,
   Card,
   CodeBlock,
+  ConfirmDialog,
   Drawer,
   EmptyState,
   ErrorState,
@@ -22,7 +23,7 @@ import {
   THead,
   TR,
 } from '@/components/ui';
-import { IconPlus } from '@/components/ui/icons';
+import { IconPlus, IconTrash } from '@/components/ui/icons';
 import { formatDateTime } from '@/lib/format';
 
 const route = getRouteApi('/_app/nodes');
@@ -43,6 +44,13 @@ export function NodesPage() {
   );
   const [creating, setCreating] = useState(false);
   const [viewing, setViewing] = useState<Node | null>(null);
+  const del = useDeleteNode();
+  const [deleting, setDeleting] = useState<Node | null>(null);
+
+  const closeDelete = () => {
+    setDeleting(null);
+    del.reset();
+  };
 
   return (
     <>
@@ -87,6 +95,9 @@ export function NodesPage() {
                 <TH>Tenant</TH>
                 <TH>Description</TH>
                 <TH>Created</TH>
+                <TH>
+                  <span className="sr-only">Actions</span>
+                </TH>
               </tr>
             </THead>
             <TBody>
@@ -116,6 +127,17 @@ export function NodesPage() {
                   <TD className="whitespace-nowrap text-fg-muted">
                     {formatDateTime(n.created_at)}
                   </TD>
+                  <TD className="text-right">
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      icon={<IconTrash size={14} />}
+                      aria-label={`Delete ${n.name} v${n.version}`}
+                      onClick={() => setDeleting(n)}
+                    >
+                      Delete
+                    </Button>
+                  </TD>
                 </TR>
               ))}
             </TBody>
@@ -139,6 +161,33 @@ export function NodesPage() {
       >
         {viewing && <CodeBlock label="Node spec" code={JSON.stringify(viewing.spec, null, 2)} />}
       </Drawer>
+      <ConfirmDialog
+        open={deleting !== null}
+        title="Delete node version?"
+        confirmLabel="Delete node version"
+        loading={del.isPending}
+        error={del.error}
+        onCancel={closeDelete}
+        onConfirm={() => {
+          // A 404 (already deleted) resolves too; the list refreshes either way.
+          if (deleting) {
+            del.mutate(
+              { tenantId: deleting.tenant_id, nodeId: deleting.id },
+              { onSuccess: closeDelete },
+            );
+          }
+        }}
+      >
+        <p>
+          Delete{' '}
+          <code className="font-mono font-medium">
+            {deleting?.name} v{deleting?.version}
+          </code>
+          ? Only this version is deleted, and it is no longer listed. Its version number is not
+          reused by later versions.
+        </p>
+        <p>Audit history is kept.</p>
+      </ConfirmDialog>
     </>
   );
 }

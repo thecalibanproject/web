@@ -1,21 +1,59 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, type RenderOptions } from '@testing-library/react';
-import type { ReactElement } from 'react';
+import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
+import { render, renderHook, type RenderOptions } from '@testing-library/react';
+import type { ReactElement, ReactNode } from 'react';
 import { vi } from 'vitest';
+import { setToken } from '@/lib/auth';
+import { createAppRouter } from '@/router';
 
-export function renderWithClient(ui: ReactElement, options?: RenderOptions) {
-  const queryClient = new QueryClient({
+function testQueryClient() {
+  return new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+}
+
+export function renderWithClient(ui: ReactElement, options?: RenderOptions) {
+  const queryClient = testQueryClient();
   return {
     queryClient,
     ...render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>, options),
   };
 }
 
+/** Renders a hook (e.g. a mutation from api/queries) inside a fresh QueryClient. */
+export function renderHookWithClient<T>(hook: () => T, queryClient = testQueryClient()) {
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+  return { queryClient, ...renderHook(hook, { wrapper }) };
+}
+
+/**
+ * Renders the whole console (router, app shell, lazy pages) signed in, at
+ * `path`, with in-memory history. Use for page-level flows such as navigation.
+ */
+export function renderApp(path: string) {
+  setToken('test-admin-token');
+  // The router's scroll restoration calls scrollTo, which jsdom does not implement.
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+  const queryClient = testQueryClient();
+  const router = createAppRouter(queryClient, createMemoryHistory({ initialEntries: [path] }));
+  return {
+    router,
+    queryClient,
+    ...render(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    ),
+  };
+}
+
 export interface RecordedCall {
   method: string;
   path: string;
+  /** Query string; routes match on `path` alone. */
+  query: URLSearchParams;
   headers: Headers;
   body: unknown;
 }
@@ -36,6 +74,7 @@ export function mockApi(routes: Record<string, Handler>) {
       const call: RecordedCall = {
         method: input.method,
         path: url.pathname,
+        query: url.searchParams,
         headers: input.headers,
         body: text ? (JSON.parse(text) as unknown) : undefined,
       };

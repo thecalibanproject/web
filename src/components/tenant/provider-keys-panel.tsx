@@ -29,9 +29,11 @@ import {
   TR,
 } from '../ui';
 import { IconPlus, IconTrash } from '../ui/icons';
+import { isNotFound } from '@/lib/errors';
 import { formatDate } from '@/lib/format';
 import { PROVIDER_LABEL, PROVIDER_SHORT, TRUST_TIER_HINT, TRUST_TIER_LABEL } from '@/lib/labels';
 import { PROVIDER_RULES } from '@/lib/providerForm';
+import { TenantDeletedState } from './tenant-deleted-state';
 
 export function ProviderKeyForm({ tenantId, onDone }: { tenantId: string; onDone: () => void }) {
   const create = useCreateProviderKey(tenantId);
@@ -237,6 +239,8 @@ export function ProviderKeysPanel({ tenantId }: { tenantId: string }) {
       />
       {keys.isPending ? (
         <LoadingState rows={3} />
+      ) : keys.isError && isNotFound(keys.error) ? (
+        <TenantDeletedState tenantId={tenantId} />
       ) : keys.isError ? (
         <ErrorState error={keys.error} onRetry={() => void keys.refetch()} />
       ) : keys.data.length === 0 ? (

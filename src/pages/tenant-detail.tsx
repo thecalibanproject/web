@@ -2,8 +2,11 @@ import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { tenantQuery } from '@/api/queries';
 import { ApiKeysPanel } from '@/components/tenant/api-keys-panel';
+import { DeleteTenantSection } from '@/components/tenant/delete-tenant-section';
 import { ProviderKeysPanel } from '@/components/tenant/provider-keys-panel';
-import { Badge, ErrorState, LoadingState, PageHeader, Tabs } from '@/components/ui';
+import { TenantDeletedState } from '@/components/tenant/tenant-deleted-state';
+import { Badge, Card, ErrorState, LoadingState, PageHeader, Tabs } from '@/components/ui';
+import { isNotFound } from '@/lib/errors';
 import { formatDate } from '@/lib/format';
 import type { TenantTab } from '@/router';
 
@@ -19,6 +22,8 @@ export function TenantDetailPage() {
   const { tab = 'api-keys' } = route.useSearch();
   const navigate = route.useNavigate();
   const tenant = useQuery(tenantQuery(tenantId));
+  // A deleted (or unknown) tenant is a 404 on every tenant-scoped endpoint.
+  const gone = tenant.isError && isNotFound(tenant.error);
 
   return (
     <>
@@ -31,6 +36,17 @@ export function TenantDetailPage() {
       </nav>
       {tenant.isPending ? (
         <LoadingState rows={2} />
+      ) : gone ? (
+        <Card>
+          <TenantDeletedState
+            tenantId={tenantId}
+            action={
+              <Link to="/tenants" className="text-[13px] text-accent hover:underline">
+                Back to tenants
+              </Link>
+            }
+          />
+        </Card>
       ) : tenant.isError ? (
         <ErrorState
           error={tenant.error}
@@ -52,18 +68,26 @@ export function TenantDetailPage() {
           }
         />
       )}
-      <Tabs
-        label="Tenant sections"
-        tabs={TABS}
-        value={tab}
-        onChange={(t) => void navigate({ search: { tab: t }, replace: true })}
-      >
-        {tab === 'api-keys' ? (
-          <ApiKeysPanel tenantId={tenantId} />
-        ) : (
-          <ProviderKeysPanel tenantId={tenantId} />
-        )}
-      </Tabs>
+      {!gone && (
+        <Tabs
+          label="Tenant sections"
+          tabs={TABS}
+          value={tab}
+          onChange={(t) => void navigate({ search: { tab: t }, replace: true })}
+        >
+          {tab === 'api-keys' ? (
+            <ApiKeysPanel tenantId={tenantId} />
+          ) : (
+            <ProviderKeysPanel tenantId={tenantId} />
+          )}
+        </Tabs>
+      )}
+      {tenant.isSuccess && (
+        <DeleteTenantSection
+          tenant={tenant.data}
+          onDeleted={() => void navigate({ to: '/tenants' })}
+        />
+      )}
     </>
   );
 }

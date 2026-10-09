@@ -5,6 +5,7 @@ import { ontologyQuery, useReviewElement } from '@/api/queries';
 import type { OntologyElement, ReviewDecision } from '@/api/types';
 import { ConfidenceMeter, ElementStatusBadge, ProvenanceBadge } from '@/components/badges';
 import { TenantFilter } from '@/components/tenant-select';
+import { TenantDeletedState } from '@/components/tenant/tenant-deleted-state';
 import {
   Badge,
   Button,
@@ -27,7 +28,7 @@ import {
 } from '@/components/ui';
 import { IconCheck, IconX } from '@/components/ui/icons';
 import { cn } from '@/lib/cn';
-import { errorMessage } from '@/lib/errors';
+import { errorMessage, isNotFound } from '@/lib/errors';
 import { ALWAYS_REVIEW, groupByKind, ONTOLOGY_KIND_LABEL, reviewQueue } from '@/lib/ontology';
 
 const route = getRouteApi('/_app/ontology');
@@ -298,6 +299,10 @@ export function OntologyPage() {
       ) : ontology.isPending ? (
         <Card>
           <LoadingState rows={6} />
+        </Card>
+      ) : ontology.isError && isNotFound(ontology.error) ? (
+        <Card>
+          <TenantDeletedState tenantId={tenant} />
         </Card>
       ) : ontology.isError ? (
         <Card>

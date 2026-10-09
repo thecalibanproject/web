@@ -5,6 +5,7 @@ import {
   datasourcesQuery,
   tenantsQuery,
   useCreateDatasource,
+  useDeleteDatasource,
   useIntrospectDatasource,
 } from '@/api/queries';
 import { DATASOURCE_KINDS, type Datasource, type DatasourceKind } from '@/api/types';
@@ -13,6 +14,7 @@ import { TenantFilter, TenantSelect } from '@/components/tenant-select';
 import {
   Button,
   Card,
+  ConfirmDialog,
   Drawer,
   EmptyState,
   ErrorState,
@@ -30,7 +32,7 @@ import {
   Textarea,
   TR,
 } from '@/components/ui';
-import { IconPlus, IconRefresh } from '@/components/ui/icons';
+import { IconPlus, IconRefresh, IconTrash } from '@/components/ui/icons';
 import {
   buildConnection,
   CONNECTION_FIELDS,
@@ -232,10 +234,17 @@ export function DatasourcesPage() {
   const sources = useQuery(datasourcesQuery(tenant));
   const tenants = useQuery(tenantsQuery());
   const [registering, setRegistering] = useState(false);
+  const del = useDeleteDatasource();
+  const [deleting, setDeleting] = useState<Datasource | null>(null);
   const names = useMemo(
     () => new Map((tenants.data ?? []).map((t) => [t.id, t.name])),
     [tenants.data],
   );
+
+  const closeDelete = () => {
+    setDeleting(null);
+    del.reset();
+  };
 
   return (
     <>
@@ -308,7 +317,18 @@ export function DatasourcesPage() {
                   </TD>
                   <TD className="text-right text-fg-muted">{ds.epoch ?? '—'}</TD>
                   <TD className="text-right whitespace-nowrap">
-                    <IntrospectButton ds={ds} />
+                    <span className="inline-flex items-center gap-1.5">
+                      <IntrospectButton ds={ds} />
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        icon={<IconTrash size={14} />}
+                        aria-label={`Delete ${ds.name}`}
+                        onClick={() => setDeleting(ds)}
+                      >
+                        Delete
+                      </Button>
+                    </span>
                   </TD>
                 </TR>
               ))}
@@ -326,6 +346,32 @@ export function DatasourcesPage() {
           <RegisterDatasourceForm defaultTenant={tenant} onDone={() => setRegistering(false)} />
         )}
       </Drawer>
+      <ConfirmDialog
+        open={deleting !== null}
+        title="Delete datasource?"
+        confirmLabel="Delete datasource"
+        loading={del.isPending}
+        error={del.error}
+        onCancel={closeDelete}
+        onConfirm={() => {
+          // A 404 (already deleted) resolves too; the list refreshes either way.
+          if (deleting) {
+            del.mutate(
+              { tenantId: deleting.tenant_id, datasourceId: deleting.id },
+              { onSuccess: closeDelete },
+            );
+          }
+        }}
+      >
+        <p>
+          Delete <code className="font-mono font-medium">{deleting?.name}</code> from{' '}
+          <span className="font-medium">
+            {deleting ? (names.get(deleting.tenant_id) ?? deleting.tenant_id) : ''}
+          </span>
+          ? Its stored connection settings are wiped and it can no longer be introspected.
+        </p>
+        <p>Audit history is kept, and the name can be used again for a new datasource.</p>
+      </ConfirmDialog>
     </>
   );
 }

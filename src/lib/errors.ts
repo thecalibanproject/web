@@ -9,3 +9,8 @@ export function errorMessage(error: unknown): string {
   }
   return error instanceof Error ? error.message : String(error);
 }
+
+/** True for the contract's 404 envelope (unknown, foreign or deleted id). */
+export function isNotFound(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 404;
+}
