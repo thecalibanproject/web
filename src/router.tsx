@@ -8,7 +8,7 @@ import {
   Outlet,
   redirect,
 } from '@tanstack/react-router';
-import { CACHE_STATUSES, type CacheStatus } from '@/api/types';
+import { CACHE_STATUSES, CACHE_TIERS, type CacheStatus, type CacheTier } from '@/api/types';
 import { AppShell } from '@/components/layout/app-shell';
 import { isAuthenticated } from '@/lib/auth';
 import { LoginPage } from '@/pages/login';
@@ -111,11 +111,12 @@ const usageRoute = createRoute({
   path: 'usage',
   validateSearch: (
     s: Record<string, unknown>,
-  ): { tenant?: string; cache?: CacheStatus; limit?: number } => {
+  ): { tenant?: string; cache?: CacheStatus; tier?: CacheTier; limit?: number } => {
     const limit = Number(s.limit);
     return {
       tenant: str(s.tenant),
       cache: CACHE_STATUSES.find((c) => c === s.cache),
+      tier: CACHE_TIERS.find((t) => t === s.tier),
       limit: [100, 250, 500, 1000].includes(limit) ? limit : undefined,
     };
   },

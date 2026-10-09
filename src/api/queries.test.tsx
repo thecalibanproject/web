@@ -8,6 +8,7 @@ import {
   useDeleteNode,
   useDeleteTenant,
   useRevokeApiKey,
+  useUpdateTenant,
 } from './queries';
 
 const notFound = {
@@ -135,5 +136,56 @@ describe('useDeleteDatasource and useDeleteNode', () => {
     expect(nodeOutcome).toBe('already-gone');
     expect(ds.queryClient.getQueryState(qk.datasources('t1'))?.isInvalidated).toBe(true);
     expect(node.queryClient.getQueryState(qk.nodes())?.isInvalidated).toBe(true);
+  });
+});
+
+describe('useUpdateTenant', () => {
+  const updated = {
+    id: 't1',
+    name: 'Acme',
+    created_at: '2026-10-01T10:00:00Z',
+    pii_default: 'reversible',
+    pii_surrogate_scope: 'session',
+    semantic_cache: 'on',
+  };
+
+  it('PATCHes only the given fields, seeds the detail and refreshes the lists', async () => {
+    const calls = mockApi({ 'PATCH /api/v1/tenants/t1': () => ({ body: updated }) });
+    const { result, queryClient } = renderHookWithClient(() => useUpdateTenant('t1'));
+    queryClient.setQueryData(qk.tenant('t1'), { ...updated, semantic_cache: 'off' });
+    queryClient.setQueryData(qk.tenantList(false), []);
+    queryClient.setQueryData(qk.tenantList(true), []);
+    queryClient.setQueryData(qk.apiKeyList('t1', false), []);
+    queryClient.setQueryData(qk.tenant('t2'), { id: 't2' });
+
+    await act(async () => {
+      await result.current.mutateAsync({ pii_surrogate_scope: 'session', semantic_cache: 'on' });
+    });
+
+    expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual(['PATCH /api/v1/tenants/t1']);
+    expect(calls[0]?.body).toEqual({ pii_surrogate_scope: 'session', semantic_cache: 'on' });
+    expect(queryClient.getQueryData(qk.tenant('t1'))).toEqual(updated);
+    expect(queryClient.getQueryState(qk.tenantList(false))?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(qk.tenantList(true))?.isInvalidated).toBe(true);
+    // Keys and other tenants are not refetched for a settings change.
+    expect(queryClient.getQueryState(qk.apiKeyList('t1', false))?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(qk.tenant('t2'))?.isInvalidated).toBe(false);
+  });
+
+  it('surfaces errors from the envelope and leaves the cached tenant alone', async () => {
+    mockApi({
+      'PATCH /api/v1/tenants/t1': () => ({
+        status: 422,
+        body: { error: { message: 'unknown field: region', type: 'invalid_request' } },
+      }),
+    });
+    const { result, queryClient } = renderHookWithClient(() => useUpdateTenant('t1'));
+    const before = { ...updated, semantic_cache: 'off' };
+    queryClient.setQueryData(qk.tenant('t1'), before);
+    act(() => result.current.mutate({ semantic_cache: 'on' }));
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBeInstanceOf(ApiError);
+    expect(result.current.error?.message).toBe('unknown field: region');
+    expect(queryClient.getQueryData(qk.tenant('t1'))).toEqual(before);
   });
 });

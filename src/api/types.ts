@@ -6,6 +6,10 @@ export type ApiErrorBody = S['Error'];
 export type Health = S['Health'];
 export type Tenant = S['Tenant'];
 export type TenantCreate = S['TenantCreate'];
+export type TenantUpdate = S['TenantUpdate'];
+export type PiiMode = NonNullable<Tenant['pii_default']>;
+export type SurrogateScope = NonNullable<Tenant['pii_surrogate_scope']>;
+export type SemanticCacheMode = NonNullable<Tenant['semantic_cache']>;
 export type ApiKeyInfo = S['ApiKeyInfo'];
 export type ApiKeyCreated = S['ApiKeyCreated'];
 export type ProviderKind = S['ProviderKind'];
@@ -36,10 +40,14 @@ export type NodeCreate = S['NodeCreate'];
 export type UsageEvent = S['UsageEvent'];
 export type UsageReport = S['UsageReport'];
 export type CacheStatus = UsageEvent['cache'];
+export type CacheTier = NonNullable<UsageEvent['cache_tier']>;
+export type RouteStage = NonNullable<UsageEvent['route_stage']>;
 export type ReviewDecision = 'approve' | 'reject';
 
 // Enum value lists, kept in the order of the OpenAPI contract. `satisfies`
 // makes the compiler flag drift when `pnpm gen:api` changes the unions.
+export const SURROGATE_SCOPES = ['tenant', 'session'] as const satisfies readonly SurrogateScope[];
+
 export const PROVIDER_KINDS = [
   'openai',
   'anthropic',
@@ -96,3 +104,7 @@ export const ONTOLOGY_KINDS = [
 ] as const satisfies readonly OntologyElementKind[];
 
 export const CACHE_STATUSES = ['hit', 'miss', 'bypass'] as const satisfies readonly CacheStatus[];
+
+export const CACHE_TIERS = ['exact', 'semantic'] as const satisfies readonly CacheTier[];
+
+export const ROUTE_STAGES = ['rules', 'knn', 'keyword'] as const satisfies readonly RouteStage[];

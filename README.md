@@ -26,12 +26,12 @@ Every page except the login screen requires the control plane's admin token.
 | `#/login` | Sign in | Enter the admin token (`CALIBAN_ADMIN_TOKEN` on the control plane). It is checked against `GET /api/v1/tenants`. |
 | `#/` | Overview | Requests, tokens, cache efficiency and spend across all tenants, plus the most recent requests. |
 | `#/tenants` | Tenants | Create and list tenants. A tenant is the isolation boundary for keys, cache, ontology and budgets. **Show deleted** adds deleted tenants, marked **Deleted** with their deletion date. |
-| `#/tenants/<id>` | Tenant detail | Two tabs: **API keys** (mint Caliban keys for your apps, revoke a key, and **Show revoked** to list revoked keys with their revocation time) and **Provider keys** (BYOK credentials for OpenAI, Anthropic, OpenAI-compatible servers such as vLLM, llama.cpp, Ollama and SGLang, Azure OpenAI, AWS Bedrock and Google Vertex AI). A **Danger zone** deletes the tenant after you type its id: its keys are revoked, provider credentials destroyed, routes removed, and datasources and nodes deleted. Audit history is kept and the id can't be reused. A deleted tenant's page says so instead of showing an error. |
+| `#/tenants/<id>` | Tenant detail | Two tabs: **API keys** (mint Caliban keys for your apps, revoke a key, and **Show revoked** to list revoked keys with their revocation time) and **Provider keys** (BYOK credentials for OpenAI, Anthropic, OpenAI-compatible servers such as vLLM, llama.cpp, Ollama and SGLang, Azure OpenAI, AWS Bedrock and Google Vertex AI). **Privacy and caching** sets the tenant's PII default mode, its surrogate scope (**Tenant**: the same stand-in for the same value across requests, so repeated questions can hit the cache, but the model provider can link the tenant's sessions through those stand-ins; **Session**: fresh stand-ins per request, and requests that contain personal data skip the cache) and its semantic cache (**Off** or **On**; also needs `[cache.semantic] enabled` in the deployment config, and answers are reused only within the tenant). Changes are saved with `PATCH /api/v1/tenants/<id>` and audited as `tenant.update`. A **Danger zone** deletes the tenant after you type its id: its keys are revoked, provider credentials destroyed, routes removed, and datasources and nodes deleted. Audit history is kept and the id can't be reused. A deleted tenant's page says so instead of showing an error. |
 | `#/models` | Models | Two tabs: **Catalogue** (the model registry the router chooses from; a model's trust tier decides which requests it may see) and **Model servers** (shared on-prem servers for open models, with live health and model discovery). |
 | `#/datasources` | Datasources | Register a datasource for a tenant, then introspect and profile it so Caliban proposes ontology elements for review. Delete a datasource (its connection settings are wiped). |
 | `#/ontology` | Ontology studio | Review proposed elements (entities, attributes, relations, metrics, dimensions, glossary terms, policies, verified queries), least confident first, and approve or reject each one. |
 | `#/nodes` | Nodes | Create node specs (versioned, budgeted AI sub-apps) in a JSON editor that validates live against the node schema. Delete a single node version. |
-| `#/usage` | Usage | Per-request events: tokens, cache outcome, PII entities, cost and latency, filterable by tenant and cache status. |
+| `#/usage` | Usage | Per-request events: the route (requested model → routed model, with the intent stage and confidence), tokens, cache outcome and cache tier (exact or semantic), PII entities, cost and latency, filterable by tenant, cache status and cache tier. Totals include cache hits with their semantic share. A `caliban/auto` margin card compares the flat auto price with the routed models' cost. Cache hits are not charged yet. |
 | `#/settings` | Settings | Admin API and data plane endpoints, control plane status, connection snippets for apps, and console preferences. |
 
 ## On-prem guarantees
@@ -51,9 +51,9 @@ Vite 8, React 19, TypeScript (strict), Tailwind CSS v4 (`@tailwindcss/vite`), Ta
 src/
   api/            generated schema, typed client (openapi-fetch + auth middleware), query hooks
   components/
-    ui/           hand-rolled primitives: Button, Field/Input/Select, Table, Tabs, Drawer (<dialog>), states
+    ui/           hand-rolled primitives: Button, Field/Input/Select/Switch, Table, Tabs, Drawer (<dialog>), states
     layout/       app shell (sidebar, health, theme toggle)
-    tenant/       API keys and BYOK provider keys panels
+    tenant/       API keys and BYOK provider keys panels, privacy and caching settings, danger zone
     models/       model catalogue, model servers, discovery dialog, server health
     nodes/        JSON node editor with live schema validation
   lib/            auth/session storage, theme, formatting, ontology review queue, datasource field specs
@@ -155,7 +155,7 @@ pnpm lint
 pnpm format:check
 ```
 
-Tests sit next to the code they cover (`*.test.ts`, `*.test.tsx`): the API client, auth storage, URL handling, the model form, node spec, datasource and ontology helpers, the API keys panel and provider key form, the model catalogue, server form, health badge and discovery dialog, and the node editor.
+Tests sit next to the code they cover (`*.test.ts`, `*.test.tsx`): the API client, auth storage, URL handling, the model form, node spec, datasource and ontology helpers, the query hooks, the API keys panel and provider key form, the tenant privacy and caching settings, the tenant, tenant detail and usage pages, the model catalogue, server form, health badge and discovery dialog, and the node editor.
 
 With pnpm 9, `pnpm test --run` is rejected because pnpm parses `--run` as its own flag. `pnpm test` already runs once. To pass extra flags, use `pnpm run test <flags>` or `pnpm test -- <flags>`.
 

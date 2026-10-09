@@ -8,6 +8,7 @@ import type {
   ReviewDecision,
   SharedProviderCreate,
   TenantCreate,
+  TenantUpdate,
 } from './types';
 
 /** Model-server health is re-probed this often while a row is on screen. */
@@ -188,6 +189,27 @@ export function useCreateTenant() {
   return useMutation({
     mutationFn: (body: TenantCreate) => unwrap(api.POST('/api/v1/tenants', { body })),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.tenants }),
+  });
+}
+
+/**
+ * PATCHes a tenant's PII and cache settings (audited as `tenant.update`).
+ * Only the fields present in the body change. The response is the updated
+ * tenant, so the detail query is seeded with it and the lists (which show
+ * `pii_default`) are refetched.
+ */
+export function useUpdateTenant(tenantId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: TenantUpdate) =>
+      unwrap(api.PATCH('/api/v1/tenants/{tenantId}', { params: { path: { tenantId } }, body })),
+    onSuccess: (tenant) => {
+      qc.setQueryData(qk.tenant(tenantId), tenant);
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: qk.tenantList(false) }),
+        qc.invalidateQueries({ queryKey: qk.tenantList(true) }),
+      ]);
+    },
   });
 }
 

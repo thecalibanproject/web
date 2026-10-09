@@ -1,9 +1,13 @@
 import type {
+  CacheTier,
   DatasourceKind,
   ModelKind,
+  PiiMode,
   ProviderKind,
   ReasoningControl,
   ReasoningMode,
+  RouteStage,
+  SurrogateScope,
   TrustTier,
 } from '@/api/types';
 
@@ -69,4 +73,29 @@ export const REASONING_CONTROL_LABEL: Record<ReasoningControl, string> = {
   none: 'None',
   enable_thinking: 'enable_thinking (Qwen3 chat template)',
   reasoning_effort: 'reasoning_effort (low / medium / high)',
+};
+
+/** In the order the console offers them (the recommended default first). */
+export const PII_MODE_OPTIONS = ['reversible', 'mask', 'off'] as const satisfies readonly PiiMode[];
+
+export const PII_MODE_LABEL: Record<PiiMode, string> = {
+  reversible: 'Reversible pseudonymization',
+  mask: 'Mask (irreversible)',
+  off: 'Off',
+};
+
+export const SURROGATE_SCOPE_LABEL: Record<SurrogateScope, string> = {
+  tenant: 'Tenant',
+  session: 'Session',
+};
+
+export const CACHE_TIER_LABEL: Record<CacheTier, string> = {
+  exact: 'Exact',
+  semantic: 'Semantic',
+};
+
+export const ROUTE_STAGE_LABEL: Record<RouteStage, string> = {
+  rules: 'Rules',
+  knn: 'kNN',
+  keyword: 'Keyword',
 };

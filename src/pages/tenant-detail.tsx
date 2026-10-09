@@ -5,6 +5,7 @@ import { ApiKeysPanel } from '@/components/tenant/api-keys-panel';
 import { DeleteTenantSection } from '@/components/tenant/delete-tenant-section';
 import { ProviderKeysPanel } from '@/components/tenant/provider-keys-panel';
 import { TenantDeletedState } from '@/components/tenant/tenant-deleted-state';
+import { TenantSettingsSection } from '@/components/tenant/tenant-settings-section';
 import { Badge, Card, ErrorState, LoadingState, PageHeader, Tabs } from '@/components/ui';
 import { isNotFound } from '@/lib/errors';
 import { formatDate } from '@/lib/format';
@@ -82,6 +83,7 @@ export function TenantDetailPage() {
           )}
         </Tabs>
       )}
+      {tenant.isSuccess && <TenantSettingsSection tenant={tenant.data} />}
       {tenant.isSuccess && (
         <DeleteTenantSection
           tenant={tenant.data}

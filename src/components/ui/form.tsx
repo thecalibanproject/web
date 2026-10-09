@@ -99,3 +99,57 @@ export function Checkbox({
     </div>
   );
 }
+
+/**
+ * On/off switch (`role="switch"`). Render it inside `Field` and pass the `id`
+ * so the field label names it. The visible state text is for sighted users;
+ * assistive tech reads `aria-checked`.
+ */
+export function Switch({
+  id,
+  checked,
+  onChange,
+  disabled,
+  onLabel = 'On',
+  offLabel = 'Off',
+  'aria-describedby': describedBy,
+}: {
+  id?: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+  onLabel?: string;
+  offLabel?: string;
+  'aria-describedby'?: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <button
+        id={id}
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-describedby={describedBy}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={cn(
+          'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors',
+          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+          'disabled:cursor-not-allowed disabled:opacity-60',
+          checked ? 'border-transparent bg-accent' : 'border-border-strong bg-surface-3',
+        )}
+      >
+        <span
+          aria-hidden="true"
+          className={cn(
+            'inline-block size-3.5 rounded-full bg-surface shadow-sm transition-transform',
+            checked ? 'translate-x-4.5' : 'translate-x-0.5',
+          )}
+        />
+      </button>
+      <span aria-hidden="true" className="text-[13px] text-fg">
+        {checked ? onLabel : offLabel}
+      </span>
+    </span>
+  );
+}

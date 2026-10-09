@@ -2,18 +2,20 @@ import { useQuery } from '@tanstack/react-query';
 import { getRouteApi } from '@tanstack/react-router';
 import { useMemo } from 'react';
 import { tenantsQuery, usageQuery } from '@/api/queries';
-import { CACHE_STATUSES, type CacheStatus } from '@/api/types';
+import { CACHE_STATUSES, CACHE_TIERS, type CacheStatus, type CacheTier } from '@/api/types';
+import { AutoMarginCard } from '@/components/auto-margin-card';
 import { TenantFilter } from '@/components/tenant-select';
 import { UsageTable } from '@/components/usage-table';
 import { Card, EmptyState, ErrorState, LoadingState, PageHeader, Select } from '@/components/ui';
 import { formatCompact, formatInt, formatUsd } from '@/lib/format';
+import { CACHE_TIER_LABEL } from '@/lib/labels';
 
 const route = getRouteApi('/_app/usage');
 const LIMITS = [100, 250, 500, 1000] as const;
 
 export function UsagePage() {
   const search = route.useSearch();
-  const { tenant, cache } = search;
+  const { tenant, cache, tier } = search;
   const limit = search.limit ?? 100;
   const navigate = route.useNavigate();
   const usage = useQuery(usageQuery(tenant, limit));
@@ -23,10 +25,13 @@ export function UsagePage() {
     [tenants.data],
   );
 
-  // The API filters by tenant; cache status is filtered client-side.
+  // The API filters by tenant; cache status and tier are filtered client-side.
   const events = useMemo(
-    () => (usage.data?.events ?? []).filter((e) => !cache || e.cache === cache),
-    [usage.data, cache],
+    () =>
+      (usage.data?.events ?? []).filter(
+        (e) => (!cache || e.cache === cache) && (!tier || e.cache_tier === tier),
+      ),
+    [usage.data, cache, tier],
   );
 
   const setSearch = (patch: Partial<typeof search>) =>
@@ -38,8 +43,13 @@ export function UsagePage() {
     <>
       <PageHeader
         title="Usage"
-        description="Per-request events: tokens, cache outcome, PII entities, cost and latency."
+        description="Per-request events: routing, tokens, cache outcome, PII entities, cost and latency."
       />
+      {usage.isSuccess && (
+        <div className="mb-6">
+          <AutoMarginCard totals={usage.data.totals} />
+        </div>
+      )}
       <Card>
         <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-2.5">
           <TenantFilter value={tenant} onChange={(v) => setSearch({ tenant: v })} />
@@ -61,6 +71,23 @@ export function UsagePage() {
             </Select>
           </label>
           <label className="flex items-center gap-2 text-[12.5px] text-fg-muted">
+            Cache tier
+            <Select
+              value={tier ?? ''}
+              onChange={(e) =>
+                setSearch({ tier: (e.target.value || undefined) as CacheTier | undefined })
+              }
+              className="w-32"
+            >
+              <option value="">All</option>
+              {CACHE_TIERS.map((t) => (
+                <option key={t} value={t}>
+                  {CACHE_TIER_LABEL[t]}
+                </option>
+              ))}
+            </Select>
+          </label>
+          <label className="flex items-center gap-2 text-[12.5px] text-fg-muted">
             Last
             <Select
               value={String(limit)}
@@ -77,7 +104,8 @@ export function UsagePage() {
           {t && (
             <p className="ml-auto text-[12px] text-fg-muted" aria-live="polite">
               {formatInt(events.length)} shown · {formatInt(t.requests)} requests ·{' '}
-              {formatCompact(t.tokens_saved)} tokens saved · {formatUsd(t.cost_usd)}
+              {formatInt(t.cache_hits ?? 0)} cache hits ({formatInt(t.semantic_cache_hits ?? 0)}{' '}
+              semantic) · {formatCompact(t.tokens_saved)} tokens saved · {formatUsd(t.cost_usd)}
             </p>
           )}
         </div>
@@ -91,7 +119,7 @@ export function UsagePage() {
             description={
               usage.data.events.length === 0
                 ? 'Requests to the data plane will appear here.'
-                : 'Try a different cache status or tenant.'
+                : 'Try a different cache status, cache tier or tenant.'
             }
           />
         ) : (

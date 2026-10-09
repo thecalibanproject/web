@@ -1,5 +1,6 @@
 import type {
   CacheStatus,
+  CacheTier,
   Datasource,
   ModelCapabilities,
   ModelKind,
@@ -8,6 +9,7 @@ import type {
 } from '@/api/types';
 import { formatPercent } from '@/lib/format';
 import {
+  CACHE_TIER_LABEL,
   MODEL_KIND_LABEL,
   REASONING_CONTROL_LABEL,
   TRUST_TIER_HINT,
@@ -88,6 +90,19 @@ const CACHE_TONE: Record<CacheStatus, Tone> = { hit: 'ok', miss: 'neutral', bypa
 
 export function CacheBadge({ cache }: { cache: CacheStatus }) {
   return <Badge tone={CACHE_TONE[cache]}>{cache}</Badge>;
+}
+
+const CACHE_TIER_HINT: Record<CacheTier, string> = {
+  exact: 'Answered from a byte-identical (pseudonymized) earlier request.',
+  semantic: 'Answered from an earlier, semantically similar request of the same tenant.',
+};
+
+export function CacheTierBadge({ tier }: { tier: CacheTier }) {
+  return (
+    <Badge tone={tier === 'semantic' ? 'accent' : 'info'} title={CACHE_TIER_HINT[tier]}>
+      {CACHE_TIER_LABEL[tier]}
+    </Badge>
+  );
 }
 
 /** Confidence as a small bar + percentage. Null renders as "unknown". */
