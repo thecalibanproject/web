@@ -27,6 +27,7 @@ const events: UsageEvent[] = [
     cost_usd: 0.0005,
     routed_model_cost_usd: 0.0005,
     flat_price_usd: 0.002,
+    billed_usd: 0.002,
   },
   {
     ...base,
@@ -41,7 +42,9 @@ const events: UsageEvent[] = [
     tokens_saved: 150,
     cost_usd: 0,
     routed_model_cost_usd: 0,
-    flat_price_usd: 0,
+    flat_price_usd: 0.002,
+    billed_usd: 0.0004,
+    saved_usd: 0.0016,
   },
   {
     ...base,
@@ -53,6 +56,7 @@ const events: UsageEvent[] = [
     cache_tier: 'exact',
     tokens_saved: 150,
     cost_usd: 0,
+    saved_usd: 0.0009,
   },
   {
     ...base,
@@ -70,11 +74,15 @@ const totals: UsageReport['totals'] = {
   cache_hits: 2,
   semantic_cache_hits: 1,
   tokens_saved: 300,
+  saved_usd: 0.0025,
   cost_usd: 0.0005,
   auto_requests: 2,
-  flat_price_usd: 0.002,
+  auto_cache_hits: 1,
+  flat_price_usd: 0.004,
+  billed_usd: 0.0024,
+  auto_saved_usd: 0.0016,
   routed_model_cost_usd: 0.0005,
-  margin_usd: 0.0015,
+  margin_usd: 0.0019,
 };
 
 function mockUsage(report: UsageReport = { events, totals }) {
@@ -161,22 +169,54 @@ describe('UsagePage', () => {
     expect(shownRequests()).toEqual(['req-semantic-hit']);
   });
 
-  it('totals cache hits with the semantic share', async () => {
+  it('totals cache hits with the semantic share and what they saved', async () => {
     mockUsage();
     await renderApp('/usage');
     expect(await screen.findByText(/2 cache hits \(1 semantic\)/)).toBeInTheDocument();
+    expect(screen.getByText(/300 tokens saved \(\$0\.0025\)/)).toBeInTheDocument();
   });
 
-  it('shows the caliban/auto margin card with flat price, routed model cost and margin', async () => {
+  it('shows what each request was billed, with the discount on caliban/auto cache hits', async () => {
+    mockUsage();
+    await renderApp('/usage');
+    const table = await screen.findByRole('table', { name: 'Usage events' });
+    expect(within(table).getByRole('columnheader', { name: 'Billed' })).toBeInTheDocument();
+    const billed = (id: string) => row(id).querySelector('td:nth-last-child(2)');
+    expect(billed('req-auto-miss')).toHaveTextContent(/^\$0\.0020$/);
+    expect(billed('req-semantic-hit')).toHaveTextContent('$0.0004of $0.0020, saved $0.0016');
+    // A pinned model's hit is not billed by Caliban; it shows the model cost it avoided.
+    expect(billed('req-pinned-exact')).toHaveTextContent('saved $0.0009');
+  });
+
+  it('shows the caliban/auto card with billed, flat price, cache-hit savings, cost and margin', async () => {
     mockUsage();
     await renderApp('/usage');
     const card = await screen.findByRole('region', { name: 'caliban/auto margin' });
-    expect(card).toHaveTextContent('2 requests asked for caliban/auto');
+    expect(card).toHaveTextContent('2 requests asked for caliban/auto, 1 answered from cache');
     const value = (label: string) => within(card).getByText(label).nextElementSibling;
-    expect(value('Flat price')).toHaveTextContent('$0.0020');
+    expect(value('Billed')).toHaveTextContent('$0.0024');
+    expect(value('Flat price')).toHaveTextContent('$0.0040');
+    expect(value('Cache-hit savings')).toHaveTextContent('$0.0016');
     expect(value('Routed model cost')).toHaveTextContent('$0.0005');
-    expect(value('Margin')).toHaveTextContent('$0.0015');
-    expect(card).toHaveTextContent('Cache hits are not charged yet.');
+    expect(value('Margin')).toHaveTextContent('$0.0019');
+    expect(card).toHaveTextContent('1 cache hit at the discounted price');
+    expect(card).toHaveTextContent('A cache hit calls no model and is billed a share');
+  });
+
+  it('treats totals without billed_usd (older servers) as billed at the flat price', async () => {
+    const {
+      billed_usd: _billed,
+      auto_cache_hits: _hits,
+      auto_saved_usd: _saved,
+      ...older
+    } = totals;
+    mockUsage({ events, totals: { ...older, margin_usd: 0.0035 } });
+    await renderApp('/usage');
+    const card = await screen.findByRole('region', { name: 'caliban/auto margin' });
+    const value = (label: string) => within(card).getByText(label).nextElementSibling;
+    expect(value('Billed')).toHaveTextContent('$0.0040');
+    expect(value('Cache-hit savings')).toHaveTextContent('$0.00');
+    expect(card).toHaveTextContent('0 answered from cache');
   });
 
   it('flags a negative margin', async () => {
@@ -200,7 +240,7 @@ describe('UsagePage', () => {
     await renderApp('/usage');
     const card = await screen.findByRole('region', { name: 'caliban/auto margin' });
     expect(card).toHaveTextContent('0 requests asked for caliban/auto');
-    expect(within(card).getAllByText('$0.00')).toHaveLength(3);
+    expect(within(card).getAllByText('$0.00')).toHaveLength(5);
     expect(screen.getByText('No usage yet')).toBeInTheDocument();
   });
 });

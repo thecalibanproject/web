@@ -48,6 +48,35 @@ function RouteCell({ event: e }: { event: UsageEvent }) {
   );
 }
 
+/**
+ * What a `caliban/auto` request was billed (`billed_usd`, or the flat price
+ * on events from before cache-hit billing). On a cache hit, the full flat
+ * price and the saving are shown under it. Other requests have no billed
+ * amount; a priced cache hit still shows the model cost it saved.
+ */
+function BilledCell({ event: e }: { event: UsageEvent }) {
+  const billed = e.billed_usd ?? e.flat_price_usd;
+  const discounted = e.cache === 'hit' && e.flat_price_usd != null && billed != null;
+  return (
+    <TD className="text-right whitespace-nowrap">
+      {formatUsd(billed)}
+      {discounted ? (
+        <span
+          className="block text-[11.5px] text-fg-subtle"
+          title={`Cache hit: billed ${formatUsd(billed)} of the ${formatUsd(e.flat_price_usd)} flat price`}
+        >
+          of {formatUsd(e.flat_price_usd)}
+          {e.saved_usd != null && `, saved ${formatUsd(e.saved_usd)}`}
+        </span>
+      ) : (
+        e.saved_usd != null && (
+          <span className="block text-[11.5px] text-fg-subtle">saved {formatUsd(e.saved_usd)}</span>
+        )
+      )}
+    </TD>
+  );
+}
+
 export function UsageTable({
   events,
   compact = false,
@@ -74,6 +103,7 @@ export function UsageTable({
           {!compact && <TH>Cache tier</TH>}
           {!compact && <TH className="text-right">PII</TH>}
           <TH className="text-right">Cost</TH>
+          {!compact && <TH className="text-right">Billed</TH>}
           <TH className="text-right">Latency</TH>
         </tr>
       </THead>
@@ -124,6 +154,7 @@ export function UsageTable({
             )}
             {!compact && <TD className="text-right">{formatInt(e.pii_entities ?? 0)}</TD>}
             <TD className="text-right">{formatUsd(e.cost_usd)}</TD>
+            {!compact && <BilledCell event={e} />}
             <TD className="text-right whitespace-nowrap">{formatMs(e.latency_ms)}</TD>
           </TR>
         ))}

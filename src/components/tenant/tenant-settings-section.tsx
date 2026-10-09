@@ -9,21 +9,39 @@ import {
   type TenantUpdate,
 } from '@/api/types';
 import { PII_MODE_LABEL, PII_MODE_OPTIONS, SURROGATE_SCOPE_LABEL } from '@/lib/labels';
-import { Button, Field, FormError, Select, Switch } from '../ui';
+import { Button, Field, FormError, Input, Select, Switch } from '../ui';
 
 interface Settings {
   pii_default: PiiMode;
   pii_surrogate_scope: SurrogateScope;
   semantic_cache: SemanticCacheMode;
+  /**
+   * Share of the flat caliban/auto price billed for a cache hit, as a percent
+   * in a text field. Empty: no override, the deployment value applies.
+   */
+  cache_hit_percent: string;
 }
 
 /** The tenant's saved values, with the server defaults for absent fields. */
 function savedSettings(t: Tenant): Settings {
+  const f = t.auto_cache_hit_fraction;
   return {
     pii_default: t.pii_default ?? 'reversible',
     pii_surrogate_scope: t.pii_surrogate_scope ?? 'tenant',
     semantic_cache: t.semantic_cache ?? 'off',
+    // Rounded so 0.1 shows as 10, not 10.000000000000002.
+    cache_hit_percent: f == null ? '' : String(Number((f * 100).toFixed(4))),
   };
+}
+
+/** An error message, or null when the percent is empty (no override) or in 0..100. */
+function cacheHitPercentError(raw: string): string | null {
+  const v = raw.trim();
+  if (v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 && n <= 100
+    ? null
+    : 'Enter a percentage from 0 to 100, or leave it empty for the deployment default.';
 }
 
 /** Only the fields that differ, so the PATCH (and its audit row) is minimal. */
@@ -34,12 +52,20 @@ function changes(saved: Settings, draft: Settings): TenantUpdate {
     body.pii_surrogate_scope = draft.pii_surrogate_scope;
   }
   if (draft.semantic_cache !== saved.semantic_cache) body.semantic_cache = draft.semantic_cache;
+  const pct = draft.cache_hit_percent.trim();
+  if (pct === '') {
+    // Clearing the override sends null; it was already unset otherwise.
+    if (saved.cache_hit_percent !== '') body.auto_cache_hit_fraction = null;
+  } else if (saved.cache_hit_percent === '' || Number(pct) !== Number(saved.cache_hit_percent)) {
+    body.auto_cache_hit_fraction = Number(pct) / 100;
+  }
   return body;
 }
 
 /**
  * "Privacy and caching" settings on the tenant detail page: PII default,
- * surrogate scope and the semantic cache. Saved with PATCH /tenants/{id},
+ * surrogate scope, the semantic cache and the caliban/auto cache-hit price.
+ * Saved with PATCH /tenants/{id},
  * which the server audits as `tenant.update`.
  */
 export function TenantSettingsSection({ tenant }: { tenant: Tenant }) {
@@ -50,8 +76,9 @@ export function TenantSettingsSection({ tenant }: { tenant: Tenant }) {
   const [draft, setDraft] = useState<Settings | null>(null);
   const [savedNotice, setSavedNotice] = useState(false);
   const values = draft ?? saved;
-  const body = changes(saved, values);
-  const dirty = Object.keys(body).length > 0;
+  const percentError = cacheHitPercentError(values.cache_hit_percent);
+  const body = percentError ? {} : changes(saved, values);
+  const dirty = draft != null && (percentError != null || Object.keys(body).length > 0);
   const deleted = tenant.status === 'deleted';
   const locked = deleted || update.isPending;
 
@@ -68,7 +95,7 @@ export function TenantSettingsSection({ tenant }: { tenant: Tenant }) {
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!dirty || locked) return;
+    if (!dirty || locked || percentError) return;
     update.mutate(body, {
       onSuccess: () => {
         setDraft(null);
@@ -97,7 +124,7 @@ export function TenantSettingsSection({ tenant }: { tenant: Tenant }) {
         aria-label="Privacy and caching settings"
         className="flex flex-col gap-4 p-4"
       >
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Field
             label="PII default mode"
             hint="Reversible pseudonymizes before the model and restores in the response."
@@ -159,6 +186,31 @@ export function TenantSettingsSection({ tenant }: { tenant: Tenant }) {
               />
             )}
           </Field>
+          <Field
+            label="Cache-hit price for caliban/auto (%)"
+            error={percentError}
+            hint={
+              <>
+                Share of the flat <code className="font-mono">caliban/auto</code> price billed when
+                the cache answers and no model is called. Leave empty for the deployment default (
+                <code className="font-mono">[routing] auto_cache_hit_fraction</code>, 20% unless
+                configured).
+              </>
+            }
+          >
+            {({ id, describedBy, invalid }) => (
+              <Input
+                id={id}
+                aria-describedby={describedBy}
+                aria-invalid={invalid}
+                inputMode="decimal"
+                placeholder="Deployment default"
+                value={values.cache_hit_percent}
+                disabled={locked}
+                onChange={(e) => edit({ cache_hit_percent: e.target.value })}
+              />
+            )}
+          </Field>
         </div>
         <FormError error={update.error} />
         <div className="flex flex-wrap items-center justify-end gap-3">
@@ -173,7 +225,7 @@ export function TenantSettingsSection({ tenant }: { tenant: Tenant }) {
             type="submit"
             variant="primary"
             loading={update.isPending}
-            disabled={!dirty || deleted}
+            disabled={!dirty || deleted || percentError != null}
           >
             Save
           </Button>

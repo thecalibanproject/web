@@ -105,7 +105,8 @@ export function UsagePage() {
             <p className="ml-auto text-[12px] text-fg-muted" aria-live="polite">
               {formatInt(events.length)} shown · {formatInt(t.requests)} requests ·{' '}
               {formatInt(t.cache_hits ?? 0)} cache hits ({formatInt(t.semantic_cache_hits ?? 0)}{' '}
-              semantic) · {formatCompact(t.tokens_saved)} tokens saved · {formatUsd(t.cost_usd)}
+              semantic) · {formatCompact(t.tokens_saved)} tokens saved
+              {t.saved_usd != null && ` (${formatUsd(t.saved_usd)})`} · {formatUsd(t.cost_usd)}
             </p>
           )}
         </div>

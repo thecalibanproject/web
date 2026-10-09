@@ -31,6 +31,7 @@ function controls() {
     pii: q.getByLabelText('PII default mode'),
     scope: q.getByLabelText('Surrogate scope'),
     semantic: q.getByRole('switch', { name: 'Semantic cache' }),
+    hitPrice: q.getByLabelText('Cache-hit price for caliban/auto (%)'),
     save: q.getByRole('button', { name: 'Save' }),
     cancel: q.getByRole('button', { name: 'Cancel' }),
   };
@@ -154,7 +155,62 @@ describe('TenantSettingsSection', () => {
     expect(c.pii).toBeDisabled();
     expect(c.scope).toBeDisabled();
     expect(c.semantic).toBeDisabled();
+    expect(c.hitPrice).toBeDisabled();
     expect(c.save).toBeDisabled();
     expect(c.cancel).toBeDisabled();
+  });
+
+  it('shows the cache-hit price override, or the deployment default when unset', () => {
+    renderWithClient(<TenantSettingsSection tenant={acme} />);
+    const c = controls();
+    expect(c.hitPrice).toHaveValue('');
+    expect(c.hitPrice).toHaveAttribute('placeholder', 'Deployment default');
+    expect(c.hitPrice).toHaveAccessibleDescription(/20% unless\s+configured/);
+  });
+
+  it('saves a cache-hit percent as a fraction and clears it with null', async () => {
+    let current: Tenant = { ...acme, auto_cache_hit_fraction: 0.1 };
+    const calls = mockApi({
+      'GET /api/v1/tenants/acme': () => ({ body: current }),
+      'PATCH /api/v1/tenants/acme': (call) => {
+        current = { ...current, ...(call.body as Partial<Tenant>) };
+        return { body: current };
+      },
+    });
+    const user = userEvent.setup();
+    renderWithClient(<FromQuery />);
+    await screen.findByRole('region', { name: 'Privacy and caching' });
+    expect(controls().hitPrice).toHaveValue('10');
+
+    await user.clear(controls().hitPrice);
+    await user.type(controls().hitPrice, '15');
+    await user.click(controls().save);
+    await waitFor(() => expect(controls().hitPrice).toHaveValue('15'));
+    await waitFor(() => expect(controls().save).toBeDisabled());
+
+    await user.clear(controls().hitPrice);
+    await user.click(controls().save);
+    await waitFor(() =>
+      expect(within(controls().section).getByRole('status')).toHaveTextContent('Settings saved.'),
+    );
+    const patches = calls.filter((call) => call.method === 'PATCH').map((call) => call.body);
+    expect(patches).toEqual([{ auto_cache_hit_fraction: 0.15 }, { auto_cache_hit_fraction: null }]);
+    expect(controls().hitPrice).toHaveValue('');
+  });
+
+  it('rejects a cache-hit percent outside 0 to 100', async () => {
+    const calls = mockApi({});
+    const user = userEvent.setup();
+    renderWithClient(<TenantSettingsSection tenant={acme} />);
+    await user.type(controls().hitPrice, '150');
+    const c = controls();
+    expect(c.hitPrice).toHaveAttribute('aria-invalid', 'true');
+    expect(c.hitPrice).toHaveAccessibleDescription(/from 0 to 100/);
+    expect(c.save).toBeDisabled();
+    expect(c.cancel).toBeEnabled();
+    await user.clear(c.hitPrice);
+    await user.type(c.hitPrice, '20');
+    expect(controls().save).toBeEnabled();
+    expect(calls).toHaveLength(0);
   });
 });
