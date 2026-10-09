@@ -13,6 +13,7 @@ export const DEFAULT_CAPABILITIES: Required<ModelCapabilities> = {
   reasoning: 'none',
   reasoning_control: 'none',
   inline_think_tags: false,
+  rejects_stream_options: false,
 };
 
 export function withDefaultCapabilities(c: ModelCapabilities | undefined) {

@@ -45,6 +45,16 @@ export function CapabilitiesFields({
           disabled={noReasoning}
           onChange={(e) => set({ inline_think_tags: e.target.checked })}
         />
+        <Checkbox
+          label={
+            <span>
+              Rejects <code className="font-mono text-[12px]">stream_options</code>
+            </span>
+          }
+          hint="Streams are then metered from an estimate."
+          checked={value.rejects_stream_options}
+          onChange={(e) => set({ rejects_stream_options: e.target.checked })}
+        />
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Reasoning">

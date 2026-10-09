@@ -52,6 +52,7 @@ describe('modelForm', () => {
         reasoning: 'none',
         reasoning_control: 'none',
         inline_think_tags: false,
+        rejects_stream_options: false,
       },
       trust_tier: 't0_sovereign',
       licence: null,
@@ -67,5 +68,18 @@ describe('modelForm', () => {
       upstreamModel: expect.any(String),
       contextWindow: expect.any(String),
     });
+  });
+
+  it('keeps a discovered rejects_stream_options flag', () => {
+    const d = draftFromModel({
+      id: 'local/old-server',
+      provider: 'legacy',
+      upstream_model: 'old',
+      trust_tier: 't0_sovereign',
+      capabilities: { rejects_stream_options: true },
+    });
+    expect(d.capabilities.rejects_stream_options).toBe(true);
+    expect(d.capabilities.tools).toBe(false);
+    expect(modelBody(d).capabilities?.rejects_stream_options).toBe(true);
   });
 });
