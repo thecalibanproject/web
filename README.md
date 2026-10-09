@@ -5,7 +5,7 @@
 
 # Caliban Console
 
-The admin console for Caliban: tenants, API keys, BYOK provider keys, the model registry, datasources, the ontology studio, nodes and usage.
+The admin console for Caliban: tenants, API keys, BYOK provider keys, the model registry, datasources, the ontology studio, nodes, usage and the audit log.
 
 [Docs](https://github.com/thecalibanproject/docs) · [Core](https://github.com/thecalibanproject/core) · [Deploy](https://github.com/thecalibanproject/deploy) · [TypeScript SDK](https://github.com/thecalibanproject/sdk-typescript) · [Python SDK](https://github.com/thecalibanproject/sdk-python)
 
@@ -32,6 +32,7 @@ Every page except the login screen requires the control plane's admin token.
 | `#/ontology` | Ontology studio | Review proposed elements (entities, attributes, relations, metrics, dimensions, glossary terms, policies, verified queries), least confident first, and approve or reject each one. |
 | `#/nodes` | Nodes | Create node specs (versioned, budgeted AI sub-apps) in a JSON editor that validates live against the node schema. Delete a single node version. |
 | `#/usage` | Usage | Per-request events: the route (requested model → routed model, with the intent stage and confidence), tokens, cache outcome and cache tier (exact or semantic), PII entities, cost and latency, filterable by tenant, cache status and cache tier. Totals include cache hits with their semantic share. A `caliban/auto` margin card compares the flat auto price with the routed models' cost. Cache hits are not charged yet. |
+| `#/audit` | Audit log | Every change made through the admin API (`GET /api/v1/audit`), newest first: time, actor, action (such as `tenant.update`, `api_key.revoke` or `tenant.delete`), tenant, target, a readable summary of the details and the raw detail. **Last** sets how many recent entries to load (100 to 1,000, the API maximum); **Tenant** and **Action** filter the loaded entries, 50 per page. A banner shows whether the control plane verified the hash chain of the loaded entries, and the head hash to record elsewhere. Each row shows its hash and previous hash, truncated, with a copy button, and is marked **Link broken** if its previous hash does not match the entry before it. |
 | `#/settings` | Settings | Admin API and data plane endpoints, control plane status, connection snippets for apps, and console preferences. |
 
 ## On-prem guarantees

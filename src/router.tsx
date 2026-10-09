@@ -10,6 +10,7 @@ import {
 } from '@tanstack/react-router';
 import { CACHE_STATUSES, CACHE_TIERS, type CacheStatus, type CacheTier } from '@/api/types';
 import { AppShell } from '@/components/layout/app-shell';
+import { AUDIT_LIMITS } from '@/lib/audit';
 import { isAuthenticated } from '@/lib/auth';
 import { LoginPage } from '@/pages/login';
 import { NotFoundPage } from '@/pages/not-found';
@@ -123,6 +124,24 @@ const usageRoute = createRoute({
   component: lazyRouteComponent(() => import('@/pages/usage'), 'UsagePage'),
 });
 
+const auditRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: 'audit',
+  validateSearch: (
+    s: Record<string, unknown>,
+  ): { tenant?: string; action?: string; limit?: number; page?: number } => {
+    const limit = AUDIT_LIMITS.find((l) => l === Number(s.limit));
+    const page = Number(s.page);
+    return {
+      tenant: str(s.tenant),
+      action: str(s.action),
+      limit,
+      page: Number.isInteger(page) && page > 1 ? page : undefined,
+    };
+  },
+  component: lazyRouteComponent(() => import('@/pages/audit'), 'AuditPage'),
+});
+
 const settingsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: 'settings',
@@ -140,6 +159,7 @@ export const routeTree = rootRoute.addChildren([
     ontologyRoute,
     nodesRoute,
     usageRoute,
+    auditRoute,
     settingsRoute,
   ]),
 ]);

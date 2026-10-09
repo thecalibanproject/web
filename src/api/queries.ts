@@ -36,6 +36,7 @@ export const qk = {
   nodes: (tenantId?: string) => ['nodes', tenantId ?? 'all'] as const,
   usage: (tenantId: string | undefined, limit: number) =>
     ['usage', tenantId ?? 'all', limit] as const,
+  audit: (limit: number) => ['audit', limit] as const,
 };
 
 // ───────────── Queries ─────────────
@@ -160,6 +161,18 @@ export const usageQuery = (tenantId: string | undefined, limit = 100) =>
           params: { query: { limit, ...(tenantId ? { tenant_id: tenantId } : {}) } },
         }),
       ),
+  });
+
+/**
+ * The newest `limit` audit rows (newest first) and whether the server could
+ * verify their hash chain. Every mutation appends a row, so the log is always
+ * refetched when the page mounts instead of being served from cache.
+ */
+export const auditQuery = (limit = 100) =>
+  queryOptions({
+    queryKey: qk.audit(limit),
+    queryFn: () => unwrap(api.GET('/api/v1/audit', { params: { query: { limit } } })),
+    staleTime: 0,
   });
 
 // ───────────── Mutations ─────────────

@@ -5,6 +5,7 @@ import { healthQuery } from '@/api/queries';
 import { clearToken } from '@/lib/auth';
 import { cn } from '@/lib/cn';
 import {
+  IconAudit,
   IconDatasources,
   IconLogout,
   IconModels,
@@ -19,7 +20,15 @@ import {
 import { ThemeToggle } from './theme-toggle';
 
 type NavTo =
-  '/' | '/tenants' | '/models' | '/datasources' | '/ontology' | '/nodes' | '/usage' | '/settings';
+  | '/'
+  | '/tenants'
+  | '/models'
+  | '/datasources'
+  | '/ontology'
+  | '/nodes'
+  | '/usage'
+  | '/audit'
+  | '/settings';
 
 const NAV: Array<{ to: NavTo; label: string; icon: ComponentType<SVGProps<SVGSVGElement>> }> = [
   { to: '/', label: 'Overview', icon: IconOverview },
@@ -29,6 +38,7 @@ const NAV: Array<{ to: NavTo; label: string; icon: ComponentType<SVGProps<SVGSVG
   { to: '/ontology', label: 'Ontology', icon: IconOntology },
   { to: '/nodes', label: 'Nodes', icon: IconNodes },
   { to: '/usage', label: 'Usage', icon: IconUsage },
+  { to: '/audit', label: 'Audit', icon: IconAudit },
   { to: '/settings', label: 'Settings', icon: IconSettings },
 ];
 

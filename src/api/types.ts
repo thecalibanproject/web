@@ -42,6 +42,8 @@ export type UsageReport = S['UsageReport'];
 export type CacheStatus = UsageEvent['cache'];
 export type CacheTier = NonNullable<UsageEvent['cache_tier']>;
 export type RouteStage = NonNullable<UsageEvent['route_stage']>;
+export type AuditEntry = S['AuditEntry'];
+export type AuditLog = S['AuditLog'];
 export type ReviewDecision = 'approve' | 'reject';
 
 // Enum value lists, kept in the order of the OpenAPI contract. `satisfies`

@@ -73,6 +73,12 @@ export const IconUsage = (p: IconProps) => (
     <path d="m7 15 4-4 3 3 5-6" />
   </Svg>
 );
+export const IconAudit = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 3 5 6v5c0 4.5 3 8.3 7 9.5 4-1.2 7-5 7-9.5V6l-7-3Z" />
+    <path d="m9 12 2 2 4-4" />
+  </Svg>
+);
 export const IconSettings = (p: IconProps) => (
   <Svg {...p}>
     <circle cx="12" cy="12" r="3" />
@@ -156,7 +162,14 @@ export const IconChevronRight = (p: IconProps) => (
 export const LogoMark = ({ size = 22 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true" focusable="false">
     <defs>
-      <linearGradient id="caliban-ring" x1="10" y1="54" x2="54" y2="10" gradientUnits="userSpaceOnUse">
+      <linearGradient
+        id="caliban-ring"
+        x1="10"
+        y1="54"
+        x2="54"
+        y2="10"
+        gradientUnits="userSpaceOnUse"
+      >
         <stop offset="0" stopColor="#6CB8FF" />
         <stop offset="1" stopColor="#FFFFFF" />
       </linearGradient>
