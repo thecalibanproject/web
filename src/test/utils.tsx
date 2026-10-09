@@ -31,13 +31,27 @@ export function renderHookWithClient<T>(hook: () => T, queryClient = testQueryCl
 /**
  * Renders the whole console (router, app shell, lazy pages) signed in, at
  * `path`, with in-memory history. Use for page-level flows such as navigation.
+ *
+ * Pages are code-split, and the first import of a page (and of what it pulls
+ * in, such as ajv for Nodes) is transformed on demand by Vite. Left to the
+ * first render, that import runs inside the test's first `findBy*` window and
+ * on a busy machine (CI, parallel workers) takes longer than the window, so
+ * the test fails before the page has even mounted. Every route chunk is
+ * loaded here first, so a test's waits only ever cover data and rendering,
+ * including after it navigates to another page.
  */
-export function renderApp(path: string) {
+export async function renderApp(path: string) {
   setToken('test-admin-token');
   // The router's scroll restoration calls scrollTo, which jsdom does not implement.
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
   const queryClient = testQueryClient();
   const router = createAppRouter(queryClient, createMemoryHistory({ initialEntries: [path] }));
+  await Promise.all(
+    Object.values(router.routesById).flatMap((r) => router.loadRouteChunk(r) ?? []),
+  );
+  // Resolve the initial match too, so the page (and its queries) mounts in
+  // the first render instead of after the router's own async load.
+  await router.load();
   return {
     router,
     queryClient,

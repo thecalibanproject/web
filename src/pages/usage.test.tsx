@@ -97,7 +97,7 @@ function shownRequests() {
 describe('UsagePage', () => {
   it('shows the route (requested → routed model, stage, confidence) and the cache tier', async () => {
     mockUsage();
-    renderApp('/usage');
+    await renderApp('/usage');
     const table = await screen.findByRole('table', { name: 'Usage events' });
     const headers = within(table)
       .getAllByRole('columnheader')
@@ -128,7 +128,7 @@ describe('UsagePage', () => {
   it('filters by cache tier alongside the cache status filter, and keeps it in the URL', async () => {
     mockUsage();
     const user = userEvent.setup();
-    const { router } = renderApp('/usage');
+    const { router } = await renderApp('/usage');
     await screen.findByRole('table', { name: 'Usage events' });
     expect(shownRequests()).toHaveLength(4);
 
@@ -156,20 +156,20 @@ describe('UsagePage', () => {
 
   it('reads the tier filter from the URL', async () => {
     mockUsage();
-    renderApp('/usage?tier=semantic');
+    await renderApp('/usage?tier=semantic');
     await screen.findByRole('table', { name: 'Usage events' });
     expect(shownRequests()).toEqual(['req-semantic-hit']);
   });
 
   it('totals cache hits with the semantic share', async () => {
     mockUsage();
-    renderApp('/usage');
+    await renderApp('/usage');
     expect(await screen.findByText(/2 cache hits \(1 semantic\)/)).toBeInTheDocument();
   });
 
   it('shows the caliban/auto margin card with flat price, routed model cost and margin', async () => {
     mockUsage();
-    renderApp('/usage');
+    await renderApp('/usage');
     const card = await screen.findByRole('region', { name: 'caliban/auto margin' });
     expect(card).toHaveTextContent('2 requests asked for caliban/auto');
     const value = (label: string) => within(card).getByText(label).nextElementSibling;
@@ -189,7 +189,7 @@ describe('UsagePage', () => {
         margin_usd: -0.002,
       },
     });
-    renderApp('/usage');
+    await renderApp('/usage');
     const card = await screen.findByRole('region', { name: 'caliban/auto margin' });
     const margin = within(card).getByText('-$0.0020');
     expect(margin).toHaveClass('text-danger');
@@ -197,7 +197,7 @@ describe('UsagePage', () => {
 
   it('shows zeros when there was no caliban/auto traffic', async () => {
     mockUsage({ events: [], totals: { requests: 0 } });
-    renderApp('/usage');
+    await renderApp('/usage');
     const card = await screen.findByRole('region', { name: 'caliban/auto margin' });
     expect(card).toHaveTextContent('0 requests asked for caliban/auto');
     expect(within(card).getAllByText('$0.00')).toHaveLength(3);

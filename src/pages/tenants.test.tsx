@@ -27,7 +27,7 @@ describe('TenantsPage', () => {
       }),
     });
     const user = userEvent.setup();
-    renderApp('/tenants');
+    await renderApp('/tenants');
 
     const table = await screen.findByRole('table', { name: 'Tenants' });
     expect(within(table).getByRole('link', { name: 'Acme' })).toBeInTheDocument();

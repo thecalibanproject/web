@@ -26,7 +26,7 @@ describe('DatasourcesPage', () => {
       },
     });
     const user = userEvent.setup();
-    renderApp('/datasources');
+    await renderApp('/datasources');
 
     await user.click(await screen.findByRole('button', { name: 'Delete sales_dw' }));
     const dialog = await screen.findByRole('dialog', { name: 'Delete datasource?' });

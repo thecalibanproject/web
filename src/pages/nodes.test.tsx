@@ -27,7 +27,7 @@ describe('NodesPage', () => {
       },
     });
     const user = userEvent.setup();
-    renderApp('/nodes');
+    await renderApp('/nodes');
 
     await user.click(await screen.findByRole('button', { name: 'Delete invoice-triage v1' }));
     const dialog = await screen.findByRole('dialog', { name: 'Delete node version?' });
@@ -62,7 +62,7 @@ describe('NodesPage', () => {
       }),
     });
     const user = userEvent.setup();
-    renderApp('/nodes');
+    await renderApp('/nodes');
 
     await user.click(await screen.findByRole('button', { name: 'Delete invoice-triage v1' }));
     const dialog = await screen.findByRole('dialog', { name: 'Delete node version?' });

@@ -29,7 +29,7 @@ describe('TenantDetailPage', () => {
       },
     });
     const user = userEvent.setup();
-    renderApp('/tenants/acme');
+    await renderApp('/tenants/acme');
 
     expect(await screen.findByText('PII: reversible')).toBeInTheDocument();
     const section = screen.getByRole('region', { name: 'Privacy and caching' });
@@ -55,7 +55,7 @@ describe('TenantDetailPage', () => {
       },
     });
     const user = userEvent.setup();
-    const { router } = renderApp('/tenants/acme');
+    const { router } = await renderApp('/tenants/acme');
 
     const section = await screen.findByRole('region', { name: 'Danger zone' });
     await user.click(within(section).getByRole('button', { name: 'Delete tenant' }));
@@ -80,7 +80,7 @@ describe('TenantDetailPage', () => {
             : [],
       }),
     });
-    renderApp('/tenants/acme');
+    await renderApp('/tenants/acme');
 
     expect(await screen.findByText('This tenant was deleted')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to tenants' })).toBeInTheDocument();
