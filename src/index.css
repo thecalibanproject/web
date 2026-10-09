@@ -1,0 +1,167 @@
+@import 'tailwindcss';
+
+/*
+ * Caliban console design tokens.
+ * Colours live in CSS variables so light/dark is a variable swap, not a class
+ * rewrite. Order of precedence:
+ *   1. [data-theme="light" | "dark"] on <html> (explicit user choice)
+ *   2. prefers-color-scheme (system)
+ * No remote fonts: system UI and monospace stacks only.
+ */
+
+:root {
+  color-scheme: light;
+  --bg: oklch(0.985 0.002 260);
+  --surface: oklch(1 0 0);
+  --surface-2: oklch(0.97 0.003 260);
+  --surface-3: oklch(0.945 0.004 260);
+  --border: oklch(0.91 0.005 260);
+  --border-strong: oklch(0.84 0.007 260);
+  --fg: oklch(0.22 0.01 260);
+  --fg-muted: oklch(0.47 0.012 260);
+  --fg-subtle: oklch(0.6 0.01 260);
+  --accent: oklch(0.49 0.2 264);
+  --accent-hover: oklch(0.44 0.2 264);
+  --accent-fg: oklch(0.99 0 0);
+  --accent-soft: oklch(0.95 0.03 264);
+  --ring: oklch(0.6 0.16 270);
+
+  --ok: oklch(0.52 0.12 155);
+  --ok-soft: oklch(0.95 0.04 155);
+  --warn: oklch(0.55 0.13 70);
+  --warn-soft: oklch(0.96 0.05 85);
+  --danger: oklch(0.53 0.19 25);
+  --danger-soft: oklch(0.96 0.03 25);
+  --info: oklch(0.52 0.11 230);
+  --info-soft: oklch(0.95 0.03 230);
+
+  --shadow: 0 1px 2px oklch(0 0 0 / 0.05), 0 4px 16px oklch(0 0 0 / 0.04);
+  --overlay: oklch(0.2 0.01 260 / 0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: oklch(0.17 0.005 260);
+    --surface: oklch(0.2 0.006 260);
+    --surface-2: oklch(0.23 0.007 260);
+    --surface-3: oklch(0.27 0.008 260);
+    --border: oklch(0.3 0.008 260);
+    --border-strong: oklch(0.38 0.01 260);
+    --fg: oklch(0.94 0.004 260);
+    --fg-muted: oklch(0.72 0.01 260);
+    --fg-subtle: oklch(0.58 0.01 260);
+    --accent: oklch(0.7 0.14 255);
+    --accent-hover: oklch(0.75 0.13 255);
+    --accent-fg: oklch(0.16 0.03 264);
+    --accent-soft: oklch(0.3 0.07 264);
+    --ring: oklch(0.7 0.14 270);
+    --ok: oklch(0.74 0.13 155);
+    --ok-soft: oklch(0.3 0.05 155);
+    --warn: oklch(0.8 0.13 80);
+    --warn-soft: oklch(0.32 0.06 75);
+    --danger: oklch(0.72 0.16 25);
+    --danger-soft: oklch(0.32 0.07 25);
+    --info: oklch(0.75 0.11 230);
+    --info-soft: oklch(0.3 0.05 230);
+    --shadow: 0 1px 2px oklch(0 0 0 / 0.4), 0 8px 24px oklch(0 0 0 / 0.3);
+    --overlay: oklch(0 0 0 / 0.55);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: oklch(0.17 0.005 260);
+  --surface: oklch(0.2 0.006 260);
+  --surface-2: oklch(0.23 0.007 260);
+  --surface-3: oklch(0.27 0.008 260);
+  --border: oklch(0.3 0.008 260);
+  --border-strong: oklch(0.38 0.01 260);
+  --fg: oklch(0.94 0.004 260);
+  --fg-muted: oklch(0.72 0.01 260);
+  --fg-subtle: oklch(0.58 0.01 260);
+  --accent: oklch(0.7 0.14 255);
+  --accent-hover: oklch(0.75 0.13 255);
+  --accent-fg: oklch(0.16 0.03 264);
+  --accent-soft: oklch(0.3 0.07 264);
+  --ring: oklch(0.7 0.14 270);
+  --ok: oklch(0.74 0.13 155);
+  --ok-soft: oklch(0.3 0.05 155);
+  --warn: oklch(0.8 0.13 80);
+  --warn-soft: oklch(0.32 0.06 75);
+  --danger: oklch(0.72 0.16 25);
+  --danger-soft: oklch(0.32 0.07 25);
+  --info: oklch(0.75 0.11 230);
+  --info-soft: oklch(0.3 0.05 230);
+  --shadow: 0 1px 2px oklch(0 0 0 / 0.4), 0 8px 24px oklch(0 0 0 / 0.3);
+  --overlay: oklch(0 0 0 / 0.55);
+}
+
+@theme inline {
+  --font-sans:
+    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', 'Liberation Sans',
+    Arial, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', 'DejaVu Sans Mono',
+    monospace;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-ring: var(--ring);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-overlay: var(--overlay);
+  --shadow-panel: var(--shadow);
+}
+
+@layer base {
+  html {
+    font-size: 14px;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-bg font-sans text-fg antialiased;
+    font-feature-settings: 'tnum' 0;
+    line-height: 1.45;
+  }
+  ::selection {
+    background: var(--accent-soft);
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  /* Tabular figures in data-heavy places. */
+  table,
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  dialog::backdrop {
+    background: var(--overlay);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

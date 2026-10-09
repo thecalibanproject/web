@@ -1,0 +1,98 @@
+import type { components, paths } from './schema';
+
+type S = components['schemas'];
+
+export type ApiErrorBody = S['Error'];
+export type Health = S['Health'];
+export type Tenant = S['Tenant'];
+export type TenantCreate = S['TenantCreate'];
+export type ApiKeyInfo = S['ApiKeyInfo'];
+export type ApiKeyCreated = S['ApiKeyCreated'];
+export type ProviderKind = S['ProviderKind'];
+export type TrustTier = S['TrustTier'];
+export type ProviderKey = S['ProviderKey'];
+export type ProviderKeyCreate = S['ProviderKeyCreate'];
+export type Model = S['Model'];
+export type ModelCreate = S['ModelCreate'];
+export type ModelKind = S['ModelKind'];
+export type ModelCapabilities = S['ModelCapabilities'];
+export type ReasoningMode = NonNullable<ModelCapabilities['reasoning']>;
+export type ReasoningControl = NonNullable<ModelCapabilities['reasoning_control']>;
+export type SharedProvider = S['SharedProvider'];
+export type SharedProviderCreate = S['SharedProviderCreate'];
+export type ProviderHealth =
+  paths['/api/v1/providers/{providerId}/health']['get']['responses'][200]['content']['application/json'];
+export type ProviderHealthStatus = ProviderHealth['status'];
+export type DiscoveryResult =
+  paths['/api/v1/providers/{providerId}/discover']['post']['responses'][200]['content']['application/json'];
+export type DatasourceKind = S['DatasourceKind'];
+export type Datasource = S['Datasource'];
+export type DatasourceCreate = S['DatasourceCreate'];
+export type OntologyElementKind = S['OntologyElementKind'];
+export type OntologyElement = S['OntologyElement'];
+export type Ontology = S['Ontology'];
+export type Node = S['Node'];
+export type NodeCreate = S['NodeCreate'];
+export type UsageEvent = S['UsageEvent'];
+export type UsageReport = S['UsageReport'];
+export type CacheStatus = UsageEvent['cache'];
+export type ReviewDecision = 'approve' | 'reject';
+
+// Enum value lists, kept in the order of the OpenAPI contract. `satisfies`
+// makes the compiler flag drift when `pnpm gen:api` changes the unions.
+export const PROVIDER_KINDS = [
+  'openai',
+  'anthropic',
+  'openai_compatible',
+  'azure_openai',
+  'bedrock',
+  'vertex',
+] as const satisfies readonly ProviderKind[];
+
+export const TRUST_TIERS = [
+  't0_sovereign',
+  't1_attested',
+  't2_contracted',
+  't3_public',
+] as const satisfies readonly TrustTier[];
+
+export const MODEL_KINDS = ['chat', 'embedding', 'rerank'] as const satisfies readonly ModelKind[];
+
+export const REASONING_MODES = [
+  'none',
+  'always',
+  'hybrid',
+] as const satisfies readonly ReasoningMode[];
+
+export const REASONING_CONTROLS = [
+  'none',
+  'enable_thinking',
+  'reasoning_effort',
+] as const satisfies readonly ReasoningControl[];
+
+export const DATASOURCE_KINDS = [
+  'mongodb',
+  'postgres',
+  'mysql',
+  'sqlserver',
+  'snowflake',
+  'bigquery',
+  'clickhouse',
+  'elasticsearch',
+  'rest_openapi',
+  's3_parquet',
+  'mcp',
+] as const satisfies readonly DatasourceKind[];
+
+export const ONTOLOGY_KINDS = [
+  'entity',
+  'attribute',
+  'relation',
+  'metric',
+  'dimension',
+  'glossary_term',
+  'policy',
+  'verified_query',
+] as const satisfies readonly OntologyElementKind[];
+
+export const CACHE_STATUSES = ['hit', 'miss', 'bypass'] as const satisfies readonly CacheStatus[];
