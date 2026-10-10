@@ -10,6 +10,7 @@ import {
 } from '@/api/types';
 import { PII_MODE_LABEL, PII_MODE_OPTIONS, SURROGATE_SCOPE_LABEL } from '@/lib/labels';
 import { Button, Field, FormError, Input, Select, Switch } from '../ui';
+import { useSavedTenant } from './use-saved-tenant';
 
 interface Settings {
   pii_default: PiiMode;
@@ -78,15 +79,8 @@ export function TenantSettingsSection({
 }) {
   const update = useUpdateTenant(tenant.id);
   const headingId = useId();
-  // The PATCH response, shown from the moment the draft is cleared until the
-  // `tenant` prop catches up. The hook writes the same response to the query
-  // cache, but query observers are notified a tick after this mutation's
-  // onSuccess runs, so without it the form would show the old values for a
-  // frame between "Saving" and the saved values.
-  const [saveResult, setSaveResult] = useState<{ before: Tenant; after: Tenant } | null>(null);
-  const caughtUp = saveResult != null && saveResult.before !== tenant;
-  if (caughtUp) setSaveResult(null);
-  const current = saveResult && !caughtUp ? saveResult.after : tenant;
+  // The PATCH response until the `tenant` prop catches up (no flash of the old values).
+  const { current, saved: showSaved } = useSavedTenant(tenant);
   const saved = savedSettings(current);
   // `null` while nothing is edited: the form then follows the saved tenant.
   const [draft, setDraft] = useState<Settings | null>(null);
@@ -114,7 +108,7 @@ export function TenantSettingsSection({
     if (!dirty || locked || percentError) return;
     update.mutate(body, {
       onSuccess: (after) => {
-        setSaveResult({ before: tenant, after });
+        showSaved(after);
         setDraft(null);
         setSavedNotice(true);
       },

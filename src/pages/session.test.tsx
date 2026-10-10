@@ -215,6 +215,9 @@ describe('Role-gated console', () => {
     expect(within(settings).getByText(/Read only: your role cannot change/)).toBeInTheDocument();
     expect(within(settings).getByLabelText('PII default mode')).toBeDisabled();
     expect(within(settings).queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+    const limits = screen.getByRole('region', { name: 'Node limits' });
+    expect(within(limits).getByLabelText('Steps per run')).toBeDisabled();
+    expect(within(limits).queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Danger zone' })).not.toBeInTheDocument();
 
     expect(within(nav()).queryByRole('link', { name: 'Audit' })).not.toBeInTheDocument();

@@ -4,6 +4,7 @@ import { usePermissions } from '@/api/auth';
 import { tenantQuery } from '@/api/queries';
 import { ApiKeysPanel } from '@/components/tenant/api-keys-panel';
 import { DeleteTenantSection } from '@/components/tenant/delete-tenant-section';
+import { NodeLimitsSection } from '@/components/tenant/node-limits-section';
 import { ProviderKeysPanel } from '@/components/tenant/provider-keys-panel';
 import { TenantDeletedState } from '@/components/tenant/tenant-deleted-state';
 import { TenantSettingsSection } from '@/components/tenant/tenant-settings-section';
@@ -94,6 +95,9 @@ export function TenantDetailPage() {
           tenant={tenant.data}
           readOnly={!perms.can('tenant.write', tenantId)}
         />
+      )}
+      {tenant.isSuccess && (
+        <NodeLimitsSection tenant={tenant.data} readOnly={!perms.can('tenant.write', tenantId)} />
       )}
       {tenant.isSuccess && perms.can('tenant.delete', tenantId) && (
         <DeleteTenantSection
