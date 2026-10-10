@@ -137,6 +137,16 @@ const nodesRoute = createRoute({
   component: lazyRouteComponent(() => import('@/pages/nodes'), 'NodesPage'),
 });
 
+const toolsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: 'tools',
+  validateSearch: (s: Record<string, unknown>): { tenant?: string; server?: string } => ({
+    tenant: str(s.tenant),
+    server: str(s.server),
+  }),
+  component: lazyRouteComponent(() => import('@/pages/tools'), 'ToolsPage'),
+});
+
 const posInt = (v: unknown): number | undefined => {
   const n = Number(v);
   return Number.isInteger(n) && n > 0 ? n : undefined;
@@ -219,6 +229,7 @@ export const routeTree = rootRoute.addChildren([
     ontologyRoute,
     nodesRoute,
     nodeDetailRoute,
+    toolsRoute,
     usageRoute,
     auditRoute,
     usersRoute,

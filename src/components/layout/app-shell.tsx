@@ -18,6 +18,7 @@ import {
   IconOverview,
   IconSettings,
   IconTenants,
+  IconTools,
   IconUsage,
   IconUsers,
   LogoMark,
@@ -31,6 +32,7 @@ type NavTo =
   | '/datasources'
   | '/ontology'
   | '/nodes'
+  | '/tools'
   | '/usage'
   | '/audit'
   | '/users'
@@ -53,6 +55,7 @@ const NAV: Array<{
   { to: '/datasources', label: 'Datasources', icon: IconDatasources, perm: 'datasources.read' },
   { to: '/ontology', label: 'Ontology', icon: IconOntology, perm: 'ontology.read' },
   { to: '/nodes', label: 'Nodes', icon: IconNodes, perm: 'nodes.read' },
+  { to: '/tools', label: 'Tools', icon: IconTools, perm: 'tools.read' },
   { to: '/usage', label: 'Usage', icon: IconUsage, perm: 'usage.read' },
   { to: '/audit', label: 'Audit', icon: IconAudit, perm: 'audit.read' },
   { to: '/users', label: 'Users and roles', icon: IconUsers, perm: 'rbac.read' },

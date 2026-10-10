@@ -67,6 +67,13 @@ export const IconNodes = (p: IconProps) => (
     <path d="M10 6.5h4a3 3 0 0 1 3 3V14" />
   </Svg>
 );
+export const IconTools = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M14.7 6.3a4 4 0 0 0 5 5L21 12.6l-8.4 8.4a2.1 2.1 0 0 1-3-3L18 9.6" />
+    <path d="M14.7 6.3 9.6 1.2a4 4 0 0 0-5.4 5.4l5.1 5.1" />
+    <path d="m3 21 4.5-4.5" />
+  </Svg>
+);
 export const IconUsage = (p: IconProps) => (
   <Svg {...p}>
     <path d="M3 3v18h18" />
