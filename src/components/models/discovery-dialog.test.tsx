@@ -58,6 +58,20 @@ const discovery: DiscoveryResult = {
   suggested: [qwenChat, qwenEmbed, qwenSmall],
 };
 
+type User = ReturnType<typeof userEvent.setup>;
+
+/**
+ * Replaces a field's value the way a user who pastes it would: one input
+ * event instead of one per character. Every keystroke re-renders all the
+ * suggestion rows, and dozens of them made up most of this test's run time;
+ * the fields take whole strings, so the outcome is the same.
+ */
+async function enter(user: User, field: HTMLElement, text: string) {
+  await user.clear(field);
+  await user.paste(text);
+  expect(field).toHaveValue(text);
+}
+
 describe('DiscoveryDialog', () => {
   it('adds only the selected (and edited) suggestions, with per-row results', async () => {
     const calls = mockApi({
@@ -87,7 +101,9 @@ describe('DiscoveryDialog', () => {
         return { status: 201, body: { ...body, provider_id: body.provider } };
       },
     });
-    const user = userEvent.setup();
+    // No real-timer pause between simulated events: the steps no longer wait on
+    // the event loop, which is what stretched this test on a busy machine.
+    const user = userEvent.setup({ delay: null });
     renderWithClient(<DiscoveryDialog server={server} onClose={() => {}} />);
 
     const dialog = await screen.findByRole('dialog', { name: /discover models on qwen3-30b/i });
@@ -107,10 +123,9 @@ describe('DiscoveryDialog', () => {
     // Inline-edit the embedding row: rename, set a licence and context window.
     const embed = within(dialog).getByRole('group', { name: 'Qwen/Qwen3-Embedding-8B' });
     const embedId = within(embed).getByLabelText(/^Model ID/);
-    await user.clear(embedId);
-    await user.type(embedId, 'local/qwen3-embed');
-    await user.type(within(embed).getByLabelText('Licence'), 'Apache-2.0');
-    await user.type(within(embed).getByLabelText('Context window'), '32768');
+    await enter(user, embedId, 'local/qwen3-embed');
+    await enter(user, within(embed).getByLabelText('Licence'), 'Apache-2.0');
+    await enter(user, within(embed).getByLabelText('Context window'), '32768');
     expect(within(embed).getByLabelText('Kind')).toHaveValue('embedding');
 
     // Toggle a capability on the chat row.
@@ -150,8 +165,7 @@ describe('DiscoveryDialog', () => {
 
     // Fix the conflicting id and retry: only the failed row is re-posted.
     const chatId = within(chat).getByLabelText(/^Model ID/);
-    await user.clear(chatId);
-    await user.type(chatId, 'local/qwen3-30b');
+    await enter(user, chatId, 'local/qwen3-30b');
     await user.click(within(dialog).getByRole('button', { name: 'Add selected (1)' }));
     await waitFor(() => expect(within(chat).getByText('added')).toBeInTheDocument());
     const retried = calls.filter((c) => c.method === 'POST' && c.path === '/api/v1/models');
