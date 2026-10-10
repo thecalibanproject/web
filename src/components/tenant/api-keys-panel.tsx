@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
+import { usePermissions } from '@/api/auth';
 import { apiKeysQuery, useMintApiKey, useRevokeApiKey } from '@/api/queries';
 import type { ApiKeyCreated, ApiKeyInfo } from '@/api/types';
 import {
@@ -68,6 +69,7 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
   const [name, setName] = useState('');
   const [created, setCreated] = useState<ApiKeyCreated | null>(null);
   const [revoking, setRevoking] = useState<ApiKeyInfo | null>(null);
+  const canWrite = usePermissions().can('api_keys.write', tenantId);
 
   const closeRevoke = () => {
     setRevoking(null);
@@ -98,32 +100,34 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
         }
       />
       {created && <NewKeyNotice created={created} onDismiss={() => setCreated(null)} />}
-      <form
-        onSubmit={onSubmit}
-        className="flex flex-wrap items-end gap-2 border-b border-border px-4 py-3"
-      >
-        <label className="flex min-w-56 flex-1 flex-col gap-1 text-[12.5px] font-medium">
-          Key name
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. billing-service-prod"
-          />
-        </label>
-        <Button
-          type="submit"
-          variant="primary"
-          icon={<IconPlus size={14} />}
-          loading={mint.isPending}
+      {canWrite && (
+        <form
+          onSubmit={onSubmit}
+          className="flex flex-wrap items-end gap-2 border-b border-border px-4 py-3"
         >
-          Mint key
-        </Button>
-        {mint.error ? (
-          <div className="w-full">
-            <FormError error={mint.error} />
-          </div>
-        ) : null}
-      </form>
+          <label className="flex min-w-56 flex-1 flex-col gap-1 text-[12.5px] font-medium">
+            Key name
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. billing-service-prod"
+            />
+          </label>
+          <Button
+            type="submit"
+            variant="primary"
+            icon={<IconPlus size={14} />}
+            loading={mint.isPending}
+          >
+            Mint key
+          </Button>
+          {mint.error ? (
+            <div className="w-full">
+              <FormError error={mint.error} />
+            </div>
+          ) : null}
+        </form>
+      )}
       {keys.isPending ? (
         <LoadingState rows={3} />
       ) : keys.isError && isNotFound(keys.error) ? (
@@ -133,7 +137,11 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
       ) : keys.data.length === 0 ? (
         <EmptyState
           title="No API keys"
-          description="Mint a key to let an application call Caliban as this tenant."
+          description={
+            canWrite
+              ? 'Mint a key to let an application call Caliban as this tenant.'
+              : 'This tenant has no API keys yet.'
+          }
         />
       ) : (
         <Table label="API keys">
@@ -169,7 +177,7 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
                     </TD>
                   )}
                   <TD className="text-right whitespace-nowrap">
-                    {!revoked && (
+                    {!revoked && canWrite && (
                       <Button
                         size="sm"
                         variant="danger"

@@ -46,7 +46,15 @@ export function NodeEditor({
     <form onSubmit={onSubmit} className="flex h-full flex-col gap-4" aria-label="Create node">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Tenant" required>
-          {({ id }) => <TenantSelect id={id} value={tenantId} onChange={setTenantId} required />}
+          {({ id }) => (
+            <TenantSelect
+              id={id}
+              value={tenantId}
+              onChange={setTenantId}
+              permission="nodes.write"
+              required
+            />
+          )}
         </Field>
         <Field label="Name" required hint="Callers use it as caliban.node.">
           {({ id, describedBy }) => (

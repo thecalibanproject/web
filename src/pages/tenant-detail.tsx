@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
+import { usePermissions } from '@/api/auth';
 import { tenantQuery } from '@/api/queries';
 import { ApiKeysPanel } from '@/components/tenant/api-keys-panel';
 import { DeleteTenantSection } from '@/components/tenant/delete-tenant-section';
@@ -9,20 +10,25 @@ import { TenantSettingsSection } from '@/components/tenant/tenant-settings-secti
 import { Badge, Card, ErrorState, LoadingState, PageHeader, Tabs } from '@/components/ui';
 import { isNotFound } from '@/lib/errors';
 import { formatDate } from '@/lib/format';
+import type { Permission } from '@/api/types';
 import type { TenantTab } from '@/router';
 
 const route = getRouteApi('/_app/tenants/$tenantId');
 
 const TABS = [
-  { value: 'api-keys', label: 'API keys' },
-  { value: 'provider-keys', label: 'Provider keys' },
-] as const satisfies ReadonlyArray<{ value: TenantTab; label: string }>;
+  { value: 'api-keys', label: 'API keys', perm: 'api_keys.read' },
+  { value: 'provider-keys', label: 'Provider keys', perm: 'provider_keys.read' },
+] as const satisfies ReadonlyArray<{ value: TenantTab; label: string; perm: Permission }>;
 
 export function TenantDetailPage() {
   const { tenantId } = route.useParams();
-  const { tab = 'api-keys' } = route.useSearch();
+  const { tab: requested } = route.useSearch();
   const navigate = route.useNavigate();
   const tenant = useQuery(tenantQuery(tenantId));
+  const perms = usePermissions();
+  // Billing users, for one, see the tenant but not its keys.
+  const tabs = TABS.filter((t) => perms.can(t.perm, tenantId));
+  const tab = tabs.find((t) => t.value === requested)?.value ?? tabs[0]?.value;
   // A deleted (or unknown) tenant is a 404 on every tenant-scoped endpoint.
   const gone = tenant.isError && isNotFound(tenant.error);
 
@@ -69,10 +75,10 @@ export function TenantDetailPage() {
           }
         />
       )}
-      {!gone && (
+      {!gone && tab && (
         <Tabs
           label="Tenant sections"
-          tabs={TABS}
+          tabs={tabs}
           value={tab}
           onChange={(t) => void navigate({ search: { tab: t }, replace: true })}
         >
@@ -83,8 +89,13 @@ export function TenantDetailPage() {
           )}
         </Tabs>
       )}
-      {tenant.isSuccess && <TenantSettingsSection tenant={tenant.data} />}
       {tenant.isSuccess && (
+        <TenantSettingsSection
+          tenant={tenant.data}
+          readOnly={!perms.can('tenant.write', tenantId)}
+        />
+      )}
+      {tenant.isSuccess && perms.can('tenant.delete', tenantId) && (
         <DeleteTenantSection
           tenant={tenant.data}
           onDeleted={() => void navigate({ to: '/tenants' })}

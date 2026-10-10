@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useDeferredValue, useMemo, useState } from 'react';
+import { usePermissions } from '@/api/auth';
 import { modelsQuery, useDeleteModel } from '@/api/queries';
 import { MODEL_KINDS, TRUST_TIERS, type Model, type ModelKind, type TrustTier } from '@/api/types';
 import { CapabilityBadges, ModelKindBadge, TrustTierBadge } from '@/components/badges';
@@ -34,6 +35,7 @@ export function CataloguePanel() {
   const [adding, setAdding] = useState(false);
   const [deleting, setDeleting] = useState<Model | null>(null);
   const query = useDeferredValue(q.trim().toLowerCase());
+  const canWrite = usePermissions().can('catalog.write');
 
   const rows = useMemo(
     () =>
@@ -97,14 +99,16 @@ export function CataloguePanel() {
               {rows.length} of {models.data.length}
             </span>
           )}
-          <Button
-            size="sm"
-            variant="primary"
-            icon={<IconPlus size={14} />}
-            onClick={() => setAdding(true)}
-          >
-            Add model
-          </Button>
+          {canWrite && (
+            <Button
+              size="sm"
+              variant="primary"
+              icon={<IconPlus size={14} />}
+              onClick={() => setAdding(true)}
+            >
+              Add model
+            </Button>
+          )}
         </span>
       </div>
       {models.isPending ? (
@@ -178,14 +182,16 @@ export function CataloguePanel() {
                     : `${formatUsd(m.price_in_per_mtok)} / ${formatUsd(m.price_out_per_mtok)}`}
                 </TD>
                 <TD className="text-right">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    icon={<IconTrash size={14} />}
-                    onClick={() => setDeleting(m)}
-                  >
-                    <span className="sr-only">Delete {m.id}</span>
-                  </Button>
+                  {canWrite && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon={<IconTrash size={14} />}
+                      onClick={() => setDeleting(m)}
+                    >
+                      <span className="sr-only">Delete {m.id}</span>
+                    </Button>
+                  )}
                 </TD>
               </TR>
             ))}

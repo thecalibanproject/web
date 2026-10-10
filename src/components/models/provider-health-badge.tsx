@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { usePermissions } from '@/api/auth';
 import { providerHealthQuery } from '@/api/queries';
 import { Badge } from '@/components/ui';
 import { errorMessage } from '@/lib/errors';
@@ -10,8 +11,16 @@ import { formatMs } from '@/lib/format';
  * plane could not reach the server) and unknown (the probe itself failed).
  */
 export function ProviderHealthBadge({ providerId }: { providerId: string }) {
-  const health = useQuery(providerHealthQuery(providerId));
+  const canProbe = usePermissions().can('providers.probe');
+  const health = useQuery({ ...providerHealthQuery(providerId), enabled: canProbe });
 
+  if (!canProbe) {
+    return (
+      <span className="text-fg-subtle" title="Your role cannot probe model servers.">
+        n/a
+      </span>
+    );
+  }
   if (health.isPending) {
     return (
       <Badge tone="neutral" dot title="Probing the server’s /models endpoint…">

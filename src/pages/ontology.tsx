@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
+import { usePermissions } from '@/api/auth';
 import { ontologyQuery, useReviewElement } from '@/api/queries';
 import type { OntologyElement, ReviewDecision } from '@/api/types';
 import { ConfidenceMeter, ElementStatusBadge, ProvenanceBadge } from '@/components/badges';
@@ -47,6 +48,7 @@ function ReviewActions({
   size?: 'sm' | 'md';
 }) {
   const review = useReviewElement(tenantId);
+  const canReview = usePermissions().can('ontology.review', tenantId);
   const [pending, setPending] = useState<ReviewDecision | null>(null);
   const decide = (decision: ReviewDecision) => {
     setPending(decision);
@@ -55,6 +57,7 @@ function ReviewActions({
       { onSettled: () => setPending(null), onSuccess: () => onDone?.() },
     );
   };
+  if (!canReview) return null;
   return (
     <span className="inline-flex flex-wrap items-center justify-end gap-1.5">
       {review.isError && (

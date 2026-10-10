@@ -1,10 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
+import { usePermissions } from '@/api/auth';
 import { tenantsQuery } from '@/api/queries';
+import type { Permission } from '@/api/types';
 import { Select } from './ui';
 
 /**
  * Tenant picker backed by GET /api/v1/tenants. `allowAll` adds an
- * "All tenants" option (value ""), for list filters.
+ * "All tenants" option (value ""), for list filters. `permission` keeps only
+ * the tenants the signed-in user holds it on, for forms that create something.
  */
 export function TenantSelect({
   id,
@@ -13,6 +16,7 @@ export function TenantSelect({
   allowAll = false,
   required = false,
   className,
+  permission,
   'aria-describedby': describedBy,
 }: {
   id?: string;
@@ -21,9 +25,12 @@ export function TenantSelect({
   allowAll?: boolean;
   required?: boolean;
   className?: string;
+  permission?: Permission;
   'aria-describedby'?: string;
 }) {
   const { data, isPending, isError } = useQuery(tenantsQuery());
+  const perms = usePermissions();
+  const options = permission ? data?.filter((t) => perms.can(permission, t.id)) : data;
   return (
     <Select
       id={id}
@@ -41,7 +48,7 @@ export function TenantSelect({
           {isPending ? 'Loading tenants…' : isError ? 'Could not load tenants' : 'Select a tenant…'}
         </option>
       )}
-      {data?.map((t) => (
+      {options?.map((t) => (
         <option key={t.id} value={t.id}>
           {t.name}
         </option>

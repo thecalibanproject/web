@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
+import { usePermissions } from '@/api/auth';
 import { nodesQuery, tenantsQuery, useDeleteNode } from '@/api/queries';
 import type { Node } from '@/api/types';
 import { NodeEditor } from '@/components/nodes/node-editor';
@@ -46,6 +47,8 @@ export function NodesPage() {
   const [viewing, setViewing] = useState<Node | null>(null);
   const del = useDeleteNode();
   const [deleting, setDeleting] = useState<Node | null>(null);
+  const perms = usePermissions();
+  const canCreate = perms.canSomewhere('nodes.write');
 
   const closeDelete = () => {
     setDeleting(null);
@@ -58,9 +61,15 @@ export function NodesPage() {
         title="Nodes"
         description="Versioned, budgeted AI sub-apps. Each is callable over HTTP, MCP and A2A."
         actions={
-          <Button variant="primary" icon={<IconPlus size={14} />} onClick={() => setCreating(true)}>
-            New node
-          </Button>
+          canCreate && (
+            <Button
+              variant="primary"
+              icon={<IconPlus size={14} />}
+              onClick={() => setCreating(true)}
+            >
+              New node
+            </Button>
+          )
         }
       />
       <Card>
@@ -76,13 +85,15 @@ export function NodesPage() {
             title="No nodes"
             description="Create a node from a JSON spec. It is validated against node.schema.json before it is saved."
             action={
-              <Button
-                variant="primary"
-                icon={<IconPlus size={14} />}
-                onClick={() => setCreating(true)}
-              >
-                New node
-              </Button>
+              canCreate && (
+                <Button
+                  variant="primary"
+                  icon={<IconPlus size={14} />}
+                  onClick={() => setCreating(true)}
+                >
+                  New node
+                </Button>
+              )
             }
           />
         ) : (
@@ -128,15 +139,17 @@ export function NodesPage() {
                     {formatDateTime(n.created_at)}
                   </TD>
                   <TD className="text-right">
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      icon={<IconTrash size={14} />}
-                      aria-label={`Delete ${n.name} v${n.version}`}
-                      onClick={() => setDeleting(n)}
-                    >
-                      Delete
-                    </Button>
+                    {perms.can('nodes.write', n.tenant_id) && (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        icon={<IconTrash size={14} />}
+                        aria-label={`Delete ${n.name} v${n.version}`}
+                        onClick={() => setDeleting(n)}
+                      >
+                        Delete
+                      </Button>
+                    )}
                   </TD>
                 </TR>
               ))}

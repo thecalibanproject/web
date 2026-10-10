@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
+import { usePermissions } from '@/api/auth';
 import { providerKeysQuery, useCreateProviderKey, useDeleteProviderKey } from '@/api/queries';
 import {
   PROVIDER_KINDS,
@@ -220,6 +221,7 @@ function DeleteKeyButton({ tenantId, pk }: { tenantId: string; pk: ProviderKey }
 export function ProviderKeysPanel({ tenantId }: { tenantId: string }) {
   const keys = useQuery(providerKeysQuery(tenantId));
   const [adding, setAdding] = useState(false);
+  const canWrite = usePermissions().can('provider_keys.write', tenantId);
 
   return (
     <Card>
@@ -227,14 +229,16 @@ export function ProviderKeysPanel({ tenantId }: { tenantId: string }) {
         title="Provider keys (BYOK)"
         description="Your own provider credentials or local model endpoints. Caliban never pools upstream keys."
         actions={
-          <Button
-            size="sm"
-            variant="primary"
-            icon={<IconPlus size={14} />}
-            onClick={() => setAdding(true)}
-          >
-            Add provider key
-          </Button>
+          canWrite && (
+            <Button
+              size="sm"
+              variant="primary"
+              icon={<IconPlus size={14} />}
+              onClick={() => setAdding(true)}
+            >
+              Add provider key
+            </Button>
+          )
         }
       />
       {keys.isPending ? (
@@ -286,7 +290,7 @@ export function ProviderKeysPanel({ tenantId }: { tenantId: string }) {
                 </TD>
                 <TD className="text-fg-muted">{formatDate(k.created_at)}</TD>
                 <TD className="text-right whitespace-nowrap">
-                  <DeleteKeyButton tenantId={tenantId} pk={k} />
+                  {canWrite && <DeleteKeyButton tenantId={tenantId} pk={k} />}
                 </TD>
               </TR>
             ))}

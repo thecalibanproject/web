@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
+import { usePermissions } from '@/api/auth';
 import { providersQuery, useDeleteProvider } from '@/api/queries';
 import type { SharedProvider } from '@/api/types';
 import { TrustTierBadge } from '@/components/badges';
@@ -32,6 +33,7 @@ export function ServersPanel() {
   const [adding, setAdding] = useState(false);
   const [discovering, setDiscovering] = useState<SharedProvider | null>(null);
   const [deleting, setDeleting] = useState<SharedProvider | null>(null);
+  const canWrite = usePermissions().can('catalog.write');
 
   const closeDelete = () => {
     setDeleting(null);
@@ -44,14 +46,16 @@ export function ServersPanel() {
         title="Model servers"
         description="Shared on-prem inference pools (vLLM, SGLang, llama.cpp, Ollama) that serve open models to every allowed tenant."
         actions={
-          <Button
-            size="sm"
-            variant="primary"
-            icon={<IconPlus size={14} />}
-            onClick={() => setAdding(true)}
-          >
-            Add server
-          </Button>
+          canWrite && (
+            <Button
+              size="sm"
+              variant="primary"
+              icon={<IconPlus size={14} />}
+              onClick={() => setAdding(true)}
+            >
+              Add server
+            </Button>
+          )
         }
       />
       {servers.isPending ? (
@@ -112,24 +116,26 @@ export function ServersPanel() {
                   {s.tenants.length === 0 ? 'All tenants' : s.tenants.join(', ')}
                 </TD>
                 <TD className="text-right whitespace-nowrap">
-                  <span className="inline-flex items-center gap-1">
-                    <Button
-                      size="sm"
-                      icon={<IconSearch size={14} />}
-                      onClick={() => setDiscovering(s)}
-                    >
-                      Discover models
-                      <span className="sr-only"> on {s.id}</span>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      icon={<IconTrash size={14} />}
-                      onClick={() => setDeleting(s)}
-                    >
-                      <span className="sr-only">Delete {s.id}</span>
-                    </Button>
-                  </span>
+                  {canWrite && (
+                    <span className="inline-flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        icon={<IconSearch size={14} />}
+                        onClick={() => setDiscovering(s)}
+                      >
+                        Discover models
+                        <span className="sr-only"> on {s.id}</span>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        icon={<IconTrash size={14} />}
+                        onClick={() => setDeleting(s)}
+                      >
+                        <span className="sr-only">Delete {s.id}</span>
+                      </Button>
+                    </span>
+                  )}
                 </TD>
               </TR>
             ))}

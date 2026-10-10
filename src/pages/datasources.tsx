@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { useMemo, useState, type FormEvent } from 'react';
+import { usePermissions } from '@/api/auth';
 import {
   datasourcesQuery,
   tenantsQuery,
@@ -141,7 +142,15 @@ export function RegisterDatasourceForm({
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4" aria-label="Register datasource">
       <Field label="Tenant" required>
-        {({ id }) => <TenantSelect id={id} value={tenantId} onChange={setTenantId} required />}
+        {({ id }) => (
+          <TenantSelect
+            id={id}
+            value={tenantId}
+            onChange={setTenantId}
+            permission="datasources.write"
+            required
+          />
+        )}
       </Field>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Kind" required>
@@ -236,6 +245,8 @@ export function DatasourcesPage() {
   const [registering, setRegistering] = useState(false);
   const del = useDeleteDatasource();
   const [deleting, setDeleting] = useState<Datasource | null>(null);
+  const perms = usePermissions();
+  const canRegister = perms.canSomewhere('datasources.write');
   const names = useMemo(
     () => new Map((tenants.data ?? []).map((t) => [t.id, t.name])),
     [tenants.data],
@@ -252,13 +263,15 @@ export function DatasourcesPage() {
         title="Datasources"
         description="Connect a source once. Introspection proposes ontology elements you approve in the Ontology studio."
         actions={
-          <Button
-            variant="primary"
-            icon={<IconPlus size={14} />}
-            onClick={() => setRegistering(true)}
-          >
-            Register datasource
-          </Button>
+          canRegister && (
+            <Button
+              variant="primary"
+              icon={<IconPlus size={14} />}
+              onClick={() => setRegistering(true)}
+            >
+              Register datasource
+            </Button>
+          )
         }
       />
       <Card>
@@ -274,13 +287,15 @@ export function DatasourcesPage() {
             title="No datasources"
             description="Register a MongoDB deployment to get started. Credentials are encrypted at rest like BYOK secrets."
             action={
-              <Button
-                variant="primary"
-                icon={<IconPlus size={14} />}
-                onClick={() => setRegistering(true)}
-              >
-                Register datasource
-              </Button>
+              canRegister && (
+                <Button
+                  variant="primary"
+                  icon={<IconPlus size={14} />}
+                  onClick={() => setRegistering(true)}
+                >
+                  Register datasource
+                </Button>
+              )
             }
           />
         ) : (
@@ -317,18 +332,20 @@ export function DatasourcesPage() {
                   </TD>
                   <TD className="text-right text-fg-muted">{ds.epoch ?? '—'}</TD>
                   <TD className="text-right whitespace-nowrap">
-                    <span className="inline-flex items-center gap-1.5">
-                      <IntrospectButton ds={ds} />
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        icon={<IconTrash size={14} />}
-                        aria-label={`Delete ${ds.name}`}
-                        onClick={() => setDeleting(ds)}
-                      >
-                        Delete
-                      </Button>
-                    </span>
+                    {perms.can('datasources.write', ds.tenant_id) && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <IntrospectButton ds={ds} />
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          icon={<IconTrash size={14} />}
+                          aria-label={`Delete ${ds.name}`}
+                          onClick={() => setDeleting(ds)}
+                        >
+                          Delete
+                        </Button>
+                      </span>
+                    )}
                   </TD>
                 </TR>
               ))}

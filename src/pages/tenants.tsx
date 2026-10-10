@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState, type FormEvent } from 'react';
+import { usePermissions } from '@/api/auth';
 import { tenantsQuery, useCreateTenant } from '@/api/queries';
 import type { TenantCreate } from '@/api/types';
 import {
@@ -127,6 +128,7 @@ export function TenantsPage() {
   const [showDeleted, setShowDeleted] = useState(false);
   const tenants = useQuery(tenantsQuery(showDeleted));
   const [creating, setCreating] = useState(false);
+  const canCreate = usePermissions().can('tenants.create');
 
   return (
     <>
@@ -134,9 +136,15 @@ export function TenantsPage() {
         title="Tenants"
         description="Each tenant has its own API keys, BYOK provider credentials, datasources and ontology."
         actions={
-          <Button variant="primary" icon={<IconPlus size={14} />} onClick={() => setCreating(true)}>
-            New tenant
-          </Button>
+          canCreate && (
+            <Button
+              variant="primary"
+              icon={<IconPlus size={14} />}
+              onClick={() => setCreating(true)}
+            >
+              New tenant
+            </Button>
+          )
         }
       />
       <Card>
@@ -152,19 +160,26 @@ export function TenantsPage() {
         ) : tenants.isError ? (
           <ErrorState error={tenants.error} onRetry={() => void tenants.refetch()} />
         ) : tenants.data.length === 0 ? (
-          <EmptyState
-            title="No tenants yet"
-            description="Create a tenant, then add a provider key (BYOK) and mint an API key for your apps."
-            action={
-              <Button
-                variant="primary"
-                icon={<IconPlus size={14} />}
-                onClick={() => setCreating(true)}
-              >
-                New tenant
-              </Button>
-            }
-          />
+          canCreate ? (
+            <EmptyState
+              title="No tenants yet"
+              description="Create a tenant, then add a provider key (BYOK) and mint an API key for your apps."
+              action={
+                <Button
+                  variant="primary"
+                  icon={<IconPlus size={14} />}
+                  onClick={() => setCreating(true)}
+                >
+                  New tenant
+                </Button>
+              }
+            />
+          ) : (
+            <EmptyState
+              title="No tenants to show"
+              description="Your roles do not cover any tenant yet. An owner or admin can grant you a role on one."
+            />
+          )
         ) : (
           <Table label="Tenants">
             <THead>
@@ -239,7 +254,7 @@ export function TenantsPage() {
           </Table>
         )}
       </Card>
-      <CreateTenantDialog open={creating} onClose={() => setCreating(false)} />
+      {canCreate && <CreateTenantDialog open={creating} onClose={() => setCreating(false)} />}
     </>
   );
 }

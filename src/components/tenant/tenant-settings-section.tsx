@@ -68,7 +68,14 @@ function changes(saved: Settings, draft: Settings): TenantUpdate {
  * Saved with PATCH /tenants/{id},
  * which the server audits as `tenant.update`.
  */
-export function TenantSettingsSection({ tenant }: { tenant: Tenant }) {
+export function TenantSettingsSection({
+  tenant,
+  readOnly = false,
+}: {
+  tenant: Tenant;
+  /** The signed-in user's roles cannot change the tenant: shown, not editable. */
+  readOnly?: boolean;
+}) {
   const update = useUpdateTenant(tenant.id);
   const headingId = useId();
   const saved = savedSettings(tenant);
@@ -80,7 +87,7 @@ export function TenantSettingsSection({ tenant }: { tenant: Tenant }) {
   const body = percentError ? {} : changes(saved, values);
   const dirty = draft != null && (percentError != null || Object.keys(body).length > 0);
   const deleted = tenant.status === 'deleted';
-  const locked = deleted || update.isPending;
+  const locked = deleted || readOnly || update.isPending;
 
   const edit = (patch: Partial<Settings>) => {
     setDraft({ ...values, ...patch });
@@ -116,7 +123,9 @@ export function TenantSettingsSection({ tenant }: { tenant: Tenant }) {
         <p className="text-[12px] text-fg-muted">
           {deleted
             ? 'This tenant was deleted. Its settings can no longer be changed.'
-            : 'Applies to new requests once routers pick up the change. Every change is recorded in the audit log.'}
+            : readOnly
+              ? 'Read only: your role cannot change these settings.'
+              : 'Applies to new requests once routers pick up the change. Every change is recorded in the audit log.'}
         </p>
       </div>
       <form
@@ -213,23 +222,25 @@ export function TenantSettingsSection({ tenant }: { tenant: Tenant }) {
           </Field>
         </div>
         <FormError error={update.error} />
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          {/* Always mounted so screen readers announce the change. */}
-          <p role="status" className="mr-auto text-[12.5px] text-fg-muted">
-            {dirty ? 'Unsaved changes' : savedNotice ? 'Settings saved.' : ''}
-          </p>
-          <Button onClick={cancel} disabled={!dirty || locked}>
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            loading={update.isPending}
-            disabled={!dirty || deleted || percentError != null}
-          >
-            Save
-          </Button>
-        </div>
+        {!readOnly && (
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            {/* Always mounted so screen readers announce the change. */}
+            <p role="status" className="mr-auto text-[12.5px] text-fg-muted">
+              {dirty ? 'Unsaved changes' : savedNotice ? 'Settings saved.' : ''}
+            </p>
+            <Button onClick={cancel} disabled={!dirty || locked}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              loading={update.isPending}
+              disabled={!dirty || deleted || percentError != null}
+            >
+              Save
+            </Button>
+          </div>
+        )}
       </form>
     </section>
   );
