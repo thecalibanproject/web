@@ -26,7 +26,16 @@ import {
 import { IconAlert, IconPlus } from '../ui/icons';
 import { cn } from '@/lib/cn';
 import { isNotFound } from '@/lib/errors';
+import {
+  accessBody,
+  accessError,
+  accessOf,
+  DEFAULT_KEY_ACCESS,
+  describeAccess,
+  type KeyAccess,
+} from '@/lib/apiKeys';
 import { formatDateTime } from '@/lib/format';
+import { KeyAccessFields } from './key-access-fields';
 import { TenantDeletedState } from './tenant-deleted-state';
 
 /** One-time reveal of a freshly minted key. Plaintext lives only in component state. */
@@ -61,6 +70,23 @@ function NewKeyNotice({ created, onDismiss }: { created: ApiKeyCreated; onDismis
   );
 }
 
+/** A key's node allowlist: every published node, none, or the names. */
+function NodeAccessCell({ access }: { access: KeyAccess }) {
+  if (access.nodes === 'all') {
+    return <span className="text-fg-muted">All published</span>;
+  }
+  if (access.nodes === 'none') return <Badge>None</Badge>;
+  return (
+    <span className="inline-flex flex-wrap gap-1">
+      {access.names.map((n) => (
+        <Badge key={n} tone="info" className="font-mono">
+          {n}
+        </Badge>
+      ))}
+    </span>
+  );
+}
+
 export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
   const [showRevoked, setShowRevoked] = useState(false);
   const keys = useQuery(apiKeysQuery(tenantId, showRevoked));
@@ -69,7 +95,13 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
   const [name, setName] = useState('');
   const [created, setCreated] = useState<ApiKeyCreated | null>(null);
   const [revoking, setRevoking] = useState<ApiKeyInfo | null>(null);
-  const canWrite = usePermissions().can('api_keys.write', tenantId);
+  const perms = usePermissions();
+  const canWrite = perms.can('api_keys.write', tenantId);
+  const canGrantNodes = perms.can('nodes.run', tenantId);
+  const [access, setAccess] = useState<KeyAccess>(DEFAULT_KEY_ACCESS);
+  // Remounts the access fields (and their text) after a key is minted.
+  const [accessKey, setAccessKey] = useState(0);
+  const invalidAccess = accessError(access);
 
   const closeRevoke = () => {
     setRevoking(null);
@@ -78,13 +110,19 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
+    if (invalidAccess) return;
     const trimmed = name.trim();
-    mint.mutate(trimmed ? { name: trimmed } : {}, {
-      onSuccess: (k) => {
-        setCreated(k);
-        setName('');
+    mint.mutate(
+      { ...(trimmed ? { name: trimmed } : {}), ...accessBody(access, canGrantNodes) },
+      {
+        onSuccess: (k) => {
+          setCreated(k);
+          setName('');
+          setAccess(DEFAULT_KEY_ACCESS);
+          setAccessKey((n) => n + 1);
+        },
       },
-    });
+    );
   };
 
   return (
@@ -119,9 +157,28 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
             variant="primary"
             icon={<IconPlus size={14} />}
             loading={mint.isPending}
+            disabled={invalidAccess != null}
           >
             Mint key
           </Button>
+          <details className="w-full rounded-md border border-border">
+            <summary className="cursor-pointer px-3 py-2 text-[12.5px] text-fg-muted hover:text-fg">
+              <span className="font-medium text-fg">Node access</span>:{' '}
+              {describeAccess(access, canGrantNodes)}
+            </summary>
+            <div className="border-t border-border p-3">
+              <KeyAccessFields
+                key={accessKey}
+                tenantId={tenantId}
+                value={access}
+                onChange={(a) => {
+                  setAccess(a);
+                  mint.reset();
+                }}
+                disabled={mint.isPending}
+              />
+            </div>
+          </details>
           {mint.error ? (
             <div className="w-full">
               <FormError error={mint.error} />
@@ -150,6 +207,8 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
             <tr>
               <TH>Name</TH>
               <TH>Prefix</TH>
+              <TH>Nodes</TH>
+              <TH>Datasource scopes</TH>
               <TH>Created</TH>
               {showRevoked && <TH>Status</TH>}
               <TH>
@@ -164,6 +223,21 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
                 <TR key={k.id} className={cn(revoked && 'text-fg-subtle')}>
                   <TD className={cn('font-medium', revoked && 'line-through')}>{k.name}</TD>
                   <TD className="font-mono text-[12px] text-fg-muted">{k.prefix}…</TD>
+                  <TD>
+                    <NodeAccessCell access={accessOf(k)} />
+                  </TD>
+                  <TD
+                    className="max-w-56 truncate text-fg-muted"
+                    title={k.datasource_scopes?.join(', ')}
+                  >
+                    {k.datasource_scopes?.length ? (
+                      <span className="font-mono text-[12px]">
+                        {k.datasource_scopes.join(', ')}
+                      </span>
+                    ) : (
+                      <span title="Every scope of the nodes it runs">Nodes&apos; scopes</span>
+                    )}
+                  </TD>
                   <TD className="text-fg-muted">{formatDateTime(k.created_at)}</TD>
                   {showRevoked && (
                     <TD>
