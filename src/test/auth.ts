@@ -28,6 +28,11 @@ const ALL: Permission[] = [
   'ontology.review',
   'nodes.read',
   'nodes.write',
+  'nodes.publish',
+  'nodes.run',
+  'tools.read',
+  'tools.write',
+  'tools.approve',
   'usage.read',
 ];
 
@@ -50,6 +55,7 @@ const VIEWER: Permission[] = [
   'datasources.read',
   'ontology.read',
   'nodes.read',
+  'tools.read',
   'usage.read',
 ];
 
@@ -66,8 +72,20 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'datasources.write',
     'ontology.review',
     'nodes.write',
+    'nodes.publish',
+    'nodes.run',
+    'tools.write',
+    'tools.approve',
   ],
-  developer: [...VIEWER, 'api_keys.write', 'routes.write', 'ontology.review', 'nodes.write'],
+  developer: [
+    ...VIEWER,
+    'api_keys.write',
+    'routes.write',
+    'ontology.review',
+    'nodes.write',
+    'nodes.run',
+    'tools.write',
+  ],
   viewer: VIEWER,
   billing: ['catalog.read', 'tenant.read', 'usage.read'],
 };

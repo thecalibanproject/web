@@ -11,6 +11,9 @@ const v1: Node = {
   name: 'invoice-triage',
   version: 1,
   spec: { kind: 'agent' },
+  hash: 'sha256:aaaa',
+  state: 'draft',
+  live: false,
   created_at: '2026-10-02T10:00:00Z',
 };
 const v2: Node = { ...v1, id: 'n2', version: 2 };

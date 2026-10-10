@@ -367,6 +367,210 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/v1/nodes/{nodeName}/runs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        nodeName: components['parameters']['NodeName'];
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Run a published node
+     * @description Starts a run of the node's live version (or `version`). The API key must be allowed to run
+     *     the node (its node allowlist; no allowlist: every published node of the tenant). The input
+     *     is checked against the node's `prompt.input_schema`.
+     *
+     *     **Sync** (default): waits until the run ends or waits for a human, at most the server's
+     *     `CALIBAN_NODE_SYNC_WAIT_SECS` (default 60) or `wait_s`; `200` when the run ended, `202`
+     *     with the run so far otherwise. **Async** (`"async": true`): `202` at once; poll
+     *     `GET /v1/runs/{id}` (also in `Location`).
+     *
+     *     `Idempotency-Key` (1 to 255 visible ASCII characters, per tenant, kept with the run):
+     *     a repeat returns the run the first request created (`Idempotent-Replayed: true`) and starts
+     *     nothing; the same key with another body is a `422` (`idempotency_key_reused`).
+     *
+     *     Every model call the run makes goes through the gateway pipeline as the invoking key (PII,
+     *     caches, routing, quotas, metering), with an Idempotency-Key per step. Streaming, MCP and
+     *     `model: "node/<name>"` come later. Split-mode routers forward this request to a worker.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: {
+          'Idempotency-Key'?: string;
+        };
+        path: {
+          nodeName: components['parameters']['NodeName'];
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Any JSON value: the run input */
+            input?: unknown;
+            /** @description A published version; default: the live one */
+            version?: number;
+            /** @default false */
+            async?: boolean;
+            /** @description Sync runs: wait at most this long (capped by the server) */
+            wait_s?: number;
+            /** @description Lowers the version's budget for this run (a larger value is ignored). */
+            budget?: {
+              steps?: number;
+              tokens?: number;
+              usd?: number;
+              wall_clock_s?: number;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description The run ended (succeeded, failed or budget_exhausted) */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['NodeRun'];
+          };
+        };
+        /** @description The run is pending, running, sleeping or waiting for input */
+        202: {
+          headers: {
+            Location?: string;
+            'Idempotent-Replayed'?: 'true';
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['NodeRun'];
+          };
+        };
+        400: components['responses']['Error'];
+        401: components['responses']['Error'];
+        403: components['responses']['Error'];
+        404: components['responses']['Error'];
+        422: components['responses']['Error'];
+        503: components['responses']['Error'];
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/runs/{runId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    /**
+     * Get a node run
+     * @description A run of the key's tenant, of a node the key may run.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          runId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['NodeRun'];
+          };
+        };
+        401: components['responses']['Error'];
+        403: components['responses']['Error'];
+        404: components['responses']['Error'];
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/runs/{runId}/input': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Answer the human step a run waits for
+     * @description Records the answer (sealed in the journal, with who answered: `api_key:<hash prefix>`) and
+     *     resumes the run. `step` defaults to the step the run waits for (`awaiting.step`). `409`
+     *     (`run_not_awaiting_input`) when the run is not waiting for input, or not for that step.
+     *
+     *     A step named `<step>@approve` is the approval of a write whose arguments carry untrusted taint
+     *     labels: answer `{"approve": true}` or `{"approve": false}` (a refusal fails the call). The
+     *     decision is journaled as an `approval` step (see docs/tools.md).
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          runId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Any JSON value */
+            answer: unknown;
+            step?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Accepted; the run resumes */
+        202: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['NodeRun'];
+          };
+        };
+        401: components['responses']['Error'];
+        403: components['responses']['Error'];
+        404: components['responses']['Error'];
+        409: components['responses']['Error'];
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/health': {
     parameters: {
       query?: never;
@@ -549,7 +753,9 @@ export interface paths {
      *     (also needs `[cache.semantic] enabled`). `auto_cache_hit_fraction` sets the share of the
      *     flat `caliban/auto` price billed for this tenant's cache hits (0 to 1); `null` clears it, so
      *     the deployment's `[routing] auto_cache_hit_fraction` (default 0.2) applies. Out of range
-     *     is a 422.
+     *     is a 422. `node_caps` bounds the budgets of every node version the tenant publishes (and
+     *     promotes); `null` restores the defaults. Lowering the caps does not touch versions already
+     *     published, but promoting one that no longer fits is refused.
      */
     patch: {
       parameters: {
@@ -633,6 +839,19 @@ export interface paths {
         content: {
           'application/json': {
             name?: string;
+            /**
+             * @description Node allowlist: the nodes this key may run (`POST /v1/nodes/{name}/runs`). Absent:
+             *     every published node of the tenant. `[]`: none. Granting node access needs the
+             *     `nodes.run` permission on the tenant (`403` otherwise); a creator without it gets
+             *     a key that runs no nodes.
+             */
+            nodes?: string[];
+            /**
+             * @description Datasource scopes (`<datasource>.<object>:read`) the built-in datasource query tool
+             *     may read for this key's runs, intersected with each node's `datasources.scopes`.
+             *     Absent: every scope of the nodes it runs.
+             */
+            datasource_scopes?: string[];
           };
         };
       };
@@ -646,6 +865,7 @@ export interface paths {
             'application/json': components['schemas']['ApiKeyCreated'];
           };
         };
+        403: components['responses']['Error'];
       };
     };
     delete?: never;
@@ -762,8 +982,9 @@ export interface paths {
     post?: never;
     /**
      * Delete a node version
-     * @description Soft-deletes one node version (`node.delete` audit row), scoped to the tenant in the path.
-     *     It is no longer listed; its version number is not reused by later versions.
+     * @description Soft-deletes one node version by its record id (`node.delete` audit row), scoped to the
+     *     tenant in the path. Drafts and retired versions can be deleted; a published version is a
+     *     409 (retire it first). It is no longer listed; its version number is not reused.
      */
     delete: {
       parameters: {
@@ -785,8 +1006,395 @@ export interface paths {
           content?: never;
         };
         404: components['responses']['Error'];
+        409: components['responses']['Error'];
       };
     };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/nodes/{nodeName}/versions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+        nodeName: components['parameters']['NodeName'];
+      };
+      cookie?: never;
+    };
+    /**
+     * List the versions of a node
+     * @description Every version not deleted (drafts, published and retired), oldest first, and the live one. Needs `nodes.read`.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          nodeName: components['parameters']['NodeName'];
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              name?: string;
+              /** @description The promoted version; `null` when none is. */
+              live?: number | null;
+              promotion?: {
+                version?: number;
+                /** Format: date-time */
+                promoted_at?: string;
+                promoted_by?: string;
+              } | null;
+              versions?: components['schemas']['Node'][];
+            };
+          };
+        };
+        404: components['responses']['Error'];
+      };
+    };
+    put?: never;
+    /**
+     * Create a draft version
+     * @description The version number is the node's latest plus one. The spec is checked statically
+     *     (schemas/node.schema.json; MCP tools pinned; cycles bounded by `max_iterations`; `code`
+     *     vertices are refused as not yet supported) and content-hashed. Versions are immutable:
+     *     changing a node means creating a new version. Needs `nodes.write`; audited as `node.create`.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          nodeName: components['parameters']['NodeName'];
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            spec: {
+              [key: string]: unknown;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Node'];
+          };
+        };
+        422: components['responses']['Error'];
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/nodes/{nodeName}/versions/{version}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+        nodeName: components['parameters']['NodeName'];
+        version: components['parameters']['NodeVersion'];
+      };
+      cookie?: never;
+    };
+    /** Get a version (spec and content hash) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          nodeName: components['parameters']['NodeName'];
+          version: components['parameters']['NodeVersion'];
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Node'];
+          };
+        };
+        404: components['responses']['Error'];
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/nodes/{nodeName}/versions/{version}/publish': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+        nodeName: components['parameters']['NodeName'];
+        version: components['parameters']['NodeVersion'];
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Publish a draft (and promote it by default)
+     * @description Validates the draft against the tenant: the static checks again; every `node://name@vN` it
+     *     calls is a published version of the same tenant and references form no cycle; every
+     *     datasource scope (`<datasource>.<object>:<access>`) names a datasource of the tenant and
+     *     `*` or an approved ontology entity bound to it; the budgets fit the tenant's
+     *     `node_caps`; `mcp://` tools are pinned (resolving them against an approved tool registry
+     *     comes with the MCP client). The spec is then sealed under the tenant's data key (created on
+     *     first use; needs `CALIBAN_KEK`, else 400) and ships to routers and workers in the signed
+     *     snapshot. With `promote` (default `true`) it also becomes the live version. Needs
+     *     `nodes.publish`; audited as `node.publish`. A version that is not a draft is a 409; a
+     *     validation failure is a 422 listing every problem.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          nodeName: components['parameters']['NodeName'];
+          version: components['parameters']['NodeVersion'];
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': {
+            /** @default true */
+            promote?: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description Published */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Node'];
+          };
+        };
+        400: components['responses']['Error'];
+        404: components['responses']['Error'];
+        409: components['responses']['Error'];
+        422: components['responses']['Error'];
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/nodes/{nodeName}/versions/{version}/retire': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+        nodeName: components['parameters']['NodeName'];
+        version: components['parameters']['NodeVersion'];
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Retire a published version
+     * @description The version leaves the data-plane snapshot (new runs of it are refused; runs in flight fail
+     *     when they next need it). If it was live, the node has no live version until another is
+     *     promoted. A version still called (`node://`) by another published version is a 409.
+     *     Retirement is final. Needs `nodes.publish`; audited as `node.retire`.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          nodeName: components['parameters']['NodeName'];
+          version: components['parameters']['NodeVersion'];
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Retired */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Node'];
+          };
+        };
+        404: components['responses']['Error'];
+        409: components['responses']['Error'];
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/nodes/{nodeName}/promote': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+        nodeName: components['parameters']['NodeName'];
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Move the promotion pointer (promote or roll back)
+     * @description Makes a published version the live one (what `POST /v1/nodes/{name}/runs` without a version
+     *     runs). Its budgets are checked against the tenant's current `node_caps` (422). A draft or a
+     *     retired version is a 409. Needs `nodes.publish`; audited as `node.promote` with the
+     *     previous live version.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          nodeName: components['parameters']['NodeName'];
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            version: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Promoted */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Node'];
+          };
+        };
+        404: components['responses']['Error'];
+        409: components['responses']['Error'];
+        422: components['responses']['Error'];
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/nodes/{nodeName}/diff': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+        nodeName: components['parameters']['NodeName'];
+      };
+      cookie?: never;
+    };
+    /**
+     * Diff two versions
+     * @description Their hashes and a structural JSON diff of their specs (JSON pointers; arrays compared index by index).
+     */
+    get: {
+      parameters: {
+        query: {
+          from: number;
+          to: number;
+        };
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          nodeName: components['parameters']['NodeName'];
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              name?: string;
+              from?: {
+                version?: number;
+                hash?: string;
+                state?: string;
+              };
+              to?: {
+                version?: number;
+                hash?: string;
+                state?: string;
+              };
+              identical?: boolean;
+              changes?: {
+                /** @description JSON pointer */
+                path: string;
+                /** @enum {string} */
+                op: 'added' | 'removed' | 'changed';
+                from?: unknown;
+                to?: unknown;
+              }[];
+            };
+          };
+        };
+        404: components['responses']['Error'];
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -1412,7 +2020,7 @@ export interface paths {
       };
     };
     put?: never;
-    /** Create a node version (spec validated against schemas/node.schema.json) */
+    /** Create a draft node version (same as POST /api/v1/tenants/{tenantId}/nodes/{nodeName}/versions) */
     post: {
       parameters: {
         query?: never;
@@ -1443,6 +2051,424 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/tenants/{tenantId}/tool-servers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+      };
+      cookie?: never;
+    };
+    /** Registered MCP tool servers (tools.read) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ToolServer'][];
+          };
+        };
+      };
+    };
+    put?: never;
+    /**
+     * Register an MCP tool server (tools.write)
+     * @description Registering a server is what allows node tools to reach it (the egress allowlist). The URL must be
+     *     Streamable HTTP (`http` or `https`; stdio servers are not supported) and pass the egress rules (no
+     *     link-local or metadata addresses; loopback only with `CALIBAN_MCP_ALLOW_LOOPBACK`). `credential` is
+     *     sealed under the tenant's data key at once and never returned. Audited (`tool_server.create`).
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': components['schemas']['ToolServerCreate'];
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ToolServer'];
+          };
+        };
+        400: components['responses']['Error'];
+        409: components['responses']['Error'];
+        422: components['responses']['Error'];
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/tool-servers/{server}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+        server: string;
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Delete a tool server (tools.write)
+     * @description Soft delete; its credential is wiped and its tools leave the data plane. `409` while a published node version uses it.
+     */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          server: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Deleted */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        404: components['responses']['Error'];
+        409: components['responses']['Error'];
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/tool-servers/{server}/discover': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+        server: string;
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Discover a server's tools (tools.write)
+     * @description The control plane connects through the egress guard (with a discovery token for `caliban_token` servers),
+     *     lists the tools, pins each manifest and runs the injection scan. A manifest seen with a new pin is a new,
+     *     `discovered` record: a server cannot change an approved tool. Audited (`tool.discover`).
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          server: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description The manifests the server lists now */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              server?: string;
+              tools?: components['schemas']['ToolManifest'][];
+            };
+          };
+        };
+        404: components['responses']['Error'];
+        422: components['responses']['Error'];
+        502: components['responses']['Error'];
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/tool-servers/{server}/tools': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+        server: string;
+      };
+      cookie?: never;
+    };
+    /** Every manifest recorded for the server, with pins, scan findings and status (tools.read) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          server: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ToolManifest'][];
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Import manifests (a server the control plane cannot reach) (tools.write) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          server: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            manifests: {
+              name: string;
+              description: string;
+              input_schema: Record<string, never>;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description The recorded manifests */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              server?: string;
+              tools?: components['schemas']['ToolManifest'][];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/tool-servers/{server}/tools/{tool}/approve': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+        server: string;
+        tool: string;
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Approve a manifest by pin (tools.approve)
+     * @description Only approved manifests reach the data plane and can be pinned by a published node version. A manifest
+     *     with scan findings needs `acknowledge_findings: true` (`422` otherwise). Audited (`tool.approve`, with the
+     *     findings and the acknowledgement).
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          server: string;
+          tool: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description sha256:<hex> */
+            pin: string;
+            /** @default false */
+            acknowledge_findings?: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description Approved; `ref` is what node specs pin */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              tool?: components['schemas']['ToolManifest'];
+              /** @description mcp://server/tool#sha256:<hex> */
+              ref?: string;
+            };
+          };
+        };
+        404: components['responses']['Error'];
+        422: components['responses']['Error'];
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/tool-servers/{server}/tools/{tool}/revoke': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+        server: string;
+        tool: string;
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Withdraw the approval of a manifest (tools.approve) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          server: string;
+          tool: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            pin: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Revoked */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        404: components['responses']['Error'];
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/.well-known/caliban-tool-jwks.json': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * The public keys tool servers verify minted tool tokens with
+     * @description The current and previous `CALIBAN_TOOL_TOKEN_*` public keys (RFC 8037 OKP, Ed25519, `alg: EdDSA`). Tokens are
+     *     minted per call, audience-bound (the server's audience), scoped to one tool (`scope: tool:<name>`) and live
+     *     60 seconds. Empty without a key.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description JWKS */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              keys?: {
+                /** @enum {string} */
+                kty?: 'OKP';
+                /** @enum {string} */
+                crv?: 'Ed25519';
+                /** @enum {string} */
+                alg?: 'EdDSA';
+                /** @enum {string} */
+                use?: 'sig';
+                kid?: string;
+                x?: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/usage': {
     parameters: {
       query?: never;
@@ -1450,11 +2476,20 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Recent usage events and aggregate savings */
+    /**
+     * Recent usage events and aggregate savings
+     * @description With the Postgres store, from `usage_event`: every data plane's events (split-mode routers ship theirs
+     *     through `POST /api/v1/usage/ingest`), totals over all of them, including the days rolled up into
+     *     `usage_daily` once raw events pass `CALIBAN_USAGE_RETENTION_DAYS` (the totals do not change). With the
+     *     in-memory store, the last 10,000 events of the process. `node` and `run_id` filter node calls; `by_node`
+     *     totals each node version (cost per node); a `run_id` covers raw events only.
+     */
     get: {
       parameters: {
         query?: {
           tenant_id?: components['parameters']['TenantQuery'];
+          node?: string;
+          run_id?: string;
           limit?: number;
         };
         header?: never;
@@ -1587,6 +2622,55 @@ export interface paths {
             'application/json': components['schemas']['AuditLog'];
           };
         };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/keys/status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * KEK rotation status (the same report as `caliban keys status`)
+     * @description Which KEK wraps each tenant data key and seals each shared provider key, what still waits for migration,
+     *     whether the retired keys in `CALIBAN_KEK_PREVIOUS` are still needed by stored data
+     *     (`previous_keks_still_needed`), and what each split-mode router reported on its last snapshot poll
+     *     (`routers`: `active` when seen within 10 minutes, `snapshot_version`, `snapshot_kek_ids`, `keyring`,
+     *     `needs_previous_kek`, `has_current_kek`). `routers_on_previous_keks` lists the active routers whose snapshot
+     *     still needs a retired KEK; `rotation_complete` is true when neither stored data nor an active router does,
+     *     which is when `CALIBAN_KEK_PREVIOUS` can be removed. Needs `audit.read`.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              [key: string]: unknown;
+            };
+          };
+        };
+        401: components['responses']['Error'];
+        403: components['responses']['Error'];
       };
     };
     put?: never;
@@ -2032,6 +3116,66 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/usage/ingest': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Usage events from a split-mode router
+     * @description Authenticated with the router token (`CALIBAN_ROUTER_TOKEN`), not the admin token. Each `request_id` is
+     *     stored once: a batch sent again (lost acknowledgement, router restart) is answered with `duplicates` and
+     *     not counted again. Invalid events (empty or oversized ids) are counted as `rejected` and dropped. Billing
+     *     fields are stored as the router computed them.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            router_id?: string;
+            events: components['schemas']['UsageEvent'][];
+          };
+        };
+      };
+      responses: {
+        /** @description Stored */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Events stored for the first time */
+              accepted: number;
+              /** @description Events already stored; ignored */
+              duplicates: number;
+              /** @description Invalid events; ignored */
+              rejected: number;
+            };
+          };
+        };
+        400: components['responses']['Error'];
+        401: components['responses']['Error'];
+        413: components['responses']['Error'];
+        503: components['responses']['Error'];
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/snapshot': {
     parameters: {
       query?: never;
@@ -2045,12 +3189,23 @@ export interface paths {
      *     control plane has `CALIBAN_SNAPSHOT_SIGNING_KEY` and `CALIBAN_ROUTER_TOKEN`. The ETag is a digest of the
      *     config; send it back in `If-None-Match` to get 304 while nothing changed. Verify `signature` (Ed25519 over
      *     `"caliban-snapshot-v1\0" ‖ base64-decoded payload`) before parsing `payload`. Sealed BYOK keys stay sealed.
+     *
+     *     Routers check in with every poll through the `x-caliban-router-*` headers (what they serve); the control
+     *     plane records them for `GET /api/v1/keys/status`. Polls without `x-caliban-router-id` are not recorded.
      */
     get: {
       parameters: {
         query?: never;
         header?: {
           'If-None-Match'?: string;
+          /** @description The router's id (`CALIBAN_ROUTER_ID`, else its host name); 1 to 128 of `[A-Za-z0-9._:-]`. */
+          'x-caliban-router-id'?: string;
+          /** @description Version label of the snapshot the router serves. */
+          'x-caliban-router-snapshot'?: string;
+          /** @description Comma-separated `kek_ids` of the snapshot the router serves. */
+          'x-caliban-router-snapshot-kek-ids'?: string;
+          /** @description Comma-separated ids of the router's own keyring, current KEK first. */
+          'x-caliban-router-keyring'?: string;
         };
         path?: never;
         cookie?: never;
@@ -2285,6 +3440,10 @@ export interface components {
       pii_surrogate_scope?: 'tenant' | 'session';
       /** @description Share of the flat `caliban/auto` price billed when a cache tier (exact or semantic) answers this tenant's request: no model is called. `null`: the deployment's `[routing] auto_cache_hit_fraction` (default 0.2) applies. */
       auto_cache_hit_fraction?: number | null;
+      /** @description `null`: the defaults (steps 200, tokens 2000000, wall_clock_s 3600, depth 5, fanout 32). */
+      node_caps?: components['schemas']['NodeCaps'] | null;
+      /** @description Caps on what the tenant's node runs spend on model calls; `null`: none. */
+      node_spend_caps?: components['schemas']['NodeSpendCaps'] | null;
       /** Format: date-time */
       created_at: string;
       /**
@@ -2315,6 +3474,8 @@ export interface components {
       semantic_cache?: 'off' | 'on';
       /** @description Overrides `[routing] auto_cache_hit_fraction` for this tenant. Omitted or `null`: the deployment value. */
       auto_cache_hit_fraction?: number | null;
+      node_caps?: components['schemas']['NodeCaps'];
+      node_spend_caps?: components['schemas']['NodeSpendCaps'];
     };
     TenantUpdate: {
       /** @enum {string} */
@@ -2325,6 +3486,28 @@ export interface components {
       semantic_cache?: 'off' | 'on';
       /** @description A number sets the override; `null` clears it (the deployment value applies); absent keeps it. */
       auto_cache_hit_fraction?: number | null;
+      /** @description Caps on the budgets of published node versions; `null` restores the defaults; absent keeps them. */
+      node_caps?: components['schemas']['NodeCaps'] | null;
+      /** @description Daily and monthly caps on node spend; `null` removes them; absent keeps them. */
+      node_spend_caps?: components['schemas']['NodeSpendCaps'] | null;
+    };
+    /**
+     * @description Caps on what the tenant's node runs spend on model calls (USD, priced like the metering), per
+     *     UTC day and month, across all workers: checked before every model call against the journal's
+     *     per-day totals. A cap reached ends runs gracefully (`budget_exhausted`).
+     */
+    NodeSpendCaps: {
+      daily_usd?: number;
+      monthly_usd?: number;
+    };
+    NodeCaps: {
+      steps: number;
+      tokens: number;
+      wall_clock_s: number;
+      depth: number;
+      fanout: number;
+      /** @description When set, every version must declare `budgets.usd` within it (the most one run may spend). */
+      usd?: number;
     };
     ApiKeyInfo: {
       id: string;
@@ -2338,6 +3521,10 @@ export interface components {
        * @description Set once the key is revoked.
        */
       revoked_at?: string | null;
+      /** @description Node allowlist. `null`: every published node of the tenant; `[]`: none. */
+      nodes?: string[] | null;
+      /** @description Datasource scopes the built-in query tool may read for this key (absent: every scope of the nodes it runs). */
+      datasource_scopes?: string[];
     };
     ApiKeyCreated: components['schemas']['ApiKeyInfo'] & {
       /** @description Plaintext key. Shown once. */
@@ -2538,7 +3725,9 @@ export interface components {
       version: number;
       elements: components['schemas']['OntologyElement'][];
     };
+    /** @description One immutable node version. */
     Node: {
+      /** @description Record id (DELETE /api/v1/tenants/{tenantId}/nodes/{id}) */
       id: string;
       tenant_id: string;
       name: string;
@@ -2547,8 +3736,88 @@ export interface components {
       spec: {
         [key: string]: unknown;
       };
+      /** @description `sha256:<hex>` over the canonical spec JSON (keys sorted, no whitespace). Stable across key order and formatting. */
+      hash: string;
+      /** @enum {string} */
+      state: 'draft' | 'published' | 'retired';
+      /** @description The promotion pointer names this version. */
+      live: boolean;
       /** Format: date-time */
       created_at: string;
+      created_by?: string | null;
+      /** Format: date-time */
+      published_at?: string | null;
+      /** Format: date-time */
+      retired_at?: string | null;
+    };
+    NodeRun: {
+      id: string;
+      /** @enum {string} */
+      object: 'node.run';
+      node: string;
+      version: number;
+      /** @description Content hash of the version that runs */
+      hash: string;
+      /** @enum {string} */
+      status:
+        | 'pending'
+        | 'running'
+        | 'sleeping'
+        | 'input_required'
+        | 'succeeded'
+        | 'failed'
+        | 'budget_exhausted';
+      /** @description The run output; on budget_exhausted (and failed, when there is one) the partial result */
+      output?: unknown;
+      /** @description The run ended on a budget overrun: output is partial */
+      partial?: boolean;
+      error?: string | null;
+      /** @description Why a run stopped early (a budget), or a note on a run that succeeded (a loop that hit max_iterations) */
+      stop_reason?: string | null;
+      awaiting?: {
+        step?: string;
+        question?: string | null;
+      } | null;
+      budget: {
+        steps_limit?: number;
+        steps_used?: number;
+        tokens_limit?: number;
+        tokens_used?: number;
+        wall_clock_ms_limit?: number;
+        /** @description Execution time only (not waiting for a human or a timer) */
+        wall_clock_ms_used?: number;
+        /** @description Model spend so far, priced like the metering */
+        usd?: number;
+        /** @description The run's USD cap (absent: none; tenant caps still apply) */
+        usd_limit?: number;
+        depth_limit?: number;
+        /** @description Deepest subnode nesting reached */
+        depth_used?: number;
+        fanout_limit?: number;
+        /** @description Widest map reached */
+        fanout_used?: number;
+      };
+      /** @description What the run spent on model calls so far (USD): the sum of `charged_usd` over its usage events */
+      cost_usd?: number;
+      steps: {
+        /** @description Deterministic step id, e.g. classify#0, fanout#0/3, agent#2.1 */
+        id?: string;
+        vertex?: string;
+        kind?: string;
+        /** @enum {string} */
+        status?: 'completed' | 'failed';
+        tokens?: number;
+        usd?: number;
+        duration_ms?: number;
+      }[];
+      /** @description How many times a worker claimed the run (more than 1 after a takeover or a resume) */
+      claims?: number;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      started_at?: string | null;
+      /** Format: date-time */
+      finished_at?: string | null;
     };
     NodeCreate: {
       tenant_id: string;
@@ -2556,6 +3825,67 @@ export interface components {
       spec: {
         [key: string]: unknown;
       };
+    };
+    /** @description How Caliban authenticates to the server. Client tokens are never passed through. */
+    ToolAuth: {
+      /** @enum {string} */
+      method: 'caliban_token' | 'api_key' | 'oauth_client_credentials' | 'none';
+      /** @description caliban_token: `aud` of minted tokens (default: the URL's origin) */
+      audience?: string;
+      /** @description api_key: the header carrying the key (default `Authorization: Bearer`) */
+      header?: string;
+      /** @description oauth_client_credentials */
+      token_url?: string;
+      /** @description oauth_client_credentials */
+      client_id?: string;
+      /** @description oauth_client_credentials: requested scope (down-scoping) */
+      scope?: string;
+    };
+    ToolServer: {
+      id?: string;
+      tenant_id?: string;
+      /** @description The `server` of `mcp://server/tool#sha256:...` */
+      name?: string;
+      url?: string;
+      auth?: components['schemas']['ToolAuth'];
+      /** @description Trusted with personal data: PII surrogates in arguments are rehydrated for it */
+      trusted?: boolean;
+      has_credential?: boolean;
+      /** Format: date-time */
+      created_at?: string;
+      created_by?: string;
+    };
+    ToolServerCreate: {
+      name: string;
+      url: string;
+      auth?: components['schemas']['ToolAuth'];
+      /** @description API key or OAuth client secret; sealed at once, never returned */
+      credential?: string;
+      /** @default false */
+      trusted?: boolean;
+    };
+    ToolManifest: {
+      id?: string;
+      server?: string;
+      name?: string;
+      description?: string;
+      input_schema?: Record<string, never>;
+      /** @description sha256 over the canonical [name, description, input_schema] */
+      pin?: string;
+      findings?: {
+        /** @enum {string} */
+        kind?: 'instruction' | 'hidden_unicode' | 'url' | 'exfiltration';
+        location?: string;
+        excerpt?: string;
+      }[];
+      /** @enum {string} */
+      status?: 'discovered' | 'approved' | 'revoked';
+      /** Format: date-time */
+      discovered_at?: string;
+      /** Format: date-time */
+      approved_at?: string | null;
+      approved_by?: string | null;
+      findings_acknowledged?: boolean;
     };
     UsageEvent: {
       request_id: string;
@@ -2607,41 +3937,54 @@ export interface components {
       billed_usd?: number;
       /** @description Cache hits only: what the hit saved the customer. `caliban/auto`: `flat_price_usd - billed_usd`. Other models: the model cost the hit avoided (the cached answer's tokens at the input and output price; nothing reached the provider). Absent on misses and for unpriced models. */
       saved_usd?: number;
+      /** @description Node model calls only: the node of the run (its root node: a subnode's calls are the run's). */
+      node?: string;
+      node_version?: number;
+      run_id?: string;
     };
     UsageReport: {
       events: components['schemas']['UsageEvent'][];
-      totals: {
-        requests?: number;
-        prompt_tokens?: number;
-        completion_tokens?: number;
-        /** @description Prompt tokens read from provider prompt caches */
-        cached_prompt_tokens?: number;
-        /** @description Prompt tokens written to provider prompt caches */
-        cache_write_tokens?: number;
-        /** @description Events with `usage_source: estimated` */
-        estimated_requests?: number;
-        /** @description Hits of both tiers. */
-        cache_hits?: number;
-        /** @description Sum of `saved_usd`: what cache hits saved customers, all models */
-        saved_usd?: number;
-        semantic_cache_hits?: number;
-        tokens_saved?: number;
-        cost_usd?: number;
-        /** @description Requests that asked for `caliban/auto` */
-        auto_requests?: number;
-        /** @description `caliban/auto` requests answered by a cache tier (billed at the discounted price) */
-        auto_cache_hits?: number;
-        /** @description Full flat price, summed over `caliban/auto` events that carry both prices (cache hits at their full price) */
-        flat_price_usd?: number;
-        /** @description What those events were billed: the flat price on misses, the discounted price on cache hits */
-        billed_usd?: number;
-        /** @description What `caliban/auto` cache hits saved customers: flat_price_usd - billed_usd over hits */
-        auto_saved_usd?: number;
-        /** @description Sum over the same events (0 on cache hits) */
-        routed_model_cost_usd?: number;
-        /** @description billed_usd - routed_model_cost_usd */
-        margin_usd?: number;
-      };
+      /** @description The same totals per node version (node calls only), raw and rolled-up days. */
+      by_node?: {
+        node?: string;
+        node_version?: number;
+        totals?: components['schemas']['UsageTotals'];
+      }[];
+      totals: components['schemas']['UsageTotals'];
+    };
+    UsageTotals: {
+      /** @description What the customer is charged: the billed `caliban/auto` price (discounted on cache hits), the model's cost otherwise. Over a run's events it equals the run's `cost_usd`. */
+      charged_usd?: number;
+      requests?: number;
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      /** @description Prompt tokens read from provider prompt caches */
+      cached_prompt_tokens?: number;
+      /** @description Prompt tokens written to provider prompt caches */
+      cache_write_tokens?: number;
+      /** @description Events with `usage_source: estimated` */
+      estimated_requests?: number;
+      /** @description Hits of both tiers. */
+      cache_hits?: number;
+      /** @description Sum of `saved_usd`: what cache hits saved customers, all models */
+      saved_usd?: number;
+      semantic_cache_hits?: number;
+      tokens_saved?: number;
+      cost_usd?: number;
+      /** @description Requests that asked for `caliban/auto` */
+      auto_requests?: number;
+      /** @description `caliban/auto` requests answered by a cache tier (billed at the discounted price) */
+      auto_cache_hits?: number;
+      /** @description Full flat price, summed over `caliban/auto` events that carry both prices (cache hits at their full price) */
+      flat_price_usd?: number;
+      /** @description What those events were billed: the flat price on misses, the discounted price on cache hits */
+      billed_usd?: number;
+      /** @description What `caliban/auto` cache hits saved customers: flat_price_usd - billed_usd over hits */
+      auto_saved_usd?: number;
+      /** @description Sum over the same events (0 on cache hits) */
+      routed_model_cost_usd?: number;
+      /** @description billed_usd - routed_model_cost_usd */
+      margin_usd?: number;
     };
     Route: {
       intent: string;
@@ -2703,6 +4046,11 @@ export interface components {
       | 'ontology.review'
       | 'nodes.read'
       | 'nodes.write'
+      | 'nodes.publish'
+      | 'nodes.run'
+      | 'tools.read'
+      | 'tools.write'
+      | 'tools.approve'
       | 'usage.read';
     RoleInfo: {
       role: components['schemas']['Role'];
@@ -2793,7 +4141,11 @@ export interface components {
     SignedSnapshot: {
       /** @description First 16 hex chars of sha256(public key) */
       key_id: string;
-      /** @description base64 of JSON {version, issued_at_ms, config}; config has the caliban.toml structure */
+      /**
+       * @description base64 of JSON {version, issued_at_ms, config, kek_ids}; config has the caliban.toml structure. kek_ids
+       *     (omitted when empty) lists the KEKs (`kek_` fingerprints) that sealed the secrets in config: what a router
+       *     needs in its keyring to open them.
+       */
       payload: string;
       /** @description base64 Ed25519 signature */
       signature: string;
@@ -2874,6 +4226,8 @@ export interface components {
   parameters: {
     TenantId: string;
     ProviderId: string;
+    NodeName: string;
+    NodeVersion: number;
     TenantQuery: string;
   };
   requestBodies: never;
