@@ -82,3 +82,28 @@ export function displayName(principal: Principal): string {
   if (!me || me.method === 'break_glass') return 'Admin token';
   return me.user?.name || me.user?.email || me.actor;
 }
+
+/** What a permission lets someone do, for "your role cannot ..." tooltips. */
+const WHAT: Partial<Record<Permission, string>> = {
+  'nodes.write': 'create or delete node versions',
+  'nodes.publish': 'publish, promote or retire node versions',
+  'nodes.run': 'grant node access to API keys',
+  'tools.write': 'register, discover or delete tool servers',
+  'tools.approve': 'approve or revoke tools',
+  'tenant.write': 'change tenant settings',
+  'api_keys.write': 'mint or revoke API keys',
+};
+
+/**
+ * Why a control is disabled: null when the user holds `perm` (on `tenantId`),
+ * otherwise a sentence naming the permission, for a tooltip.
+ */
+export function deniedReason(
+  perms: Permissions,
+  perm: Permission,
+  tenantId?: string,
+): string | null {
+  if (perms.can(perm, tenantId)) return null;
+  const what = WHAT[perm] ?? 'do this';
+  return `Your role cannot ${what}${tenantId ? ' on this tenant' : ''} (needs ${perm}).`;
+}

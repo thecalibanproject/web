@@ -1,25 +1,43 @@
 import { useDeferredValue, useMemo, useState, type FormEvent } from 'react';
-import { useCreateNode } from '@/api/queries';
-import { TenantSelect } from '../tenant-select';
-import { Button, Field, FormError, Input } from '../ui';
-import { IconAlert, IconCheck } from '../ui/icons';
+import { useCreateNodeVersion } from '@/api/queries';
+import type { Node } from '@/api/types';
 import { checkNodeSpec, NODE_SPEC_TEMPLATE } from '@/lib/nodeSpec';
+import { TenantSelect } from '../tenant-select';
+import { Button, Field, Input } from '../ui';
+import { IconAlert, IconCheck } from '../ui/icons';
+import { NodeProblems } from './node-problems';
+
+/** Node names: 1 to 64 characters of a-z, 0-9, '-' and '_', starting with a letter or digit. */
+export const NODE_NAME_PATTERN = '[a-z0-9][a-z0-9_\\-]{0,63}';
 
 /**
- * JSON editor for a node spec, validated against node.schema.json with ajv
- * before POST. The server validates again; this is for fast feedback.
+ * JSON editor for a draft version. The text is parsed and checked against
+ * node.schema.json as you type, and nothing is sent while it does not parse
+ * or match. The control plane checks the spec again (pinned tools, schema
+ * keywords, unsupported vertices) and its refusal is shown problem by problem.
+ *
+ * Without `target` it creates a new node (v1) in a tenant the user may write
+ * to; with it, the next version of that node, starting from `initialSpec`.
  */
 export function NodeEditor({
+  target,
   defaultTenant,
-  onDone,
+  initialSpec,
+  onCancel,
+  onCreated,
 }: {
-  defaultTenant: string | undefined;
-  onDone: () => void;
+  target?: { tenantId: string; name: string };
+  defaultTenant?: string | undefined;
+  initialSpec?: Record<string, unknown>;
+  onCancel: () => void;
+  onCreated: (node: Node) => void;
 }) {
-  const create = useCreateNode();
-  const [tenantId, setTenantId] = useState(defaultTenant);
-  const [name, setName] = useState('');
-  const [text, setText] = useState(() => JSON.stringify(NODE_SPEC_TEMPLATE, null, 2));
+  const create = useCreateNodeVersion();
+  const [tenantId, setTenantId] = useState(target?.tenantId ?? defaultTenant);
+  const [name, setName] = useState(target?.name ?? '');
+  const [text, setText] = useState(() =>
+    JSON.stringify(initialSpec ?? NODE_SPEC_TEMPLATE, null, 2),
+  );
   const deferred = useDeferredValue(text);
   const check = useMemo(() => checkNodeSpec(deferred), [deferred]);
   const valid = check.ok && deferred === text;
@@ -27,11 +45,8 @@ export function NodeEditor({
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
     const now = checkNodeSpec(text);
-    if (!now.ok || !tenantId) return;
-    create.mutate(
-      { tenant_id: tenantId, name: name.trim(), spec: now.spec },
-      { onSuccess: onDone },
-    );
+    if (!now.ok || !tenantId || !name.trim()) return;
+    create.mutate({ tenantId, name: name.trim(), spec: now.spec }, { onSuccess: onCreated });
   };
 
   const format = () => {
@@ -43,35 +58,53 @@ export function NodeEditor({
   };
 
   return (
-    <form onSubmit={onSubmit} className="flex h-full flex-col gap-4" aria-label="Create node">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Tenant" required>
-          {({ id }) => (
-            <TenantSelect
-              id={id}
-              value={tenantId}
-              onChange={setTenantId}
-              permission="nodes.write"
-              required
-            />
-          )}
-        </Field>
-        <Field label="Name" required hint="Callers use it as caliban.node.">
-          {({ id, describedBy }) => (
-            <Input
-              id={id}
-              required
-              aria-describedby={describedBy}
-              pattern="[a-z0-9][a-z0-9\-]*"
-              title="Lowercase letters, digits and hyphens"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="invoice-triage"
-              className="font-mono"
-            />
-          )}
-        </Field>
-      </div>
+    <form
+      onSubmit={onSubmit}
+      className="flex h-full flex-col gap-4"
+      aria-label={target ? 'Create version' : 'Create node'}
+    >
+      {target ? (
+        <p className="text-[12.5px] text-fg-muted">
+          A new draft of <code className="font-mono font-medium text-fg">{target.name}</code>. It
+          gets the next version number; published versions are not changed.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Tenant" required>
+            {({ id }) => (
+              <TenantSelect
+                id={id}
+                value={tenantId}
+                onChange={setTenantId}
+                permission="nodes.write"
+                required
+              />
+            )}
+          </Field>
+          <Field
+            label="Name"
+            required
+            hint="Runs call it as POST /v1/nodes/{name}/runs. Lowercase letters, digits, - and _."
+          >
+            {({ id, describedBy }) => (
+              <Input
+                id={id}
+                required
+                aria-describedby={describedBy}
+                pattern={NODE_NAME_PATTERN}
+                title="1 to 64 lowercase letters, digits, - and _"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  create.reset();
+                }}
+                placeholder="invoice-triage"
+                className="font-mono"
+              />
+            )}
+          </Field>
+        </div>
+      )}
 
       <div className="flex min-h-0 flex-1 flex-col gap-1">
         <div className="flex items-center justify-between">
@@ -93,7 +126,10 @@ export function NodeEditor({
           autoCapitalize="off"
           autoCorrect="off"
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            create.reset();
+          }}
           onKeyDown={(e) => {
             // Tab inserts two spaces; Escape-then-Tab still leaves the field (WCAG 2.1.2).
             if (e.key === 'Tab' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
@@ -135,16 +171,16 @@ export function NodeEditor({
         </div>
       </div>
 
-      <FormError error={create.error} />
+      <NodeProblems error={create.error} />
       <div className="flex justify-end gap-2">
-        <Button onClick={onDone}>Cancel</Button>
+        <Button onClick={onCancel}>Cancel</Button>
         <Button
           type="submit"
           variant="primary"
           loading={create.isPending}
           disabled={!valid || !tenantId || !name.trim()}
         >
-          Create node
+          {target ? 'Create draft' : 'Create node'}
         </Button>
       </div>
     </form>

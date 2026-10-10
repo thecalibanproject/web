@@ -1,20 +1,18 @@
 import { useQuery } from '@tanstack/react-query';
-import { getRouteApi } from '@tanstack/react-router';
+import { getRouteApi, Link } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 import { usePermissions } from '@/api/auth';
-import { nodesQuery, tenantsQuery, useDeleteNode } from '@/api/queries';
-import type { Node } from '@/api/types';
+import { nodesQuery, tenantsQuery } from '@/api/queries';
+import { NodeStateBadge } from '@/components/nodes/node-badges';
 import { NodeEditor } from '@/components/nodes/node-editor';
 import { TenantFilter } from '@/components/tenant-select';
 import {
   Badge,
-  Button,
   Card,
-  CodeBlock,
-  ConfirmDialog,
   Drawer,
   EmptyState,
   ErrorState,
+  GatedButton,
   LoadingState,
   PageHeader,
   Table,
@@ -24,15 +22,13 @@ import {
   THead,
   TR,
 } from '@/components/ui';
-import { IconPlus, IconTrash } from '@/components/ui/icons';
+import { IconPlus } from '@/components/ui/icons';
 import { formatDateTime } from '@/lib/format';
+import { summarizeNodes } from '@/lib/nodes';
 
 const route = getRouteApi('/_app/nodes');
 
-function specField(node: Node, key: string): string | undefined {
-  const v = node.spec[key];
-  return typeof v === 'string' ? v : undefined;
-}
+const NO_WRITE = 'Your role cannot create nodes on any tenant (needs nodes.write).';
 
 export function NodesPage() {
   const { tenant } = route.useSearch();
@@ -43,34 +39,28 @@ export function NodesPage() {
     () => new Map((tenants.data ?? []).map((t) => [t.id, t.name])),
     [tenants.data],
   );
+  const rows = useMemo(() => summarizeNodes(nodes.data ?? []), [nodes.data]);
   const [creating, setCreating] = useState(false);
-  const [viewing, setViewing] = useState<Node | null>(null);
-  const del = useDeleteNode();
-  const [deleting, setDeleting] = useState<Node | null>(null);
   const perms = usePermissions();
-  const canCreate = perms.canSomewhere('nodes.write');
+  const cannotCreate = perms.canSomewhere('nodes.write') ? null : NO_WRITE;
 
-  const closeDelete = () => {
-    setDeleting(null);
-    del.reset();
-  };
+  const newNode = (
+    <GatedButton
+      variant="primary"
+      icon={<IconPlus size={14} />}
+      deniedReason={cannotCreate}
+      onClick={() => setCreating(true)}
+    >
+      New node
+    </GatedButton>
+  );
 
   return (
     <>
       <PageHeader
         title="Nodes"
-        description="Versioned, budgeted AI sub-apps. Each is callable over HTTP, MCP and A2A."
-        actions={
-          canCreate && (
-            <Button
-              variant="primary"
-              icon={<IconPlus size={14} />}
-              onClick={() => setCreating(true)}
-            >
-              New node
-            </Button>
-          )
-        }
+        description="Versioned, budgeted AI sub-apps. Publish a version to run it; the live version is what a run that names no version runs."
+        actions={newNode}
       />
       <Card>
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
@@ -80,77 +70,58 @@ export function NodesPage() {
           <LoadingState />
         ) : nodes.isError ? (
           <ErrorState error={nodes.error} onRetry={() => void nodes.refetch()} />
-        ) : nodes.data.length === 0 ? (
+        ) : rows.length === 0 ? (
           <EmptyState
             title="No nodes"
-            description="Create a node from a JSON spec. It is validated against node.schema.json before it is saved."
-            action={
-              canCreate && (
-                <Button
-                  variant="primary"
-                  icon={<IconPlus size={14} />}
-                  onClick={() => setCreating(true)}
-                >
-                  New node
-                </Button>
-              )
-            }
+            description="Create a node from a JSON spec. It is checked against node.schema.json as you type, and again by the control plane."
+            action={newNode}
           />
         ) : (
           <Table label="Nodes">
             <THead>
               <tr>
                 <TH>Name</TH>
-                <TH>Version</TH>
-                <TH>Kind</TH>
                 <TH>Tenant</TH>
-                <TH>Description</TH>
-                <TH>Created</TH>
-                <TH>
-                  <span className="sr-only">Actions</span>
-                </TH>
+                <TH>Live version</TH>
+                <TH>Latest version</TH>
+                <TH className="text-right">Versions</TH>
+                <TH>Updated</TH>
               </tr>
             </THead>
             <TBody>
-              {nodes.data.map((n) => (
-                <TR key={n.id}>
+              {rows.map((n) => (
+                <TR key={`${n.tenantId}/${n.name}`}>
                   <TD>
-                    <button
-                      type="button"
-                      onClick={() => setViewing(n)}
+                    <Link
+                      to="/nodes/$tenantId/$nodeName"
+                      params={{ tenantId: n.tenantId, nodeName: n.name }}
                       className="font-mono text-[12.5px] font-medium hover:text-accent hover:underline"
                     >
                       {n.name}
-                    </button>
+                    </Link>
                   </TD>
                   <TD>
-                    <Badge>v{n.version}</Badge>
+                    {names.get(n.tenantId) ?? (
+                      <span className="font-mono text-[12px]">{n.tenantId}</span>
+                    )}
                   </TD>
-                  <TD>{specField(n, 'kind') ?? '—'}</TD>
                   <TD>
-                    {names.get(n.tenant_id) ?? (
-                      <span className="font-mono text-[12px]">{n.tenant_id}</span>
+                    {n.live ? (
+                      <Badge tone="accent" dot>
+                        v{n.live.version}
+                      </Badge>
+                    ) : (
+                      <span className="text-fg-subtle">None</span>
                     )}
                   </TD>
-                  <TD className="max-w-80 truncate text-fg-muted">
-                    {specField(n, 'description') ?? '—'}
+                  <TD>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Badge>v{n.latest.version}</Badge>
+                      <NodeStateBadge state={n.latest.state} />
+                    </span>
                   </TD>
-                  <TD className="whitespace-nowrap text-fg-muted">
-                    {formatDateTime(n.created_at)}
-                  </TD>
-                  <TD className="text-right">
-                    {perms.can('nodes.write', n.tenant_id) && (
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        icon={<IconTrash size={14} />}
-                        aria-label={`Delete ${n.name} v${n.version}`}
-                        onClick={() => setDeleting(n)}
-                      >
-                        Delete
-                      </Button>
-                    )}
-                  </TD>
+                  <TD className="text-right text-fg-muted">{n.versions}</TD>
+                  <TD className="whitespace-nowrap text-fg-muted">{formatDateTime(n.updatedAt)}</TD>
                 </TR>
               ))}
             </TBody>
@@ -162,45 +133,22 @@ export function NodesPage() {
         open={creating}
         onClose={() => setCreating(false)}
         title="New node"
-        description="Posting a node with an existing name creates a new version."
+        description="Creates version 1 as a draft. Publish it from the node's page to make it runnable."
       >
-        {creating && <NodeEditor defaultTenant={tenant} onDone={() => setCreating(false)} />}
+        {creating && (
+          <NodeEditor
+            defaultTenant={tenant}
+            onCancel={() => setCreating(false)}
+            onCreated={(n) => {
+              setCreating(false);
+              void navigate({
+                to: '/nodes/$tenantId/$nodeName',
+                params: { tenantId: n.tenant_id, nodeName: n.name },
+              });
+            }}
+          />
+        )}
       </Drawer>
-      <Drawer
-        open={viewing !== null}
-        onClose={() => setViewing(null)}
-        title={viewing ? `${viewing.name} v${viewing.version}` : ''}
-        description={viewing?.id}
-      >
-        {viewing && <CodeBlock label="Node spec" code={JSON.stringify(viewing.spec, null, 2)} />}
-      </Drawer>
-      <ConfirmDialog
-        open={deleting !== null}
-        title="Delete node version?"
-        confirmLabel="Delete node version"
-        loading={del.isPending}
-        error={del.error}
-        onCancel={closeDelete}
-        onConfirm={() => {
-          // A 404 (already deleted) resolves too; the list refreshes either way.
-          if (deleting) {
-            del.mutate(
-              { tenantId: deleting.tenant_id, nodeId: deleting.id },
-              { onSuccess: closeDelete },
-            );
-          }
-        }}
-      >
-        <p>
-          Delete{' '}
-          <code className="font-mono font-medium">
-            {deleting?.name} v{deleting?.version}
-          </code>
-          ? Only this version is deleted, and it is no longer listed. Its version number is not
-          reused by later versions.
-        </p>
-        <p>Audit history is kept.</p>
-      </ConfirmDialog>
     </>
   );
 }

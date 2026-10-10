@@ -1,15 +1,17 @@
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, slashPreservingPath, unwrap } from './client';
 import type {
+  ApiKeyCreate,
   DatasourceCreate,
   ModelCreate,
-  NodeCreate,
   ProviderKeyCreate,
   RoleBindingCreate,
   ReviewDecision,
   SharedProviderCreate,
   TenantCreate,
   TenantUpdate,
+  ToolImport,
+  ToolServerCreate,
 } from './types';
 
 /** Model-server health is re-probed this often while a row is on screen. */
@@ -34,9 +36,19 @@ export const qk = {
   discovery: (providerId: string) => ['providers', providerId, 'discover'] as const,
   datasources: (tenantId?: string) => ['datasources', tenantId ?? 'all'] as const,
   ontology: (tenantId: string) => ['ontology', tenantId] as const,
+  /** Prefix of every node query: lists, versions and diffs. */
+  nodesAll: ['nodes'] as const,
   nodes: (tenantId?: string) => ['nodes', tenantId ?? 'all'] as const,
-  usage: (tenantId: string | undefined, limit: number) =>
-    ['usage', tenantId ?? 'all', limit] as const,
+  // An object segment cannot collide with a tenant id in `nodes(tenantId)`.
+  nodeVersions: (tenantId: string, name: string) =>
+    ['nodes', { tenantId, name }, 'versions'] as const,
+  nodeDiff: (tenantId: string, name: string, from: number, to: number) =>
+    ['nodes', { tenantId, name }, 'diff', from, to] as const,
+  toolServers: (tenantId: string) => ['tool-servers', tenantId] as const,
+  toolManifests: (tenantId: string, server: string) =>
+    ['tool-servers', tenantId, server, 'tools'] as const,
+  usage: (tenantId: string | undefined, limit: number, filter: UsageFilter = {}) =>
+    ['usage', tenantId ?? 'all', limit, filter] as const,
   audit: (limit: number) => ['audit', limit] as const,
   /** Prefix of the sign-in state; dropped on sign-out. */
   auth: ['auth'] as const,
@@ -158,13 +170,77 @@ export const nodesQuery = (tenantId?: string) =>
       ),
   });
 
-export const usageQuery = (tenantId: string | undefined, limit = 100) =>
+/** Node call filters of the usage report. */
+export interface UsageFilter {
+  node?: string;
+  runId?: string;
+}
+
+/**
+ * Recent events and totals. `by_node` totals each node version over the same
+ * tenant (and node or run) filter.
+ */
+/** Every version of one node (oldest first), the live one and who promoted it. */
+export const nodeVersionsQuery = (tenantId: string, name: string) =>
   queryOptions({
-    queryKey: qk.usage(tenantId, limit),
+    queryKey: qk.nodeVersions(tenantId, name),
+    queryFn: () =>
+      unwrap(
+        api.GET('/api/v1/tenants/{tenantId}/nodes/{nodeName}/versions', {
+          params: { path: { tenantId, nodeName: name } },
+        }),
+      ),
+  });
+
+/** What changed between two versions of a node (versions are immutable, so never stale). */
+export const nodeDiffQuery = (tenantId: string, name: string, from: number, to: number) =>
+  queryOptions({
+    queryKey: qk.nodeDiff(tenantId, name, from, to),
+    queryFn: () =>
+      unwrap(
+        api.GET('/api/v1/tenants/{tenantId}/nodes/{nodeName}/diff', {
+          params: { path: { tenantId, nodeName: name }, query: { from, to } },
+        }),
+      ),
+    staleTime: Infinity,
+  });
+
+/** The tenant's registered MCP tool servers (credentials are never returned). */
+export const toolServersQuery = (tenantId: string) =>
+  queryOptions({
+    queryKey: qk.toolServers(tenantId),
+    queryFn: () =>
+      unwrap(
+        api.GET('/api/v1/tenants/{tenantId}/tool-servers', { params: { path: { tenantId } } }),
+      ),
+  });
+
+/** Every manifest recorded for a server: pins, scan findings and approval state. */
+export const toolManifestsQuery = (tenantId: string, server: string) =>
+  queryOptions({
+    queryKey: qk.toolManifests(tenantId, server),
+    queryFn: () =>
+      unwrap(
+        api.GET('/api/v1/tenants/{tenantId}/tool-servers/{server}/tools', {
+          params: { path: { tenantId, server } },
+        }),
+      ),
+  });
+
+export const usageQuery = (tenantId: string | undefined, limit = 100, filter: UsageFilter = {}) =>
+  queryOptions({
+    queryKey: qk.usage(tenantId, limit, filter),
     queryFn: () =>
       unwrap(
         api.GET('/api/v1/usage', {
-          params: { query: { limit, ...(tenantId ? { tenant_id: tenantId } : {}) } },
+          params: {
+            query: {
+              limit,
+              ...(tenantId ? { tenant_id: tenantId } : {}),
+              ...(filter.node ? { node: filter.node } : {}),
+              ...(filter.runId ? { run_id: filter.runId } : {}),
+            },
+          },
         }),
       ),
   });
@@ -246,14 +322,19 @@ export function useUpdateTenant(tenantId: string) {
   });
 }
 
+/**
+ * Mints a key. `nodes` (the node allowlist) and `datasource_scopes` are sent
+ * only when set: absent means every published node, and every scope of the
+ * nodes the key runs.
+ */
 export function useMintApiKey(tenantId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (name: string) =>
+    mutationFn: (body: ApiKeyCreate) =>
       unwrap(
         api.POST('/api/v1/tenants/{tenantId}/api-keys', {
           params: { path: { tenantId } },
-          body: name ? { name } : {},
+          body,
         }),
       ),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.apiKeys(tenantId) }),
@@ -292,7 +373,8 @@ export function useDeleteTenant() {
         qc.invalidateQueries({ queryKey: qk.tenantList(false) }),
         qc.invalidateQueries({ queryKey: qk.tenantList(true) }),
         qc.invalidateQueries({ queryKey: ['datasources'] }),
-        qc.invalidateQueries({ queryKey: ['nodes'] }),
+        qc.invalidateQueries({ queryKey: qk.nodesAll }),
+        qc.invalidateQueries({ queryKey: ['tool-servers', tenantId] }),
       ]);
     },
   });
@@ -422,11 +504,76 @@ export function useReviewElement(tenantId: string) {
   });
 }
 
-export function useCreateNode() {
+/**
+ * Creates a draft: version = the node's latest plus one (a new node starts at
+ * v1). The server checks the spec statically and refuses it with a 422.
+ */
+export function useCreateNodeVersion() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: NodeCreate) => unwrap(api.POST('/api/v1/nodes', { body })),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['nodes'] }),
+    mutationFn: ({
+      tenantId,
+      name,
+      spec,
+    }: {
+      tenantId: string;
+      name: string;
+      spec: Record<string, unknown>;
+    }) =>
+      unwrap(
+        api.POST('/api/v1/tenants/{tenantId}/nodes/{nodeName}/versions', {
+          params: { path: { tenantId, nodeName: name } },
+          body: { spec },
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.nodesAll }),
+  });
+}
+
+/**
+ * Publishes a draft after the server validates it against the tenant (a 422
+ * lists every problem). `promote` also makes it the live version.
+ */
+export function usePublishNodeVersion(tenantId: string, name: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ version, promote }: { version: number; promote: boolean }) =>
+      unwrap(
+        api.POST('/api/v1/tenants/{tenantId}/nodes/{nodeName}/versions/{version}/publish', {
+          params: { path: { tenantId, nodeName: name, version } },
+          body: { promote },
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.nodesAll }),
+  });
+}
+
+/** Moves the promotion pointer to a published version (promote or roll back). */
+export function usePromoteNode(tenantId: string, name: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (version: number) =>
+      unwrap(
+        api.POST('/api/v1/tenants/{tenantId}/nodes/{nodeName}/promote', {
+          params: { path: { tenantId, nodeName: name } },
+          body: { version },
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.nodesAll }),
+  });
+}
+
+/** Retires a published version: new runs are refused, runs in flight finish on it. */
+export function useRetireNodeVersion(tenantId: string, name: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (version: number) =>
+      unwrap(
+        api.POST('/api/v1/tenants/{tenantId}/nodes/{nodeName}/versions/{version}/retire', {
+          params: { path: { tenantId, nodeName: name, version } },
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.nodesAll }),
   });
 }
 
@@ -439,7 +586,113 @@ export function useDeleteNode() {
           params: { path: { tenantId, nodeId } },
         }),
       ),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['nodes'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.nodesAll }),
+  });
+}
+
+/** Registers an MCP server. The credential is sealed at once and never returned. */
+export function useRegisterToolServer(tenantId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ToolServerCreate) =>
+      unwrap(
+        api.POST('/api/v1/tenants/{tenantId}/tool-servers', {
+          params: { path: { tenantId } },
+          body,
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.toolServers(tenantId), exact: true }),
+  });
+}
+
+/** Deletes a server (its credential is wiped). A 409 while a published version uses it. */
+export function useDeleteToolServer(tenantId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (server: string) =>
+      deleteOrGone(
+        api.DELETE('/api/v1/tenants/{tenantId}/tool-servers/{server}', {
+          params: { path: { tenantId, server } },
+        }),
+      ),
+    onSuccess: (_outcome, server) => {
+      qc.removeQueries({ queryKey: qk.toolManifests(tenantId, server) });
+      return qc.invalidateQueries({ queryKey: qk.toolServers(tenantId), exact: true });
+    },
+  });
+}
+
+/**
+ * Lists the server's tools now, pins each manifest and runs the injection
+ * scan. A changed tool comes back as a new `discovered` manifest.
+ */
+export function useDiscoverTools(tenantId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (server: string) =>
+      unwrap(
+        api.POST('/api/v1/tenants/{tenantId}/tool-servers/{server}/discover', {
+          params: { path: { tenantId, server } },
+        }),
+      ),
+    onSuccess: (_data, server) =>
+      qc.invalidateQueries({ queryKey: qk.toolManifests(tenantId, server) }),
+  });
+}
+
+/** Records manifests for a server the control plane cannot reach (pinned and scanned the same way). */
+export function useImportTools(tenantId: string, server: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ToolImport) =>
+      unwrap(
+        api.POST('/api/v1/tenants/{tenantId}/tool-servers/{server}/tools', {
+          params: { path: { tenantId, server } },
+          body,
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.toolManifests(tenantId, server) }),
+  });
+}
+
+/**
+ * Approves a manifest by pin. One with scan findings needs
+ * `acknowledge_findings` (the server answers 422 otherwise).
+ */
+export function useApproveTool(tenantId: string, server: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      tool,
+      pin,
+      acknowledgeFindings,
+    }: {
+      tool: string;
+      pin: string;
+      acknowledgeFindings: boolean;
+    }) =>
+      unwrap(
+        api.POST('/api/v1/tenants/{tenantId}/tool-servers/{server}/tools/{tool}/approve', {
+          params: { path: { tenantId, server, tool } },
+          body: acknowledgeFindings ? { pin, acknowledge_findings: true } : { pin },
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.toolManifests(tenantId, server) }),
+  });
+}
+
+/** Withdraws the approval of a manifest. */
+export function useRevokeTool(tenantId: string, server: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tool, pin }: { tool: string; pin: string }) =>
+      unwrap(
+        api.POST('/api/v1/tenants/{tenantId}/tool-servers/{server}/tools/{tool}/revoke', {
+          params: { path: { tenantId, server, tool } },
+          body: { pin },
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.toolManifests(tenantId, server) }),
   });
 }
 

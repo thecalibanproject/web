@@ -137,6 +137,30 @@ const nodesRoute = createRoute({
   component: lazyRouteComponent(() => import('@/pages/nodes'), 'NodesPage'),
 });
 
+const posInt = (v: unknown): number | undefined => {
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0 ? n : undefined;
+};
+
+export interface NodeDetailSearch {
+  /** The version whose spec is open. */
+  version?: number;
+  /** The versions compared. */
+  from?: number;
+  to?: number;
+}
+
+const nodeDetailRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: 'nodes/$tenantId/$nodeName',
+  validateSearch: (s: Record<string, unknown>): NodeDetailSearch => ({
+    version: posInt(s.version),
+    from: posInt(s.from),
+    to: posInt(s.to),
+  }),
+  component: lazyRouteComponent(() => import('@/pages/node-detail'), 'NodeDetailPage'),
+});
+
 const usageRoute = createRoute({
   getParentRoute: () => appRoute,
   path: 'usage',
@@ -194,6 +218,7 @@ export const routeTree = rootRoute.addChildren([
     datasourcesRoute,
     ontologyRoute,
     nodesRoute,
+    nodeDetailRoute,
     usageRoute,
     auditRoute,
     usersRoute,

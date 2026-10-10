@@ -7,6 +7,7 @@ export * from './confirm-dialog';
 export * from './copy-button';
 export * from './drawer';
 export * from './form';
+export * from './gated-button';
 export * from './page-header';
 export * from './spinner';
 export * from './stat-tile';

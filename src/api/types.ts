@@ -37,8 +37,35 @@ export type OntologyElement = S['OntologyElement'];
 export type Ontology = S['Ontology'];
 export type Node = S['Node'];
 export type NodeCreate = S['NodeCreate'];
+export type NodeState = Node['state'];
+export type NodeCaps = S['NodeCaps'];
+export type NodeSpendCaps = S['NodeSpendCaps'];
+/** `GET .../nodes/{name}/versions`: every version not deleted, oldest first, and the live one. */
+export type NodeVersions =
+  paths['/api/v1/tenants/{tenantId}/nodes/{nodeName}/versions']['get']['responses'][200]['content']['application/json'];
+/** `GET .../nodes/{name}/diff`: both hashes and a structural diff (JSON pointers). */
+export type NodeDiff =
+  paths['/api/v1/tenants/{tenantId}/nodes/{nodeName}/diff']['get']['responses'][200]['content']['application/json'];
+export type NodeDiffChange = NonNullable<NodeDiff['changes']>[number];
+export type ToolAuth = S['ToolAuth'];
+export type ToolAuthMethod = ToolAuth['method'];
+export type ToolServer = S['ToolServer'];
+export type ToolServerCreate = S['ToolServerCreate'];
+export type ToolManifest = S['ToolManifest'];
+export type ToolFinding = NonNullable<ToolManifest['findings']>[number];
+export type ToolFindingKind = NonNullable<ToolFinding['kind']>;
+export type ToolStatus = NonNullable<ToolManifest['status']>;
+export type ToolImport =
+  paths['/api/v1/tenants/{tenantId}/tool-servers/{server}/tools']['post']['requestBody']['content']['application/json'];
+export type ToolApproved =
+  paths['/api/v1/tenants/{tenantId}/tool-servers/{server}/tools/{tool}/approve']['post']['responses'][200]['content']['application/json'];
+export type ApiKeyCreate = NonNullable<
+  paths['/api/v1/tenants/{tenantId}/api-keys']['post']['requestBody']
+>['content']['application/json'];
 export type UsageEvent = S['UsageEvent'];
 export type UsageReport = S['UsageReport'];
+export type UsageByNode = NonNullable<UsageReport['by_node']>[number];
+export type UsageTotals = S['UsageTotals'];
 export type CacheStatus = UsageEvent['cache'];
 export type CacheTier = NonNullable<UsageEvent['cache_tier']>;
 export type RouteStage = NonNullable<UsageEvent['route_stage']>;
@@ -114,6 +141,26 @@ export const ONTOLOGY_KINDS = [
   'policy',
   'verified_query',
 ] as const satisfies readonly OntologyElementKind[];
+
+export const NODE_STATES = [
+  'draft',
+  'published',
+  'retired',
+] as const satisfies readonly NodeState[];
+
+export const TOOL_AUTH_METHODS = [
+  'caliban_token',
+  'api_key',
+  'oauth_client_credentials',
+  'none',
+] as const satisfies readonly ToolAuthMethod[];
+
+export const TOOL_FINDING_KINDS = [
+  'instruction',
+  'hidden_unicode',
+  'url',
+  'exfiltration',
+] as const satisfies readonly ToolFindingKind[];
 
 export const CACHE_STATUSES = ['hit', 'miss', 'bypass'] as const satisfies readonly CacheStatus[];
 

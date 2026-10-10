@@ -78,7 +78,8 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
-    mint.mutate(name.trim(), {
+    const trimmed = name.trim();
+    mint.mutate(trimmed ? { name: trimmed } : {}, {
       onSuccess: (k) => {
         setCreated(k);
         setName('');

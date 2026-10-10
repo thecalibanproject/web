@@ -306,9 +306,7 @@ describe('Role-gated console', () => {
     const user = userEvent.setup();
     await renderApp('/nodes', { token: null });
 
-    // Globex is read-only for this user: its node cannot be deleted here.
     expect(await screen.findByText('triage')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Delete triage v1' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'New node' }));
     const form = await screen.findByRole('form', { name: 'Create node' });

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Button } from './button';
+import type { ButtonVariant } from './button-styles';
 import { Drawer } from './drawer';
 import { FormError } from './states';
 
@@ -12,6 +13,7 @@ export function ConfirmDialog({
   title,
   children,
   confirmLabel = 'Delete',
+  confirmVariant = 'danger',
   confirmDisabled = false,
   loading = false,
   error,
@@ -22,6 +24,8 @@ export function ConfirmDialog({
   title: ReactNode;
   children?: ReactNode;
   confirmLabel?: string;
+  /** `primary` for confirmations that are not destructive, such as publishing. */
+  confirmVariant?: ButtonVariant;
   /** Keeps the confirm button disabled, e.g. until a typed confirmation matches. */
   confirmDisabled?: boolean;
   loading?: boolean;
@@ -38,7 +42,12 @@ export function ConfirmDialog({
       footer={
         <>
           <Button onClick={onCancel}>Cancel</Button>
-          <Button variant="danger" loading={loading} disabled={confirmDisabled} onClick={onConfirm}>
+          <Button
+            variant={confirmVariant}
+            loading={loading}
+            disabled={confirmDisabled}
+            onClick={onConfirm}
+          >
             {confirmLabel}
           </Button>
         </>
