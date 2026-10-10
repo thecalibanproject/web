@@ -270,6 +270,7 @@ describe('Role-gated console', () => {
     expect(await screen.findByRole('table', { name: 'Tenants' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'New tenant' })).not.toBeInTheDocument();
     expect(within(nav()).getByRole('link', { name: 'Audit' })).toBeInTheDocument();
+    expect(within(nav()).getByRole('link', { name: 'Users and roles' })).toBeInTheDocument();
 
     await user.click(within(nav()).getByRole('link', { name: 'Models' }));
     expect(await screen.findByText('No models registered')).toBeInTheDocument();

@@ -19,6 +19,7 @@ import {
   IconSettings,
   IconTenants,
   IconUsage,
+  IconUsers,
   LogoMark,
 } from '../ui/icons';
 import { ThemeToggle } from './theme-toggle';
@@ -32,6 +33,7 @@ type NavTo =
   | '/nodes'
   | '/usage'
   | '/audit'
+  | '/users'
   | '/settings';
 
 /**
@@ -53,6 +55,7 @@ const NAV: Array<{
   { to: '/nodes', label: 'Nodes', icon: IconNodes, perm: 'nodes.read' },
   { to: '/usage', label: 'Usage', icon: IconUsage, perm: 'usage.read' },
   { to: '/audit', label: 'Audit', icon: IconAudit, perm: 'audit.read' },
+  { to: '/users', label: 'Users and roles', icon: IconUsers, perm: 'rbac.read' },
   { to: '/settings', label: 'Settings', icon: IconSettings },
 ];
 

@@ -172,6 +172,12 @@ const auditRoute = createRoute({
   component: lazyRouteComponent(() => import('@/pages/audit'), 'AuditPage'),
 });
 
+const usersRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: 'users',
+  component: lazyRouteComponent(() => import('@/pages/users'), 'UsersPage'),
+});
+
 const settingsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: 'settings',
@@ -190,6 +196,7 @@ export const routeTree = rootRoute.addChildren([
     nodesRoute,
     usageRoute,
     auditRoute,
+    usersRoute,
     settingsRoute,
   ]),
 ]);
