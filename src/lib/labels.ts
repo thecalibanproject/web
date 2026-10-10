@@ -6,6 +6,7 @@ import type {
   ProviderKind,
   ReasoningControl,
   ReasoningMode,
+  Role,
   RouteStage,
   SurrogateScope,
   TrustTier,
@@ -98,4 +99,25 @@ export const ROUTE_STAGE_LABEL: Record<RouteStage, string> = {
   rules: 'Rules',
   knn: 'kNN',
   keyword: 'Keyword',
+};
+
+export const ROLE_LABEL: Record<Role, string> = {
+  owner: 'Owner',
+  admin: 'Admin',
+  auditor: 'Auditor',
+  tenant_admin: 'Tenant admin',
+  developer: 'Developer',
+  viewer: 'Viewer',
+  billing: 'Billing',
+};
+
+/** Same wording as the control plane's `GET /api/v1/roles`. */
+export const ROLE_DESCRIPTION: Record<Role, string> = {
+  owner: 'Everything, including granting and revoking the owner role.',
+  admin: 'Everything except granting or revoking the owner role.',
+  auditor: 'Read-only access to everything, including the audit log.',
+  tenant_admin: 'Manages one tenant: settings, API keys, BYOK keys, routes, datasources, nodes.',
+  developer: 'API keys, routes, nodes and ontology review of one tenant; reads the rest.',
+  viewer: 'Read-only access to one tenant.',
+  billing: 'Usage and spend of one tenant.',
 };

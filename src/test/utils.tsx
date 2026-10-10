@@ -3,8 +3,12 @@ import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
 import { render, renderHook, type RenderOptions } from '@testing-library/react';
 import type { ReactElement, ReactNode } from 'react';
 import { vi } from 'vitest';
+import type { AuthState } from '@/api/auth';
+import { qk } from '@/api/queries';
 import { setToken } from '@/lib/auth';
-import { createAppRouter } from '@/router';
+import type { Principal } from '@/lib/permissions';
+import { createAppRouter, wireAuth } from '@/router';
+import { addTeardown } from './teardowns';
 
 function testQueryClient() {
   return new QueryClient({
@@ -12,8 +16,28 @@ function testQueryClient() {
   });
 }
 
-export function renderWithClient(ui: ReactElement, options?: RenderOptions) {
+/**
+ * Renders `ui` inside a fresh QueryClient. `principal` seeds the sign-in state
+ * so role-gated components can be tested on their own; without it, they offer
+ * every action (the auth state is unknown).
+ */
+export function renderWithClient(
+  ui: ReactElement,
+  options?: RenderOptions & { principal?: Principal | null; ssoEnabled?: boolean },
+) {
   const queryClient = testQueryClient();
+  if (options?.principal !== undefined) {
+    const state: AuthState = {
+      config: {
+        sso_enabled: options.ssoEnabled ?? options.principal?.mode === 'session',
+        break_glass_enabled: true,
+        login_url: '/auth/login',
+      },
+      principal: options.principal,
+      error: null,
+    };
+    queryClient.setQueryData(qk.authState, state);
+  }
   return {
     queryClient,
     ...render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>, options),
@@ -40,12 +64,18 @@ export function renderHookWithClient<T>(hook: () => T, queryClient = testQueryCl
  * loaded here first, so a test's waits only ever cover data and rendering,
  * including after it navigates to another page.
  */
-export async function renderApp(path: string) {
-  setToken('test-admin-token');
+export async function renderApp(
+  path: string,
+  { token = 'test-admin-token' }: { token?: string | null } = {},
+) {
+  // `token: null` signs in with the session cookie instead (mock `/auth/config`
+  // and `/auth/me`), or not at all.
+  if (token) setToken(token);
   // The router's scroll restoration calls scrollTo, which jsdom does not implement.
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
   const queryClient = testQueryClient();
   const router = createAppRouter(queryClient, createMemoryHistory({ initialEntries: [path] }));
+  addTeardown(wireAuth(router, queryClient));
   await Promise.all(
     Object.values(router.routesById).flatMap((r) => router.loadRouteChunk(r) ?? []),
   );

@@ -5,6 +5,7 @@ import type {
   ModelCreate,
   NodeCreate,
   ProviderKeyCreate,
+  RoleBindingCreate,
   ReviewDecision,
   SharedProviderCreate,
   TenantCreate,
@@ -37,6 +38,11 @@ export const qk = {
   usage: (tenantId: string | undefined, limit: number) =>
     ['usage', tenantId ?? 'all', limit] as const,
   audit: (limit: number) => ['audit', limit] as const,
+  /** Prefix of the sign-in state; dropped on sign-out. */
+  auth: ['auth'] as const,
+  authState: ['auth', 'state'] as const,
+  roleBindings: ['role-bindings'] as const,
+  users: ['users'] as const,
 };
 
 // ───────────── Queries ─────────────
@@ -174,6 +180,17 @@ export const auditQuery = (limit = 100) =>
     queryFn: () => unwrap(api.GET('/api/v1/audit', { params: { query: { limit } } })),
     staleTime: 0,
   });
+
+/** Stored role bindings, plus the read-only group mappings from the config file. */
+export const roleBindingsQuery = () =>
+  queryOptions({
+    queryKey: qk.roleBindings,
+    queryFn: () => unwrap(api.GET('/api/v1/role-bindings')),
+  });
+
+/** Users known from the identity provider, with their bindings and active sessions. */
+export const usersQuery = () =>
+  queryOptions({ queryKey: qk.users, queryFn: () => unwrap(api.GET('/api/v1/users')) });
 
 // ───────────── Mutations ─────────────
 
@@ -420,5 +437,47 @@ export function useDeleteNode() {
         }),
       ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['nodes'] }),
+  });
+}
+
+/** Grants a role (audited as `role_binding.create`). Only owners grant `owner`. */
+export function useCreateRoleBinding() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: RoleBindingCreate) => unwrap(api.POST('/api/v1/role-bindings', { body })),
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: qk.roleBindings }),
+        qc.invalidateQueries({ queryKey: qk.users }),
+        // The signed-in user may have changed their own roles.
+        qc.invalidateQueries({ queryKey: qk.authState }),
+      ]),
+  });
+}
+
+/** Revokes a role binding; takes effect on the next request. */
+export function useDeleteRoleBinding() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (bindingId: string) =>
+      deleteOrGone(
+        api.DELETE('/api/v1/role-bindings/{bindingId}', { params: { path: { bindingId } } }),
+      ),
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: qk.roleBindings }),
+        qc.invalidateQueries({ queryKey: qk.users }),
+        qc.invalidateQueries({ queryKey: qk.authState }),
+      ]),
+  });
+}
+
+/** Signs a user out everywhere: every active session is revoked. */
+export function useRevokeUserSessions() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) =>
+      unwrap(api.DELETE('/api/v1/users/{userId}/sessions', { params: { path: { userId } } })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.users }),
   });
 }

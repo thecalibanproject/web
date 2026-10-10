@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query';
+import { useAuthState, useSignOut } from '@/api/auth';
 import { healthQuery } from '@/api/queries';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
+import { PrincipalRoles } from '@/components/roles';
 import {
   Badge,
   Button,
@@ -15,7 +16,7 @@ import {
   PageHeader,
 } from '@/components/ui';
 import { IconLogout } from '@/components/ui/icons';
-import { clearToken } from '@/lib/auth';
+import { displayName } from '@/lib/permissions';
 import { apiBaseUrl, dataPlaneUrl } from '@/lib/urls';
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -47,8 +48,10 @@ function Snippets({
 
 export function SettingsPage() {
   const health = useQuery(healthQuery());
-  const navigate = useNavigate();
-  const qc = useQueryClient();
+  const auth = useAuthState();
+  const principal = auth?.principal;
+  const session = principal?.mode === 'session';
+  const { signOut, pending } = useSignOut();
   const api = `${apiBaseUrl()}/api/v1`;
   const dp = dataPlaneUrl();
 
@@ -225,19 +228,32 @@ client.chat.completions.create(
             </Row>
             <Row label="Privacy">
               <p className="text-[13px]">
-                Served from your control plane. No CDN, remote fonts, analytics or telemetry. The
-                admin token is kept in this tab&apos;s sessionStorage only.
+                Served from your control plane. No CDN, remote fonts, analytics or telemetry.{' '}
+                {session
+                  ? 'Signed in with single sign-on: the session cookie is HttpOnly, and nothing is kept in browser storage.'
+                  : 'The admin token is kept in this tab’s sessionStorage only.'}
               </p>
             </Row>
+            {principal && (
+              <Row label="Signed in as">
+                <div className="flex flex-col gap-1.5 text-[13px]">
+                  <span>
+                    <span className="font-medium">{displayName(principal)}</span>
+                    {principal.me?.user?.email &&
+                      principal.me.user.email !== displayName(principal) && (
+                        <span className="text-fg-muted"> ({principal.me.user.email})</span>
+                      )}
+                    <span className="text-fg-subtle">
+                      {' '}
+                      {session ? 'with single sign-on' : 'with the admin token'}
+                    </span>
+                  </span>
+                  <PrincipalRoles principal={principal} ssoEnabled={auth.config.sso_enabled} />
+                </div>
+              </Row>
+            )}
             <Row label="Session">
-              <Button
-                icon={<IconLogout size={14} />}
-                onClick={() => {
-                  clearToken();
-                  qc.clear();
-                  void navigate({ to: '/login' });
-                }}
-              >
+              <Button icon={<IconLogout size={14} />} loading={pending} onClick={signOut}>
                 Sign out
               </Button>
             </Row>

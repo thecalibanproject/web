@@ -1,9 +1,13 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, Outlet, useNavigate } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query';
+import { Link, Outlet } from '@tanstack/react-router';
 import type { ComponentType, SVGProps } from 'react';
+import { useAuthState, useAuthStateRefresh, usePermissions, useSignOut } from '@/api/auth';
 import { healthQuery } from '@/api/queries';
-import { clearToken } from '@/lib/auth';
+import type { Permission } from '@/api/types';
 import { cn } from '@/lib/cn';
+import { displayName, type Principal } from '@/lib/permissions';
+import { PrincipalRoles } from '../roles';
+import { Button, EmptyState } from '../ui';
 import {
   IconAudit,
   IconDatasources,
@@ -30,15 +34,25 @@ type NavTo =
   | '/audit'
   | '/settings';
 
-const NAV: Array<{ to: NavTo; label: string; icon: ComponentType<SVGProps<SVGSVGElement>> }> = [
-  { to: '/', label: 'Overview', icon: IconOverview },
-  { to: '/tenants', label: 'Tenants', icon: IconTenants },
-  { to: '/models', label: 'Models', icon: IconModels },
-  { to: '/datasources', label: 'Datasources', icon: IconDatasources },
-  { to: '/ontology', label: 'Ontology', icon: IconOntology },
-  { to: '/nodes', label: 'Nodes', icon: IconNodes },
-  { to: '/usage', label: 'Usage', icon: IconUsage },
-  { to: '/audit', label: 'Audit', icon: IconAudit },
+/**
+ * `perm`: shown to users who hold it deployment-wide or on some tenant. The
+ * control plane still checks every request; this only keeps the menu to
+ * pages the user can open.
+ */
+const NAV: Array<{
+  to: NavTo;
+  label: string;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  perm?: Permission;
+}> = [
+  { to: '/', label: 'Overview', icon: IconOverview, perm: 'usage.read' },
+  { to: '/tenants', label: 'Tenants', icon: IconTenants, perm: 'tenant.read' },
+  { to: '/models', label: 'Models', icon: IconModels, perm: 'catalog.read' },
+  { to: '/datasources', label: 'Datasources', icon: IconDatasources, perm: 'datasources.read' },
+  { to: '/ontology', label: 'Ontology', icon: IconOntology, perm: 'ontology.read' },
+  { to: '/nodes', label: 'Nodes', icon: IconNodes, perm: 'nodes.read' },
+  { to: '/usage', label: 'Usage', icon: IconUsage, perm: 'usage.read' },
+  { to: '/audit', label: 'Audit', icon: IconAudit, perm: 'audit.read' },
   { to: '/settings', label: 'Settings', icon: IconSettings },
 ];
 
@@ -67,15 +81,42 @@ function HealthPill() {
   );
 }
 
-export function AppShell() {
-  const navigate = useNavigate();
-  const qc = useQueryClient();
+/** Who is signed in, and their roles. */
+function SignedInAs({ principal, ssoEnabled }: { principal: Principal; ssoEnabled: boolean }) {
+  const name = displayName(principal);
+  const email = principal.me?.user?.email;
+  return (
+    <section aria-label="Signed in as" className="flex flex-col gap-1 px-2 py-1.5">
+      <p className="truncate text-[12.5px] font-medium text-fg" title={principal.me?.actor}>
+        {name}
+      </p>
+      {email && email !== name && (
+        <p className="-mt-1 truncate text-[11.5px] text-fg-subtle">{email}</p>
+      )}
+      <PrincipalRoles principal={principal} ssoEnabled={ssoEnabled} />
+    </section>
+  );
+}
 
-  const signOut = () => {
-    clearToken();
-    qc.clear();
-    void navigate({ to: '/login' });
-  };
+/** Signed in through single sign-on, but no role grants anything yet. */
+function NoAccess({ onSignOut }: { onSignOut: () => void }) {
+  return (
+    <EmptyState
+      className="py-20"
+      title="You are signed in, but have no role yet"
+      description="An owner or admin of this deployment can grant you a role, directly or through a group in your identity provider. Reload the page once they have."
+      action={<Button onClick={onSignOut}>Sign out</Button>}
+    />
+  );
+}
+
+export function AppShell() {
+  useAuthStateRefresh();
+  const auth = useAuthState();
+  const perms = usePermissions();
+  const { signOut, pending } = useSignOut();
+  const principal = auth?.principal;
+  const nav = NAV.filter((n) => !n.perm || perms.canSomewhere(n.perm));
 
   return (
     <div className="flex min-h-dvh flex-col md:flex-row">
@@ -104,7 +145,7 @@ export function AppShell() {
         </div>
         <nav aria-label="Primary" className="overflow-x-auto md:flex-1 md:overflow-y-auto">
           <ul className="flex gap-0.5 px-2 pb-2 md:flex-col md:pb-0">
-            {NAV.map(({ to, label, icon: Icon }) => (
+            {nav.map(({ to, label, icon: Icon }) => (
               <li key={to}>
                 <Link
                   to={to}
@@ -123,11 +164,17 @@ export function AppShell() {
           <div className="hidden lg:block">
             <HealthPill />
           </div>
+          {principal && (
+            <div className="hidden lg:block">
+              <SignedInAs principal={principal} ssoEnabled={auth?.config.sso_enabled ?? false} />
+            </div>
+          )}
           <ThemeToggle />
           <button
             type="button"
             onClick={signOut}
-            title="Sign out"
+            disabled={pending}
+            title={principal ? `Sign out ${displayName(principal)}` : 'Sign out'}
             className="flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-[13px] text-fg-muted hover:bg-surface-2 hover:text-fg"
           >
             <IconLogout />
@@ -138,7 +185,7 @@ export function AppShell() {
 
       <main id="main" tabIndex={-1} className="min-w-0 flex-1 focus:outline-none">
         <div className="mx-auto w-full max-w-[1400px] px-4 py-5 md:px-6 lg:px-8 lg:py-7">
-          <Outlet />
+          {perms.hasNoRole ? <NoAccess onSignOut={signOut} /> : <Outlet />}
         </div>
       </main>
     </div>

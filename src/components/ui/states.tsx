@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
-import { errorMessage } from '@/lib/errors';
+import { errorMessage, isForbidden } from '@/lib/errors';
 import { cn } from '@/lib/cn';
 import { Button } from './button';
-import { IconAlert, IconRefresh } from './icons';
+import { IconAlert, IconLock, IconRefresh } from './icons';
 import { Spinner } from './spinner';
 
 export function LoadingState({ label = 'Loading…', rows = 4 }: { label?: string; rows?: number }) {
@@ -61,6 +61,7 @@ export function ErrorState({
   title?: string;
   className?: string;
 }) {
+  if (isForbidden(error)) return <ForbiddenState error={error} className={className} />;
   return (
     <div
       role="alert"
@@ -79,6 +80,32 @@ export function ErrorState({
           Retry
         </Button>
       )}
+    </div>
+  );
+}
+
+/**
+ * A 403: the signed-in user's roles do not allow this. Not an error to retry,
+ * so it is calm and says who can help.
+ */
+export function ForbiddenState({ error, className }: { error?: unknown; className?: string }) {
+  const detail = error instanceof Error ? error.message : null;
+  return (
+    <div
+      role="alert"
+      className={cn(
+        'm-4 flex items-start gap-3 rounded-md border border-border bg-surface-2 p-3',
+        className,
+      )}
+    >
+      <IconLock className="mt-0.5 shrink-0 text-fg-muted" />
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] font-medium text-fg">Your role does not allow this</p>
+        <p className="mt-0.5 text-[12.5px] break-words text-fg-muted">
+          Ask an owner or admin of this deployment for access.
+          {detail && <span className="text-fg-subtle"> The control plane said: {detail}.</span>}
+        </p>
+      </div>
     </div>
   );
 }

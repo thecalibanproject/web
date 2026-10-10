@@ -18,3 +18,31 @@ export function dataPlaneUrl(
 ): string {
   return `${loc.protocol}//${loc.hostname}:8080/v1`;
 }
+
+/**
+ * An in-app href to return to after signing in (`/usage?tenant=x`), or `/`.
+ * Only paths inside the console: never another origin (`//host`), and never
+ * the sign-in screen itself.
+ */
+export function safeRedirect(href: string | undefined): string {
+  if (!href || !href.startsWith('/') || href.startsWith('//') || href.startsWith('/\\')) return '/';
+  if (href === '/login' || href.startsWith('/login?')) return '/';
+  return href;
+}
+
+/**
+ * Where "Sign in with SSO" goes: the control plane's `/auth/login` (or the
+ * `login_url` it advertises), asking it to come back to `redirect` in the
+ * console once the identity provider has signed the user in.
+ */
+export function ssoLoginUrl(
+  loginUrl: string | null | undefined,
+  redirect: string | undefined,
+  loc: Pick<Location, 'origin' | 'pathname'> = window.location,
+): string {
+  const path = loginUrl || '/auth/login';
+  const base = /^https?:\/\//.test(path) ? path : `${apiBaseUrl(loc)}${path}`;
+  // Hash routing: the console page itself, then the route after '#'.
+  const returnTo = `${loc.pathname}#${safeRedirect(redirect)}`;
+  return `${base}${base.includes('?') ? '&' : '?'}return_to=${encodeURIComponent(returnTo)}`;
+}

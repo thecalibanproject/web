@@ -8,10 +8,13 @@ import {
   Outlet,
   redirect,
 } from '@tanstack/react-router';
+import { authStateQuery } from '@/api/auth';
+import { qk } from '@/api/queries';
 import { CACHE_STATUSES, CACHE_TIERS, type CacheStatus, type CacheTier } from '@/api/types';
 import { AppShell } from '@/components/layout/app-shell';
 import { AUDIT_LIMITS } from '@/lib/audit';
-import { isAuthenticated } from '@/lib/auth';
+import { isAuthenticated, onAuthChange, takeSessionExpired } from '@/lib/auth';
+import { safeRedirect } from '@/lib/urls';
 import { LoginPage } from '@/pages/login';
 import { NotFoundPage } from '@/pages/not-found';
 import { OverviewPage } from '@/pages/overview';
@@ -30,25 +33,52 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
   notFoundComponent: NotFoundPage,
 });
 
+/** Errors the control plane's `/auth/callback` sends the browser back with. */
+export const LOGIN_ERRORS = ['login_failed', 'login_expired', 'idp_unavailable'] as const;
+export type LoginError = (typeof LOGIN_ERRORS)[number];
+
+export interface LoginSearch {
+  /** In-app href to return to after signing in. */
+  redirect?: string;
+  /** Single sign-on failed (set by the control plane). */
+  error?: LoginError;
+  /** Why the user is here: the console session ended. */
+  reason?: 'expired';
+}
+
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'login',
-  validateSearch: (s: Record<string, unknown>): { redirect?: string } => ({
+  validateSearch: (s: Record<string, unknown>): LoginSearch => ({
     redirect: str(s.redirect),
+    error: LOGIN_ERRORS.find((e) => e === s.error),
+    reason: s.reason === 'expired' ? 'expired' : undefined,
   }),
-  beforeLoad: () => {
-    if (isAuthenticated()) throw redirect({ to: '/' });
+  beforeLoad: async ({ context, search }) => {
+    const { principal } = await context.queryClient.ensureQueryData(authStateQuery());
+    if (principal) throw redirect({ href: safeRedirect(search.redirect), replace: true });
   },
   component: LoginPage,
 });
 
-/** Pathless layout: everything below requires an admin token. */
+/**
+ * Pathless layout: everything below requires a signed-in user, with the admin
+ * token (token mode) or a single sign-on session. Who that is, and what their
+ * roles allow, is loaded once here and kept in the query cache.
+ */
 const appRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: '_app',
-  beforeLoad: ({ location }) => {
-    if (!isAuthenticated()) {
-      throw redirect({ to: '/login', search: { redirect: location.href } });
+  beforeLoad: async ({ context, location }) => {
+    const { principal } = await context.queryClient.ensureQueryData(authStateQuery());
+    if (!principal) {
+      throw redirect({
+        to: '/login',
+        search: {
+          redirect: location.href,
+          ...(takeSessionExpired() ? { reason: 'expired' as const } : {}),
+        },
+      });
     }
   },
   component: AppShell,
@@ -181,6 +211,20 @@ export function createAppRouter(queryClient: QueryClient, history = createHashHi
     defaultPreload: 'intent',
     defaultPreloadStaleTime: 0,
     scrollRestoration: true,
+  });
+}
+
+/**
+ * Sends the user back to the sign-in screen when they are signed out from
+ * under the page: a 401 dropped the token, or the console session expired or
+ * was revoked. Signing in navigates by itself. Returns an unsubscribe function.
+ */
+export function wireAuth(router: ReturnType<typeof createAppRouter>, queryClient: QueryClient) {
+  return onAuthChange(() => {
+    // Signing in navigates by itself, and the sign-in screen has nowhere to send anyone.
+    if (isAuthenticated() || router.state.location.pathname === '/login') return;
+    queryClient.removeQueries({ queryKey: qk.auth });
+    void router.invalidate();
   });
 }
 

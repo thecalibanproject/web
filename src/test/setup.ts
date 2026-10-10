@@ -1,6 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach, beforeAll } from 'vitest';
+import { clearToken, setCsrfToken, takeSessionExpired } from '@/lib/auth';
+import { runTeardowns } from './teardowns';
 
 // jsdom parses its default stylesheet the first time anything calls
 // getComputedStyle, and every *ByRole query does (to skip hidden elements).
@@ -13,6 +15,11 @@ beforeAll(() => {
 
 afterEach(() => {
   cleanup();
+  // Routers stop listening first, so signing out below navigates nothing.
+  runTeardowns();
+  clearToken();
+  setCsrfToken(null);
+  takeSessionExpired();
   window.sessionStorage.clear();
   window.localStorage.clear();
 });

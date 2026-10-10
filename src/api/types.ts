@@ -45,6 +45,16 @@ export type RouteStage = NonNullable<UsageEvent['route_stage']>;
 export type AuditEntry = S['AuditEntry'];
 export type AuditLog = S['AuditLog'];
 export type ReviewDecision = 'approve' | 'reject';
+export type AuthConfig = S['AuthConfig'];
+export type Me = S['Me'];
+export type Role = S['Role'];
+export type Permission = S['Permission'];
+export type User = S['User'];
+export type RoleBinding = S['RoleBinding'];
+export type RoleBindingCreate = S['RoleBindingCreate'];
+export type RoleBindingList = S['RoleBindingList'];
+export type GroupMapping = S['GroupMapping'];
+export type SubjectKind = RoleBinding['subject_kind'];
 
 // Enum value lists, kept in the order of the OpenAPI contract. `satisfies`
 // makes the compiler flag drift when `pnpm gen:api` changes the unions.
@@ -110,3 +120,21 @@ export const CACHE_STATUSES = ['hit', 'miss', 'bypass'] as const satisfies reado
 export const CACHE_TIERS = ['exact', 'semantic'] as const satisfies readonly CacheTier[];
 
 export const ROUTE_STAGES = ['rules', 'knn', 'keyword'] as const satisfies readonly RouteStage[];
+
+/** Deployment roles first, then tenant roles, as in the contract. */
+export const ROLES = [
+  'owner',
+  'admin',
+  'auditor',
+  'tenant_admin',
+  'developer',
+  'viewer',
+  'billing',
+] as const satisfies readonly Role[];
+
+export const TENANT_ROLES = [
+  'tenant_admin',
+  'developer',
+  'viewer',
+  'billing',
+] as const satisfies readonly Role[];

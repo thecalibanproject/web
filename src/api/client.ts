@@ -1,5 +1,5 @@
 import createClient, { type Middleware } from 'openapi-fetch';
-import { clearToken, getToken } from '@/lib/auth';
+import { clearToken, getCsrfToken, getToken, markSessionExpired } from '@/lib/auth';
 import { apiBaseUrl } from '@/lib/urls';
 import type { paths } from './schema';
 import type { ApiErrorBody } from './types';
@@ -19,16 +19,29 @@ export class ApiError extends Error {
   }
 }
 
+/** Methods that change nothing, so a console session needs no CSRF token for them. */
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
 const authMiddleware: Middleware = {
   onRequest({ request }) {
     const token = getToken();
-    if (token) request.headers.set('Authorization', `Bearer ${token}`);
+    if (token) {
+      request.headers.set('Authorization', `Bearer ${token}`);
+      return request;
+    }
+    // Console session: the cookie goes along by itself; writes also prove they
+    // come from the console with the session's CSRF token.
+    const csrf = getCsrfToken();
+    if (csrf && !SAFE_METHODS.has(request.method)) request.headers.set('X-CSRF-Token', csrf);
     return request;
   },
-  onResponse({ response }) {
+  onResponse({ request, response }) {
+    if (response.status !== 401) return response;
     // An expired or rotated admin token: drop it so the router sends the user
-    // back to the login screen on the next navigation.
-    if (response.status === 401) clearToken();
+    // back to the login screen. A console session that expired or was revoked
+    // does the same, and the sign-in screen says why.
+    if (request.headers.has('Authorization')) clearToken();
+    else if (getCsrfToken() !== null) markSessionExpired();
     return response;
   },
 };
@@ -36,6 +49,9 @@ const authMiddleware: Middleware = {
 export function createApiClient(baseUrl: string = apiBaseUrl()) {
   const client = createClient<paths>({
     baseUrl,
+    // The session cookie is SameSite=Strict and the control plane serves the
+    // console, so same-origin is all a console session needs.
+    credentials: 'same-origin',
     // Resolve fetch at call time (not import time) so tests can stub it.
     fetch: (input: Request) => globalThis.fetch(input),
   });

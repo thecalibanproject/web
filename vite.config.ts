@@ -22,6 +22,10 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       proxy: {
         '/api': { target: apiTarget, changeOrigin: true },
+        // Single sign-on endpoints. For SSO in development, register
+        // http://localhost:5173/auth/callback as the redirect URL so the
+        // session cookie is set on the dev server's origin.
+        '/auth': { target: apiTarget, changeOrigin: true },
       },
     },
     build: {
