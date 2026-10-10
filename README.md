@@ -19,11 +19,11 @@ Caliban is in active development with design partners.
 
 ## Pages
 
-Every page except the login screen requires the control plane's admin token.
+Every page except the sign-in screen requires a signed-in user: through single sign-on when the control plane has it configured, otherwise with the control plane's admin token. See [Signing in and roles](#signing-in-and-roles).
 
 | Route | Page | What you do there |
 | --- | --- | --- |
-| `#/login` | Sign in | Enter the admin token (`CALIBAN_ADMIN_TOKEN` on the control plane). It is checked against `GET /api/v1/tenants`. |
+| `#/login` | Sign in | With single sign-on: **Sign in with SSO** (your identity provider), and the break-glass admin token as a secondary option while the control plane accepts it. Without single sign-on: the admin token (`CALIBAN_ADMIN_TOKEN` on the control plane), checked against `GET /auth/me`. Explains failed sign-ins and expired sessions. |
 | `#/` | Overview | Requests, tokens, cache efficiency and spend across all tenants, plus the most recent requests. |
 | `#/tenants` | Tenants | Create and list tenants. A tenant is the isolation boundary for keys, cache, ontology and budgets. **Show deleted** adds deleted tenants, marked **Deleted** with their deletion date. |
 | `#/tenants/<id>` | Tenant detail | Two tabs: **API keys** (mint Caliban keys for your apps, revoke a key, and **Show revoked** to list revoked keys with their revocation time) and **Provider keys** (BYOK credentials for OpenAI, Anthropic, OpenAI-compatible servers such as vLLM, llama.cpp, Ollama and SGLang, Azure OpenAI, AWS Bedrock and Google Vertex AI). **Privacy and caching** sets the tenant's PII default mode, its surrogate scope (**Tenant**: the same stand-in for the same value across requests, so repeated questions can hit the cache, but the model provider can link the tenant's sessions through those stand-ins; **Session**: fresh stand-ins per request, and requests that contain personal data skip the cache) and its semantic cache (**Off** or **On**; also needs `[cache.semantic] enabled` in the deployment config, and answers are reused only within the tenant), and the **cache-hit price for caliban/auto** (the percent of the flat price billed when the cache answers; empty means the deployment default, 20% unless configured). Changes are saved with `PATCH /api/v1/tenants/<id>` and audited as `tenant.update`. A **Danger zone** deletes the tenant after you type its id: its keys are revoked, provider credentials destroyed, routes removed, and datasources and nodes deleted. Audit history is kept and the id can't be reused. A deleted tenant's page says so instead of showing an error. |
@@ -33,14 +33,25 @@ Every page except the login screen requires the control plane's admin token.
 | `#/nodes` | Nodes | Create node specs (versioned, budgeted AI sub-apps) in a JSON editor that validates live against the node schema. Delete a single node version. |
 | `#/usage` | Usage | Per-request events: the route (requested model → routed model, with the intent stage and confidence), tokens, cache outcome and cache tier (exact or semantic), PII entities, cost, billed amount (for `caliban/auto`, with the full flat price and the saving on cache hits; for other models, the cost a cache hit saved) and latency, filterable by tenant, cache status and cache tier. Totals include cache hits with their semantic share and what they saved. A `caliban/auto` card shows what was billed, the full flat price, cache-hit count and savings, the routed models' cost and the margin (billed minus routed cost). Cache hits are billed a share of the flat price. |
 | `#/audit` | Audit log | Every change made through the admin API (`GET /api/v1/audit`), newest first: time, actor, action (such as `tenant.update`, `api_key.revoke` or `tenant.delete`), tenant, target, a readable summary of the details and the raw detail. **Last** sets how many recent entries to load (100 to 1,000, the API maximum); **Tenant** and **Action** filter the loaded entries, 50 per page. A banner shows whether the control plane verified the hash chain of the loaded entries, and the head hash to record elsewhere. Each row shows its hash and previous hash, truncated, with a copy button, and is marked **Link broken** if its previous hash does not match the entry before it. |
+| `#/users` | Users and roles | Owners, admins and auditors. Role bindings (a user or an identity provider group, the role, and the tenant for tenant roles), with **Grant role** and **Revoke** for owners and admins (only owners grant or revoke `owner`). The group mappings from the config file, read-only. Users known from the identity provider, with their last sign-in, active sessions and **Sign out everywhere**. |
 | `#/settings` | Settings | Admin API and data plane endpoints, control plane status, connection snippets for apps, and console preferences. |
 
 ## On-prem guarantees
 
 - **No egress.** No CDN links, remote fonts (it uses system font stacks), analytics, telemetry or external images. Every script, style and icon is bundled into `dist/`.
-- **The admin token stays in the tab.** The token is entered on the login screen and kept in `sessionStorage`, falling back to memory when storage is blocked. It is sent as `Authorization: Bearer ...` and cleared on sign-out or on any `401`.
+- **Nothing sensitive in browser storage with single sign-on.** The control plane is the backend for the console: tokens from the identity provider never reach the browser, which holds only an `HttpOnly`, `SameSite=Strict` session cookie. The console keeps the session's CSRF token in memory and sends it as `X-CSRF-Token` on writes.
+- **The admin token stays in the tab.** In token mode the token is entered on the sign-in screen and kept in `sessionStorage`, falling back to memory when storage is blocked. It is sent as `Authorization: Bearer ...` and cleared on sign-out or on any `401`.
 - **Secrets are write-only.** BYOK API keys and datasource credentials are posted once and never read back. The UI shows only the last four characters. A newly minted Caliban API key is shown exactly once.
 - **CSP-friendly.** There is no inline JavaScript. The pre-paint theme script is a same-origin file (`public/theme-init.js`).
+
+## Signing in and roles
+
+The console follows what the control plane offers at `GET /auth/config`:
+
+- **Single sign-on configured.** The sign-in screen offers **Sign in with SSO**, which goes to `/auth/login` on the control plane (authorization code flow with PKCE, run by the control plane) and comes back to the page you were on. If break-glass is still enabled, **Use the break-glass admin token** reveals the token form; every use of the token is audited. When a session expires or is revoked, the console returns to the sign-in screen, says so, and keeps the page to come back to. **Sign out** ends the session at the control plane and then at the identity provider, when it has a logout endpoint.
+- **No single sign-on.** The admin token form, as before.
+
+What you see follows your roles from `GET /auth/me` (deployment-wide `owner`, `admin`, `auditor`; per tenant `tenant_admin`, `developer`, `viewer`, `billing`). The menu shows only pages your roles can open, and actions your roles cannot perform are hidden or read-only. Tenant-scoped users see only their tenants. The control plane checks every request again: a refusal shows as "Your role does not allow this". Setting up the identity provider and the role mappings is described in core's `docs/sso.md`.
 
 ## Stack
 
@@ -57,7 +68,7 @@ src/
     tenant/       API keys and BYOK provider keys panels, privacy and caching settings, danger zone
     models/       model catalogue, model servers, discovery dialog, server health
     nodes/        JSON node editor with live schema validation
-  lib/            auth/session storage, theme, formatting, ontology review queue, datasource field specs
+  lib/            auth (token and session), permissions, theme, formatting, ontology review queue, datasource field specs
   pages/          one file per route
   schemas/        JSON schemas vendored from core
   test/           Vitest setup and helpers
@@ -75,7 +86,7 @@ Requirements: Node 24 (see `.nvmrc`) and pnpm 9 (pinned through `packageManager`
 ```sh
 nvm use            # Node 24
 pnpm install
-pnpm dev           # http://localhost:5173, proxies /api -> http://localhost:8081
+pnpm dev           # http://localhost:5173, proxies /api and /auth -> http://localhost:8081
 ```
 
 Open http://localhost:5173 and sign in with the `CALIBAN_ADMIN_TOKEN` value the control plane was started with.
@@ -110,7 +121,7 @@ All configuration is optional. See `.env.example`.
 | Variable | Used by | Effect |
 | --- | --- | --- |
 | `VITE_CALIBAN_API_BASE` | `pnpm build` | Where the console sends `/api/v1/*` calls. Defaults to the origin and path prefix the console was loaded from. |
-| `CALIBAN_DEV_API_TARGET` | `pnpm dev` | Where the dev server proxies `/api`. Defaults to `http://localhost:8081`. |
+| `CALIBAN_DEV_API_TARGET` | `pnpm dev` | Where the dev server proxies `/api` and `/auth`. Defaults to `http://localhost:8081`. For single sign-on in development, register `http://localhost:5173/auth/callback` as the redirect URL so the session cookie lands on the dev server's origin. |
 | `CALIBAN_SOURCEMAP` | `pnpm build` | Set to `true` to emit source maps. Production builds have none by default. |
 
 Theme colours are CSS variables in `src/index.css` and follow `prefers-color-scheme` by default. The theme toggle (System, Light, Dark) sets `<html data-theme>` and stores the choice in `localStorage`.
@@ -143,7 +154,8 @@ pnpm typecheck    # the compiler shows every call site that drifted
 - `gen:api` passes `--default-non-nullable false`, so request fields that have a server default (such as `pii_default` or `limit`) stay optional.
 - `src/api/types.ts` re-exports the schema types under friendly names and lists enum values with `satisfies`, so drift fails the type check.
 - `src/api/queries.ts` holds every TanStack Query `queryOptions` and mutation hook.
-- `src/api/client.ts` adds the bearer token to each request, clears it on `401`, and turns the contract's error envelope into a typed `ApiError`.
+- `src/api/client.ts` adds the bearer token to each request in token mode, or the CSRF token to writes in session mode, signs out on `401`, and turns the contract's error envelope into a typed `ApiError`.
+- `src/api/auth.ts` loads the sign-in state (`/auth/config` and `/auth/me`) and provides `usePermissions()` and `useSignOut()`.
 
 The node spec schema in `src/schemas/node.schema.json` is vendored for the same reason. The Nodes editor validates against it with `ajv` before it POSTs, and the server validates again.
 
@@ -156,7 +168,7 @@ pnpm lint
 pnpm format:check
 ```
 
-Tests sit next to the code they cover (`*.test.ts`, `*.test.tsx`): the API client, auth storage, URL handling, the model form, node spec, datasource and ontology helpers, the query hooks, the API keys panel and provider key form, the tenant privacy and caching settings, the tenant, tenant detail and usage pages, the model catalogue, server form, health badge and discovery dialog, and the node editor.
+Tests sit next to the code they cover (`*.test.ts`, `*.test.tsx`): the API client (token and session mode, CSRF, 401 and 403), the sign-in state and permissions, the sign-in screen, session and role-gated console flows, the users and roles page, auth storage, URL handling, the model form, node spec, datasource and ontology helpers, the query hooks, the API keys panel and provider key form, the tenant privacy and caching settings, the tenant, tenant detail and usage pages, the model catalogue, server form, health badge and discovery dialog, and the node editor.
 
 With pnpm 9, `pnpm test --run` is rejected because pnpm parses `--run` as its own flag. `pnpm test` already runs once. To pass extra flags, use `pnpm run test <flags>` or `pnpm test -- <flags>`.
 
