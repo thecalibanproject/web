@@ -1,5 +1,5 @@
 import type { UsageReport } from '@/api/types';
-import { formatInt, formatUsd } from '@/lib/format';
+import { formatInt, formatUsd, isNegativeUsd } from '@/lib/format';
 import { Card, CardHeader, StatTile } from './ui';
 
 /**
@@ -48,7 +48,7 @@ export function AutoMarginCard({ totals }: { totals: UsageReport['totals'] }) {
         <StatTile
           label="Margin"
           value={
-            <span className={margin != null && margin < 0 ? 'text-danger' : undefined}>
+            <span className={isNegativeUsd(margin) ? 'text-danger' : undefined}>
               {formatUsd(margin ?? 0)}
             </span>
           }

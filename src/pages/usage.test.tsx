@@ -235,6 +235,41 @@ describe('UsagePage', () => {
     expect(margin).toHaveClass('text-danger');
   });
 
+  it('does not flag or sign a margin that is float noise around zero', async () => {
+    mockUsage({
+      events,
+      totals: { ...totals, billed_usd: 0.3, routed_model_cost_usd: 0.3, margin_usd: -1e-17 },
+    });
+    await renderApp('/usage');
+    const card = await screen.findByRole('region', { name: 'caliban/auto margin' });
+    const margin = within(card).getByText('Margin').nextElementSibling!;
+    expect(margin).toHaveTextContent(/^\$0\.00$/);
+    expect(margin.querySelector('span')).not.toHaveClass('text-danger');
+  });
+
+  it('shows $0.00, not -$0.00, for the -0.0 totals the server sends over no priced events', async () => {
+    // Rust sums an empty f64 iterator to -0.0, and serde_json writes it as -0.0.
+    const zero = (keys: string[]) => keys.map((k) => `"${k}":-0.0`).join(',');
+    const raw = `{"events":[],"totals":{"requests":0,"auto_requests":0,${zero([
+      'saved_usd',
+      'cost_usd',
+      'flat_price_usd',
+      'billed_usd',
+      'auto_saved_usd',
+      'routed_model_cost_usd',
+      'margin_usd',
+    ])}}}`;
+    mockApi({
+      'GET /api/v1/tenants': () => ({ body: tenants }),
+      'GET /api/v1/usage': () => ({ raw }),
+    });
+    await renderApp('/usage');
+    const card = await screen.findByRole('region', { name: 'caliban/auto margin' });
+    expect(within(card).getAllByText('$0.00')).toHaveLength(5);
+    expect(document.body).not.toHaveTextContent('-$');
+    expect(screen.getByText(/shown ·/)).toHaveTextContent('tokens saved ($0.00) · $0.00');
+  });
+
   it('shows zeros when there was no caliban/auto traffic', async () => {
     mockUsage({ events: [], totals: { requests: 0 } });
     await renderApp('/usage');

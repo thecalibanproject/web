@@ -102,7 +102,13 @@ export interface RecordedCall {
   body: unknown;
 }
 
-type Handler = (call: RecordedCall) => { status?: number; body?: unknown } | undefined;
+/**
+ * `raw` is sent as the response text verbatim, for payloads JSON.stringify
+ * cannot produce (such as `-0.0`, which it writes as `0`).
+ */
+type Handler = (
+  call: RecordedCall,
+) => { status?: number; body?: unknown; raw?: string } | undefined;
 
 /**
  * Stubs global fetch. `routes` maps "METHOD /path" to a handler; unmatched
@@ -129,7 +135,8 @@ export function mockApi(routes: Record<string, Handler>) {
         body: { error: { message: `no mock for ${call.method} ${call.path}`, type: 'not_found' } },
       };
       const status = res.status ?? 200;
-      return new Response(status === 204 ? null : JSON.stringify(res.body ?? null), {
+      const responseText = status === 204 ? null : (res.raw ?? JSON.stringify(res.body ?? null));
+      return new Response(responseText, {
         status,
         headers: { 'Content-Type': 'application/json' },
       });
