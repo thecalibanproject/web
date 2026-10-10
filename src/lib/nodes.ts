@@ -1,6 +1,12 @@
 import { ApiError } from '@/api/client';
 import type { Node } from '@/api/types';
 
+/**
+ * Node names (and tool server names): 1 to 64 characters of a-z, 0-9, '-'
+ * and '_', starting with a letter or digit. For the `pattern` attribute.
+ */
+export const NODE_NAME_PATTERN = '[a-z0-9][a-z0-9_\\-]{0,63}';
+
 /** One node of a tenant: its versions summed up for the list. */
 export interface NodeSummary {
   tenantId: string;

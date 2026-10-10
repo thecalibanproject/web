@@ -1,14 +1,12 @@
 import { useDeferredValue, useMemo, useState, type FormEvent } from 'react';
 import { useCreateNodeVersion } from '@/api/queries';
 import type { Node } from '@/api/types';
+import { NODE_NAME_PATTERN } from '@/lib/nodes';
 import { checkNodeSpec, NODE_SPEC_TEMPLATE } from '@/lib/nodeSpec';
 import { TenantSelect } from '../tenant-select';
 import { Button, Field, Input } from '../ui';
 import { IconAlert, IconCheck } from '../ui/icons';
 import { NodeProblems } from './node-problems';
-
-/** Node names: 1 to 64 characters of a-z, 0-9, '-' and '_', starting with a letter or digit. */
-export const NODE_NAME_PATTERN = '[a-z0-9][a-z0-9_\\-]{0,63}';
 
 /**
  * JSON editor for a draft version. The text is parsed and checked against

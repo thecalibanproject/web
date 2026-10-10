@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useRegisterToolServer } from '@/api/queries';
 import { TOOL_AUTH_METHODS, type ToolAuth, type ToolAuthMethod } from '@/api/types';
 import { NEEDS_CREDENTIAL, TOOL_AUTH_HINT, TOOL_AUTH_LABEL } from '@/lib/tools';
-import { NODE_NAME_PATTERN } from '../nodes/node-editor';
+import { NODE_NAME_PATTERN } from '@/lib/nodes';
 import { Button, Field, FormError, Input, Select, Switch } from '../ui';
 import { IconAlert } from '../ui/icons';
 
