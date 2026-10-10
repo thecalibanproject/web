@@ -176,10 +176,19 @@ const usageRoute = createRoute({
   path: 'usage',
   validateSearch: (
     s: Record<string, unknown>,
-  ): { tenant?: string; cache?: CacheStatus; tier?: CacheTier; limit?: number } => {
+  ): {
+    tenant?: string;
+    cache?: CacheStatus;
+    tier?: CacheTier;
+    limit?: number;
+    node?: string;
+    run?: string;
+  } => {
     const limit = Number(s.limit);
     return {
       tenant: str(s.tenant),
+      node: str(s.node),
+      run: str(s.run),
       cache: CACHE_STATUSES.find((c) => c === s.cache),
       tier: CACHE_TIERS.find((t) => t === s.tier),
       limit: [100, 250, 500, 1000].includes(limit) ? limit : undefined,

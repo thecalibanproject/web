@@ -278,4 +278,118 @@ describe('UsagePage', () => {
     expect(within(card).getAllByText('$0.00')).toHaveLength(5);
     expect(screen.getByText('No usage yet')).toBeInTheDocument();
   });
+
+  describe('by node', () => {
+    const nodeEvent: UsageEvent = {
+      ...base,
+      request_id: 'req-node',
+      model: 'local/qwen3-8b',
+      requested_model: 'caliban/auto',
+      cache: 'miss',
+      cost_usd: 0.001,
+      node: 'triage',
+      node_version: 2,
+      run_id: 'run_123',
+    };
+    const report: UsageReport = {
+      events: [...events, nodeEvent],
+      totals,
+      by_node: [
+        {
+          node: 'triage',
+          node_version: 1,
+          totals: {
+            requests: 2,
+            prompt_tokens: 100,
+            completion_tokens: 20,
+            charged_usd: 0.01,
+            cost_usd: 0.004,
+          },
+        },
+        {
+          node: 'triage',
+          node_version: 2,
+          totals: {
+            requests: 3,
+            prompt_tokens: 300,
+            completion_tokens: 30,
+            charged_usd: 0.02,
+            cost_usd: 0.008,
+          },
+        },
+        {
+          node: 'intake',
+          node_version: 1,
+          totals: {
+            requests: 1,
+            prompt_tokens: 10,
+            completion_tokens: 5,
+            charged_usd: 0.5,
+            cost_usd: 0.2,
+          },
+        },
+      ],
+    };
+
+    it('shows the cost per node with its versions, most charged first', async () => {
+      mockUsage(report);
+      await renderApp('/usage');
+      const card = await screen.findByRole('region', { name: 'Cost per node' });
+      const rows = within(within(card).getByRole('table')).getAllByRole('row').slice(1);
+      expect(rows.map((r) => r.querySelector('td')?.textContent)).toEqual(['intake', 'triage']);
+      const triage = rows[1]!;
+      expect(triage).toHaveTextContent('v1 $0.01 · v2 $0.02');
+      const cells = within(triage).getAllByRole('cell');
+      expect(cells[2]).toHaveTextContent('5');
+      expect(cells[3]).toHaveTextContent('450');
+      expect(cells[6]).toHaveTextContent('$0.03');
+    });
+
+    it('shows the node and version of node calls in the events', async () => {
+      mockUsage(report);
+      await renderApp('/usage');
+      await screen.findByRole('table', { name: 'Usage events' });
+      const node = row('req-node');
+      expect(within(node).getByText('triage')).toBeInTheDocument();
+      expect(node).toHaveTextContent('triage v2');
+      expect(within(node).getByTitle('Run run_123')).toBeInTheDocument();
+      expect(row('req-auto-miss').querySelector('td:nth-child(4)')).toHaveTextContent('—');
+    });
+
+    it('filters by node from the cost table or the node filter, through the API', async () => {
+      const calls = mockUsage(report);
+      const user = userEvent.setup();
+      const { router } = await renderApp('/usage');
+      const card = await screen.findByRole('region', { name: 'Cost per node' });
+
+      await user.click(within(card).getByRole('button', { name: 'triage' }));
+      await waitFor(() => expect(router.state.location.search).toMatchObject({ node: 'triage' }));
+      await waitFor(() => expect(calls.at(-1)?.query.get('node')).toBe('triage'));
+      expect(screen.getByRole('combobox', { name: 'Node' })).toHaveValue('triage');
+
+      await user.selectOptions(screen.getByRole('combobox', { name: 'Node' }), '');
+      await waitFor(() => expect(router.state.location.search).not.toHaveProperty('node'));
+    });
+
+    it('filters by run id', async () => {
+      const calls = mockUsage(report);
+      const user = userEvent.setup();
+      const { router } = await renderApp('/usage');
+      await screen.findByRole('table', { name: 'Usage events' });
+      const filter = screen.getByRole('form', { name: 'Run filter' });
+      await user.type(within(filter).getByLabelText('Run'), 'run_123');
+      await user.click(within(filter).getByRole('button', { name: 'Apply' }));
+      await waitFor(() => expect(router.state.location.search).toMatchObject({ run: 'run_123' }));
+      await waitFor(() => expect(calls.at(-1)?.query.get('run_id')).toBe('run_123'));
+      await user.click(within(filter).getByRole('button', { name: 'Clear run' }));
+      await waitFor(() => expect(router.state.location.search).not.toHaveProperty('run'));
+    });
+
+    it('says when there are no node calls', async () => {
+      mockUsage();
+      await renderApp('/usage');
+      const card = await screen.findByRole('region', { name: 'Cost per node' });
+      expect(within(card).getByText('No node calls')).toBeInTheDocument();
+    });
+  });
 });

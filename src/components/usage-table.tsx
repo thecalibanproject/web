@@ -93,6 +93,7 @@ export function UsageTable({
           <TH>Time</TH>
           {!compact && <TH>Request</TH>}
           <TH>Tenant</TH>
+          {!compact && <TH>Node</TH>}
           {compact ? <TH>Model</TH> : <TH>Route</TH>}
           {!compact && <TH>Intent</TH>}
           <TH className="text-right">Prompt</TH>
@@ -124,6 +125,20 @@ export function UsageTable({
                 <span className="font-mono text-[12px]">{e.tenant_id}</span>
               )}
             </TD>
+            {!compact && (
+              <TD className="whitespace-nowrap" title={e.run_id ? `Run ${e.run_id}` : undefined}>
+                {e.node ? (
+                  <span className="font-mono text-[12px]">
+                    {e.node}
+                    {e.node_version != null && (
+                      <span className="text-fg-subtle"> v{e.node_version}</span>
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-fg-subtle">—</span>
+                )}
+              </TD>
+            )}
             {compact ? (
               <TD className="max-w-56 truncate font-mono text-[12px]" title={e.model}>
                 {e.model}
