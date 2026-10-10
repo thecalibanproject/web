@@ -172,6 +172,29 @@ describe('useUpdateTenant', () => {
     expect(queryClient.getQueryState(qk.tenant('t2'))?.isInvalidated).toBe(false);
   });
 
+  it('cancels a detail fetch in flight so its stale answer cannot overwrite the saved tenant', async () => {
+    mockApi({ 'PATCH /api/v1/tenants/t1': () => ({ body: updated }) });
+    const { result, queryClient } = renderHookWithClient(() => useUpdateTenant('t1'));
+    const stale = { ...updated, semantic_cache: 'off' };
+    queryClient.setQueryData(qk.tenant('t1'), stale);
+    let answer!: (t: typeof stale) => void;
+    const inFlight = queryClient
+      .fetchQuery({
+        queryKey: qk.tenant('t1'),
+        queryFn: () => new Promise<typeof stale>((resolve) => (answer = resolve)),
+        staleTime: 0,
+      })
+      .catch(() => undefined);
+
+    await act(async () => {
+      await result.current.mutateAsync({ semantic_cache: 'on' });
+    });
+    answer(stale);
+    await inFlight;
+
+    expect(queryClient.getQueryData(qk.tenant('t1'))).toEqual(updated);
+  });
+
   it('surfaces errors from the envelope and leaves the cached tenant alone', async () => {
     mockApi({
       'PATCH /api/v1/tenants/t1': () => ({

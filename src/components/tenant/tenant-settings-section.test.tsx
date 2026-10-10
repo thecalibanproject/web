@@ -120,6 +120,46 @@ describe('TenantSettingsSection', () => {
     expect(c.cancel).toBeDisabled();
   });
 
+  it('goes straight from the edited values to the saved ones, never back to the old values', async () => {
+    let current: Tenant = { ...acme, auto_cache_hit_fraction: 0.2 };
+    mockApi({
+      'GET /api/v1/tenants/acme': () => ({ body: current }),
+      'PATCH /api/v1/tenants/acme': (call) => {
+        current = { ...current, ...(call.body as Partial<Tenant>) };
+        return { body: current };
+      },
+    });
+    const user = userEvent.setup();
+    renderWithClient(<FromQuery />);
+    await screen.findByRole('region', { name: 'Privacy and caching' });
+
+    await user.click(controls().semantic);
+    await user.clear(controls().hitPrice);
+    await user.type(controls().hitPrice, '35');
+
+    // Record every value the switch and the price field show while saving.
+    // React mirrors a controlled input's value to its attribute.
+    const shown = new Set<string>();
+    const record = () => {
+      const c = controls();
+      shown.add(`${c.semantic.getAttribute('aria-checked')}|${c.hitPrice.getAttribute('value')}`);
+    };
+    const observer = new MutationObserver(record);
+    observer.observe(controls().section, { attributes: true, childList: true, subtree: true });
+    try {
+      await user.click(controls().save);
+      await waitFor(() =>
+        expect(within(controls().section).getByRole('status')).toHaveTextContent('Settings saved.'),
+      );
+      record();
+    } finally {
+      observer.disconnect();
+    }
+
+    expect([...shown]).toEqual(['true|35']);
+    expect(controls().save).toBeDisabled();
+  });
+
   it('keeps the edits and shows the error when the save fails', async () => {
     mockApi({
       'PATCH /api/v1/tenants/acme': () => ({

@@ -78,7 +78,16 @@ export function TenantSettingsSection({
 }) {
   const update = useUpdateTenant(tenant.id);
   const headingId = useId();
-  const saved = savedSettings(tenant);
+  // The PATCH response, shown from the moment the draft is cleared until the
+  // `tenant` prop catches up. The hook writes the same response to the query
+  // cache, but query observers are notified a tick after this mutation's
+  // onSuccess runs, so without it the form would show the old values for a
+  // frame between "Saving" and the saved values.
+  const [saveResult, setSaveResult] = useState<{ before: Tenant; after: Tenant } | null>(null);
+  const caughtUp = saveResult != null && saveResult.before !== tenant;
+  if (caughtUp) setSaveResult(null);
+  const current = saveResult && !caughtUp ? saveResult.after : tenant;
+  const saved = savedSettings(current);
   // `null` while nothing is edited: the form then follows the saved tenant.
   const [draft, setDraft] = useState<Settings | null>(null);
   const [savedNotice, setSavedNotice] = useState(false);
@@ -104,7 +113,8 @@ export function TenantSettingsSection({
     e.preventDefault();
     if (!dirty || locked || percentError) return;
     update.mutate(body, {
-      onSuccess: () => {
+      onSuccess: (after) => {
+        setSaveResult({ before: tenant, after });
         setDraft(null);
         setSavedNotice(true);
       },

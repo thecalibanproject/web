@@ -233,6 +233,9 @@ export function useUpdateTenant(tenantId: string) {
   return useMutation({
     mutationFn: (body: TenantUpdate) =>
       unwrap(api.PATCH('/api/v1/tenants/{tenantId}', { params: { path: { tenantId } }, body })),
+    // A detail fetch still in flight would land after the PATCH response and
+    // put the pre-save tenant back in the cache.
+    onMutate: () => qc.cancelQueries({ queryKey: qk.tenant(tenantId), exact: true }),
     onSuccess: (tenant) => {
       qc.setQueryData(qk.tenant(tenantId), tenant);
       return Promise.all([
