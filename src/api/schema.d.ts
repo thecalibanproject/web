@@ -1597,6 +1597,441 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/roles': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The roles and the permissions each grants */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['RoleInfo'][];
+          };
+        };
+        403: components['responses']['Error'];
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/users': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Users known from the identity provider (created just in time) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['User'][];
+          };
+        };
+        403: components['responses']['Error'];
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/users/{userId}/sessions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        userId: string;
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Sign the user out everywhere (revokes every active session)
+     * @description Audited as `user.sessions_revoke`.
+     */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          userId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Revoked */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        403: components['responses']['Error'];
+        404: components['responses']['Error'];
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/role-bindings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Stored role bindings, and the group mappings from the config file */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['RoleBindingList'];
+          };
+        };
+        403: components['responses']['Error'];
+      };
+    };
+    put?: never;
+    /**
+     * Grant a role to a user or an identity-provider group
+     * @description Deployment roles (`owner`, `admin`, `auditor`) take no `tenant_id`; tenant roles (`tenant_admin`,
+     *     `developer`, `viewer`, `billing`) need one (`422` otherwise). Only an owner can grant `owner`
+     *     (`403`). A user subject must be a user id (`404` if unknown). Takes effect on the next request.
+     *     Audited as `role_binding.create`.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': components['schemas']['RoleBindingCreate'];
+        };
+      };
+      responses: {
+        /** @description Created */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['RoleBinding'];
+          };
+        };
+        400: components['responses']['Error'];
+        403: components['responses']['Error'];
+        404: components['responses']['Error'];
+        409: components['responses']['Error'];
+        422: components['responses']['Error'];
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/role-bindings/{bindingId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        bindingId: string;
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Revoke a role binding
+     * @description Only an owner can revoke an `owner` binding. Audited as `role_binding.delete`.
+     */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          bindingId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Revoked */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        403: components['responses']['Error'];
+        404: components['responses']['Error'];
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/auth/config': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** How the console should offer login (public) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['AuthConfig'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/auth/login': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Start single sign-on (browser navigation)
+     * @description Redirects (303) to the identity provider (authorization code flow with PKCE) and sets a short-lived
+     *     login cookie. On failure to reach the provider, redirects to `/#/login?error=idp_unavailable`.
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Path on the console to come back to (same origin only), e.g. `/#/tenants`. */
+          return_to?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description To the identity provider */
+        303: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        404: components['responses']['Error'];
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/auth/callback': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Identity provider redirect target (browser navigation)
+     * @description Validates the state, the login cookie and the ID token, creates the session cookie (HttpOnly,
+     *     SameSite=Strict) and redirects (303) to `return_to`. Failures redirect to
+     *     `/#/login?error=login_failed` (audited as `auth.login_failed`) or `/#/login?error=login_expired`.
+     */
+    get: {
+      parameters: {
+        query?: {
+          code?: string;
+          state?: string;
+          error?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description To the console */
+        303: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/auth/logout': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * End the console session
+     * @description Needs `X-CSRF-Token`. Clears the cookie; audited as `auth.logout`.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Logged out */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description The provider's logout URL (RP-initiated logout), if it has one. */
+              end_session_url: string | null;
+            };
+          };
+        };
+        400: components['responses']['Error'];
+        401: components['responses']['Error'];
+        403: components['responses']['Error'];
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/auth/me': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The authenticated caller, roles and effective permissions */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Me'];
+          };
+        };
+        401: components['responses']['Error'];
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/snapshot': {
     parameters: {
       query?: never;
@@ -1659,7 +2094,7 @@ export interface components {
     Error: {
       error: {
         message: string;
-        /** @description e.g. invalid_request_error, authentication_error, policy_violation, upstream_error, rate_limited */
+        /** @description e.g. invalid_request_error, authentication_error, permission_error, policy_violation, upstream_error, rate_limited */
         type: string;
         /** @description For rate_limited: the limit that was hit (e.g. tokens_per_minute). */
         code?: string | null;
@@ -2221,9 +2656,9 @@ export interface components {
       /** Format: date-time */
       ts: string;
       tenant_id?: string | null;
-      /** @description e.g. admin, system (seed) */
+      /** @description The user as `email <issuer#subject>`, `break_glass` (bootstrap token), `system`, or `anonymous` (failed logins) */
       actor: string;
-      /** @description e.g. tenant.create, api_key.create, provider_key.delete, routes.set, store.seed */
+      /** @description e.g. tenant.create, api_key.create, provider_key.delete, routes.set, store.seed, auth.login, auth.logout, auth.login_failed, auth.break_glass, role_binding.create */
       action: string;
       target?: string | null;
       detail: {
@@ -2241,6 +2676,119 @@ export interface components {
         hash?: string;
       } | null;
       chain_verified: boolean;
+    };
+    /** @enum {string} */
+    Role: 'owner' | 'admin' | 'auditor' | 'tenant_admin' | 'developer' | 'viewer' | 'billing';
+    /** @enum {string} */
+    Permission:
+      | 'tenants.create'
+      | 'catalog.read'
+      | 'catalog.write'
+      | 'providers.probe'
+      | 'audit.read'
+      | 'rbac.read'
+      | 'rbac.write'
+      | 'tenant.read'
+      | 'tenant.write'
+      | 'tenant.delete'
+      | 'api_keys.read'
+      | 'api_keys.write'
+      | 'provider_keys.read'
+      | 'provider_keys.write'
+      | 'routes.read'
+      | 'routes.write'
+      | 'datasources.read'
+      | 'datasources.write'
+      | 'ontology.read'
+      | 'ontology.review'
+      | 'nodes.read'
+      | 'nodes.write'
+      | 'usage.read';
+    RoleInfo: {
+      role: components['schemas']['Role'];
+      /** @enum {string} */
+      scope: 'deployment' | 'tenant';
+      description: string;
+      permissions: components['schemas']['Permission'][];
+    };
+    User: {
+      id: string;
+      issuer: string;
+      subject: string;
+      email?: string | null;
+      name?: string | null;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      last_login_at?: string | null;
+      /** @description Bindings naming this user (GET /users only) */
+      role_bindings?: components['schemas']['RoleBinding'][];
+      /** @description GET /users only */
+      active_sessions?: number;
+    };
+    RoleBinding: {
+      id: string;
+      /** @enum {string} */
+      subject_kind: 'user' | 'group';
+      /** @description A user id, or a group name as the identity provider sends it */
+      subject: string;
+      role: components['schemas']['Role'];
+      tenant_id?: string | null;
+      /** Format: date-time */
+      created_at: string;
+      created_by: string;
+    };
+    RoleBindingCreate: {
+      /** @enum {string} */
+      subject_kind: 'user' | 'group';
+      subject: string;
+      role: components['schemas']['Role'];
+      tenant_id?: string | null;
+    };
+    GroupMapping: {
+      group: string;
+      role: components['schemas']['Role'];
+      tenant_id?: string | null;
+      /** @enum {string} */
+      source: 'config';
+    };
+    RoleBindingList: {
+      bindings: components['schemas']['RoleBinding'][];
+      group_mappings: components['schemas']['GroupMapping'][];
+      groups_claim?: string | null;
+    };
+    AuthConfig: {
+      sso_enabled: boolean;
+      break_glass_enabled: boolean;
+      login_url?: string | null;
+    };
+    Me: {
+      authenticated: boolean;
+      /** @enum {string} */
+      method: 'session' | 'bearer' | 'break_glass';
+      actor: string;
+      user?: components['schemas']['User'] | null;
+      groups?: string[];
+      roles: {
+        role: components['schemas']['Role'];
+        tenant_id?: string;
+      }[];
+      permissions: {
+        /** @description Held deployment-wide; tenant-scoped ones here apply to every tenant. */
+        deployment: components['schemas']['Permission'][];
+        tenants: {
+          [key: string]: components['schemas']['Permission'][];
+        };
+      };
+      /** @description Sessions only: send as X-CSRF-Token on writes */
+      csrf_token?: string;
+      session?: {
+        id?: string;
+        /** Format: date-time */
+        created_at?: string;
+        /** Format: date-time */
+        expires_at?: string;
+      };
     };
     SignedSnapshot: {
       /** @description First 16 hex chars of sha256(public key) */
