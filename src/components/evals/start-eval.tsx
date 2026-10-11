@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
-import { apiKeysQuery, goldenSetQuery, useStartEval } from '@/api/queries';
+import { apiKeysQuery, evalKeyQuery, goldenSetQuery, useStartEval } from '@/api/queries';
 import type { Eval, EvalStart, EvalSuite } from '@/api/types';
 import { EVAL_SUITES } from '@/api/types';
 import { splitList } from '@/lib/apiKeys';
@@ -30,9 +30,13 @@ export function StartEvalDrawer({
 }) {
   const start = useStartEval(tenantId, name, version);
   const keys = useQuery(apiKeysQuery(tenantId));
+  const evalKey = useQuery(evalKeyQuery(tenantId));
   const golden = useQuery(goldenSetQuery(tenantId, name, version));
-  // Keys allowed to run this node: no allowlist, or one naming it.
-  const usable = (keys.data ?? []).filter((k) => k.nodes == null || k.nodes.includes(name));
+  // Customer keys allowed to run this node: no allowlist, or one naming it.
+  const usable = (keys.data ?? []).filter(
+    (k) => k.purpose !== 'eval' && (k.nodes == null || k.nodes.includes(name)),
+  );
+  const managed = evalKey.data?.key;
   const caseIds = (golden.data?.cases ?? []).map((c) => c.id);
 
   const [suite, setSuite] = useState<EvalSuite>('golden');
@@ -56,7 +60,6 @@ export function StartEvalDrawer({
     };
     const kn = int(k, 1, 10, 'k');
     const cn = int(concurrency, 1, 16, 'concurrency');
-    if (!keyId) errs.key = 'Pick the API key the eval runs as.';
     let input: unknown;
     if (suite === 'injection' && inputCase === '__custom') {
       try {
@@ -70,7 +73,7 @@ export function StartEvalDrawer({
     const only = splitList(cases);
     const body: EvalStart = {
       suite,
-      api_key_id: keyId,
+      ...(keyId ? { api_key_id: keyId } : {}),
       ...(kn !== undefined ? { k: kn } : {}),
       ...(cn !== undefined ? { concurrency: cn } : {}),
       ...(suite === 'golden' && only.length > 0 ? { cases: only } : {}),
@@ -88,7 +91,7 @@ export function StartEvalDrawer({
       open
       onClose={onClose}
       title={`Start an eval of ${name} v${version}`}
-      description="The eval's runs are ordinary node runs through the gateway pipeline, made, limited and metered as the API key you pick."
+      description="The eval's runs are ordinary node runs through the gateway pipeline, made, limited and metered as the tenant's eval key, or as an API key you pick."
       footer={
         <>
           <Button onClick={onClose}>Cancel</Button>
@@ -116,15 +119,14 @@ export function StartEvalDrawer({
           )}
         </Field>
         <Field
-          label="API key"
-          required
+          label="Runs as"
           error={errors.key}
           hint={
-            keys.isError
-              ? 'Could not load the API keys.'
-              : usable.length === 0 && keys.isSuccess
-                ? `No active key of this tenant may run ${name}. Mint one on the tenant page.`
-                : 'Its quotas apply to the eval, and its usage is the eval’s.'
+            keyId
+              ? 'Its quotas apply to the eval, and its usage is the eval’s.'
+              : managed
+                ? `The tenant's eval key (${managed.prefix}), managed by the control plane. Its quotas apply and its usage is metered as the eval's.`
+                : "The tenant's eval key, which the control plane creates on the first eval. Its usage is metered as the eval's."
           }
         >
           {({ id, describedBy, invalid }) => (
@@ -133,15 +135,12 @@ export function StartEvalDrawer({
               aria-describedby={describedBy}
               aria-invalid={invalid}
               value={keyId}
-              disabled={keys.isPending}
               onChange={(e) => setKeyId(e.target.value)}
             >
-              <option value="" disabled>
-                {keys.isPending ? 'Loading keys…' : 'Select a key…'}
-              </option>
+              <option value="">The tenant&apos;s eval key (managed)</option>
               {usable.map((key) => (
                 <option key={key.id} value={key.id}>
-                  {key.name} ({key.prefix})
+                  API key {key.name} ({key.prefix})
                 </option>
               ))}
             </Select>

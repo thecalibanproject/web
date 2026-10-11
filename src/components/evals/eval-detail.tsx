@@ -408,7 +408,12 @@ export function EvalDetail({ tenantId, evalId }: { tenantId: string; evalId: str
       )}
       <Section title="Trials">
         <Trials e={e} tenantId={tenantId} />
-        {!e.content_visible && (e.trials?.length ?? 0) > 0 && (
+        {e.content_purged && (
+          <p className="mt-2 text-[12px] text-fg-muted">
+            The run retention cleared this eval&apos;s trial detail. Its metrics and verdicts stay.
+          </p>
+        )}
+        {!e.content_visible && !e.content_purged && (e.trials?.length ?? 0) > 0 && (
           <p className="mt-2 text-[12px] text-fg-muted">
             Trial detail (outputs, what the scorers said, what sandboxed tools received) is run
             content: your role cannot see it (needs runs.data).

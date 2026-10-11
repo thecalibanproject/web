@@ -136,6 +136,13 @@ const keys: ApiKeyInfo[] = [
     created_at: '2026-10-01T10:00:00Z',
     nodes: ['other'],
   },
+  {
+    id: 'key_eval',
+    name: 'eval',
+    prefix: 'cal_ev99',
+    created_at: '2026-10-01T10:00:00Z',
+    purpose: 'eval',
+  },
 ];
 
 const P = '/api/v1/tenants/t1/nodes/triage';
@@ -206,6 +213,7 @@ function mockEvals(roles: Grant[] | null, extra: Parameters<typeof mockApi>[0] =
     'GET /api/v1/tenants/t1/evals/ev_g1': () => ({ body: goldenDetail }),
     'GET /api/v1/tenants/t1/evals/ev_i1': () => ({ body: { ...injectionEval, trials: [] } }),
     'GET /api/v1/tenants/t1/api-keys': () => ({ body: keys }),
+    'GET /api/v1/tenants/t1/eval-key': () => ({ body: { tenant_id: 't1', key: keys[2] } }),
     [`POST ${P}/versions/2/evals`]: () => ({
       status: 202,
       body: { ...goldenEval, id: 'ev_new', status: 'pending', summary: null },
@@ -333,8 +341,10 @@ describe('Node evals', () => {
     const { calls } = await openEvals(null);
     await user.click(screen.getByRole('button', { name: 'Start eval' }));
     const drawer = await screen.findByRole('dialog', { name: 'Start an eval of triage v2' });
-    const key = within(drawer).getByLabelText(/API key/);
-    await within(drawer).findByRole('option', { name: 'evals (cal_ab12)' });
+    const key = within(drawer).getByLabelText('Runs as');
+    await within(drawer).findByRole('option', { name: 'API key evals (cal_ab12)' });
+    // The managed eval key is the default, not one of the customer keys.
+    expect(within(drawer).queryByRole('option', { name: /cal_ev99/ })).not.toBeInTheDocument();
     expect(
       within(drawer).queryByRole('option', { name: /other-node-only/ }),
     ).not.toBeInTheDocument();
@@ -354,23 +364,39 @@ describe('Node evals', () => {
     expect(await screen.findByRole('dialog', { name: 'Eval ev_new' })).toBeInTheDocument();
   });
 
-  it('starts an injection eval on a golden case input', async () => {
+  it('starts an injection eval on a golden case input, as the managed eval key', async () => {
     const user = userEvent.setup();
     const { calls } = await openEvals(null);
     await user.click(screen.getByRole('button', { name: 'Start eval' }));
     const drawer = await screen.findByRole('dialog', { name: 'Start an eval of triage v2' });
     await user.selectOptions(within(drawer).getByLabelText('Suite'), 'injection');
-    await within(drawer).findByRole('option', { name: 'evals (cal_ab12)' });
-    await user.selectOptions(within(drawer).getByLabelText(/API key/), 'key_1');
+    await within(drawer).findByText(/The tenant's eval key \(cal_ev99\)/);
     await user.selectOptions(within(drawer).getByLabelText('Run input'), 'Golden case refund');
     await user.click(within(drawer).getByRole('button', { name: 'Start eval' }));
+    // No api_key_id: the eval runs as the tenant's eval key.
     await waitFor(() =>
       expect(lastCall(calls, 'POST', `${P}/versions/2/evals`)?.body).toEqual({
         suite: 'injection',
-        api_key_id: 'key_1',
         input_case: 'refund',
       }),
     );
+  });
+
+  it("says when the run retention cleared an eval's trial detail", async () => {
+    const user = userEvent.setup();
+    await openEvals(null, undefined, {
+      'GET /api/v1/tenants/t1/evals/ev_g1': () => ({
+        body: {
+          ...goldenDetail,
+          content_purged: true,
+          trials: goldenDetail.trials!.map((t) => ({ ...t, detail: null })),
+        },
+      }),
+    });
+    await user.click(screen.getByRole('button', { name: 'Open eval ev_g1' }));
+    const drawer = await screen.findByRole('dialog', { name: 'Eval ev_g1' });
+    expect(await within(drawer).findByText(/run retention cleared/)).toBeInTheDocument();
+    expect(within(drawer).getByText('pass^k').nextSibling).toHaveTextContent('50%');
   });
 
   it('sets the promotion bar', async () => {

@@ -45,6 +45,37 @@ describe('ApiKeysPanel', () => {
     await waitFor(() => expect(screen.queryByText(/SUPERSECRET/)).not.toBeInTheDocument());
   });
 
+  it('marks the managed eval key, which is rotated rather than revoked', async () => {
+    let keys: ApiKeyInfo[] = [
+      {
+        id: 'k_ev1',
+        name: 'eval',
+        prefix: 'cal_ev01',
+        created_at: '2026-10-02T10:00:00Z',
+        purpose: 'eval',
+      },
+    ];
+    const calls = mockApi({
+      'GET /api/v1/tenants/t1/api-keys': () => ({ body: keys }),
+      'POST /api/v1/tenants/t1/eval-key/rotate': () => {
+        keys = [{ ...keys[0]!, id: 'k_ev2', prefix: 'cal_ev02' }];
+        return { body: { tenant_id: 't1', key: keys[0], revoked: 'k_ev1' } };
+      },
+    });
+    const user = userEvent.setup();
+    renderWithClient(<ApiKeysPanel tenantId="t1" />);
+    const table = await screen.findByRole('table', { name: 'API keys' });
+    expect(within(table).getByText('Eval key')).toBeInTheDocument();
+    expect(within(table).queryByRole('button', { name: /Revoke/ })).not.toBeInTheDocument();
+
+    await user.click(within(table).getByRole('button', { name: 'Rotate the eval key eval' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Rotate the eval key?' });
+    expect(dialog).toHaveTextContent('Evals in flight lose their key');
+    await user.click(within(dialog).getByRole('button', { name: 'Rotate eval key' }));
+    await within(table).findByText(/cal_ev02/);
+    expect(calls.some((c) => c.path.endsWith('/eval-key/rotate'))).toBe(true);
+  });
+
   it('shows an error state with retry when the list fails', async () => {
     mockApi({
       'GET /api/v1/tenants/t1/api-keys': () => ({

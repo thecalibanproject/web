@@ -87,6 +87,7 @@ export const qk = {
   evalList: (tenantId: string, name: string, version: number) =>
     ['evals', tenantId, name, 'list', version] as const,
   eval: (tenantId: string, evalId: string) => ['eval', tenantId, evalId] as const,
+  evalKey: (tenantId: string) => ['tenants', tenantId, 'eval-key'] as const,
 };
 
 // ───────────── Queries ─────────────
@@ -446,6 +447,14 @@ export const evalQuery = (tenantId: string, evalId: string) =>
       ),
     refetchInterval: (q) =>
       q.state.data && isEvalActive(q.state.data.status) ? EVAL_POLL_MS : false,
+  });
+
+/** The tenant's eval key, managed by the control plane; `key` is null before the first eval. */
+export const evalKeyQuery = (tenantId: string) =>
+  queryOptions({
+    queryKey: qk.evalKey(tenantId),
+    queryFn: () =>
+      unwrap(api.GET('/api/v1/tenants/{tenantId}/eval-key', { params: { path: { tenantId } } })),
   });
 
 // ───────────── Mutations ─────────────
@@ -1042,5 +1051,24 @@ export function useCancelRun(tenantId: string) {
       return qc.invalidateQueries({ queryKey: qk.runs(tenantId) });
     },
     onError: () => qc.invalidateQueries({ queryKey: qk.runs(tenantId) }),
+  });
+}
+
+/**
+ * Rotates the tenant's eval key (`api_keys.write`): the old one is revoked
+ * and a new one created. Evals in flight lose their key.
+ */
+export function useRotateEvalKey(tenantId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      unwrap(
+        api.POST('/api/v1/tenants/{tenantId}/eval-key/rotate', { params: { path: { tenantId } } }),
+      ),
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: qk.evalKey(tenantId) }),
+        qc.invalidateQueries({ queryKey: qk.apiKeys(tenantId) }),
+      ]),
   });
 }

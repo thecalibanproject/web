@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { usePermissions } from '@/api/auth';
-import { apiKeysQuery, useMintApiKey, useRevokeApiKey } from '@/api/queries';
+import { apiKeysQuery, useMintApiKey, useRevokeApiKey, useRotateEvalKey } from '@/api/queries';
 import type { ApiKeyCreated, ApiKeyInfo } from '@/api/types';
 import {
   Badge,
@@ -92,6 +92,8 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
   const keys = useQuery(apiKeysQuery(tenantId, showRevoked));
   const mint = useMintApiKey(tenantId);
   const revoke = useRevokeApiKey(tenantId);
+  const rotate = useRotateEvalKey(tenantId);
+  const [rotating, setRotating] = useState(false);
   const [name, setName] = useState('');
   const [created, setCreated] = useState<ApiKeyCreated | null>(null);
   const [revoking, setRevoking] = useState<ApiKeyInfo | null>(null);
@@ -221,7 +223,18 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
               const revoked = Boolean(k.revoked_at);
               return (
                 <TR key={k.id} className={cn(revoked && 'text-fg-subtle')}>
-                  <TD className={cn('font-medium', revoked && 'line-through')}>{k.name}</TD>
+                  <TD className={cn('font-medium', revoked && 'line-through')}>
+                    {k.name}
+                    {k.purpose === 'eval' && (
+                      <Badge
+                        tone="info"
+                        className="ml-2"
+                        title="Managed by the control plane: node evals run as this key. It cannot be used on the data plane."
+                      >
+                        Eval key
+                      </Badge>
+                    )}
+                  </TD>
                   <TD className="font-mono text-[12px] text-fg-muted">{k.prefix}…</TD>
                   <TD>
                     <NodeAccessCell access={accessOf(k)} />
@@ -252,7 +265,19 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
                     </TD>
                   )}
                   <TD className="text-right whitespace-nowrap">
-                    {!revoked && canWrite && (
+                    {!revoked && canWrite && k.purpose === 'eval' && (
+                      <Button
+                        size="sm"
+                        aria-label={`Rotate the eval key ${k.name}`}
+                        onClick={() => {
+                          rotate.reset();
+                          setRotating(true);
+                        }}
+                      >
+                        Rotate
+                      </Button>
+                    )}
+                    {!revoked && canWrite && k.purpose !== 'eval' && (
                       <Button
                         size="sm"
                         variant="danger"
@@ -270,6 +295,20 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
         </Table>
       )}
 
+      <ConfirmDialog
+        open={rotating}
+        title="Rotate the eval key?"
+        confirmLabel="Rotate eval key"
+        loading={rotate.isPending}
+        error={rotate.error}
+        onCancel={() => setRotating(false)}
+        onConfirm={() => rotate.mutate(undefined, { onSuccess: () => setRotating(false) })}
+      >
+        <p>
+          The eval key is revoked and a new one created. Its plaintext is never shown: the control
+          plane keeps it for evals. Evals in flight lose their key, so rotate between evals.
+        </p>
+      </ConfirmDialog>
       <ConfirmDialog
         open={revoking !== null}
         title="Revoke API key?"
