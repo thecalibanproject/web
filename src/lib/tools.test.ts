@@ -4,6 +4,7 @@ import { manifestRows, parseManifests, revealHidden, toolRef } from './tools';
 
 const m = (over: Partial<ToolManifest>): ToolManifest => ({
   id: 'm',
+  tenant_id: 't1',
   server: 'crm',
   name: 'find',
   description: 'Finds a customer.',
@@ -12,6 +13,9 @@ const m = (over: Partial<ToolManifest>): ToolManifest => ({
   findings: [],
   status: 'discovered',
   discovered_at: '2026-10-01T10:00:00Z',
+  approved_at: null,
+  approved_by: null,
+  findings_acknowledged: false,
   ...over,
 });
 

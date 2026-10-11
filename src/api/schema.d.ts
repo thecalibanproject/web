@@ -16,6 +16,14 @@ export interface paths {
     /**
      * OpenAI-compatible chat completion (streaming via SSE when stream=true)
      * @description Authenticate with a tenant API key (`cal_…`).
+     *
+     *     **Nodes.** `model: "node/<name>"` (or `"node/<name>@v<N>"`) runs a published node: the
+     *     messages become its input, its output is the assistant message, and a human step is the
+     *     assistant message with `finish_reason: "input_required"` (continue with the header
+     *     `Caliban-Run-Id` and the answer as the last user message). The body then carries a `caliban`
+     *     object (`run_id`, `status`, `node`, `version`, `cost_usd`, `awaiting`). With
+     *     `model: "caliban/auto"`, a tenant that maps intents to nodes gets the node when the request
+     *     classifies into such an intent (see core/docs/nodes.md).
      */
     post: {
       parameters: {
@@ -44,6 +52,20 @@ export interface paths {
             'x-caliban-pii-entities'?: number;
             /** @description Cost of this request in USD (non-streaming only; absent when the model has no price). */
             'x-caliban-cost-usd'?: string;
+            /** @description The path taken: `node/<name>@v<N>` (a node answered), or `model:<id>` (a `caliban/auto` answer by a model, for a tenant that maps intents to nodes). */
+            'x-caliban-route'?: string;
+            /** @description Why `caliban/auto` answered with a model rather than a node. */
+            'x-caliban-route-fallback'?:
+              | 'low_confidence'
+              | 'no_node_for_intent'
+              | 'node_not_allowed'
+              | 'node_unavailable'
+              | 'nodes_not_enabled'
+              | 'node_over_budget'
+              | 'node_input_invalid';
+            /** @description The node run that answered. */
+            'Caliban-Run-Id'?: string;
+            'x-caliban-run-status'?: string;
             [name: string]: unknown;
           };
           content: {
@@ -393,9 +415,15 @@ export interface paths {
      *     a repeat returns the run the first request created (`Idempotent-Replayed: true`) and starts
      *     nothing; the same key with another body is a `422` (`idempotency_key_reused`).
      *
+     *     **Stream** (`"stream": true`): `200` with the run's events (`text/event-stream`, see
+     *     `GET /v1/runs/{runId}/events`) until it ends or waits for a human.
+     *
+     *     Instead of `input`, `chat.messages` gives chat messages, mapped to the node's input as the
+     *     `node/<name>` chat shortcut does.
+     *
      *     Every model call the run makes goes through the gateway pipeline as the invoking key (PII,
-     *     caches, routing, quotas, metering), with an Idempotency-Key per step. Streaming, MCP and
-     *     `model: "node/<name>"` come later. Split-mode routers forward this request to a worker.
+     *     caches, routing, quotas, metering), with an Idempotency-Key per step. Split-mode routers
+     *     forward this request to a worker.
      */
     post: {
       parameters: {
@@ -413,10 +441,19 @@ export interface paths {
           'application/json': {
             /** @description Any JSON value: the run input */
             input?: unknown;
+            /** @description Chat messages instead of `input` (mapped to the node's input). */
+            chat?: {
+              messages: components['schemas']['ChatMessage'][];
+            };
             /** @description A published version; default: the live one */
             version?: number;
             /** @default false */
             async?: boolean;
+            /**
+             * @description Answer with the run's events (SSE)
+             * @default false
+             */
+            stream?: boolean;
             /** @description Sync runs: wait at most this long (capped by the server) */
             wait_s?: number;
             /** @description Lowers the version's budget for this run (a larger value is ignored). */
@@ -430,13 +467,15 @@ export interface paths {
         };
       };
       responses: {
-        /** @description The run ended (succeeded, failed or budget_exhausted) */
+        /** @description The run ended (succeeded, failed, budget_exhausted or cancelled), or its event stream */
         200: {
           headers: {
+            'Caliban-Run-Id'?: string;
             [name: string]: unknown;
           };
           content: {
             'application/json': components['schemas']['NodeRun'];
+            'text/event-stream': string;
           };
         };
         /** @description The run is pending, running, sleeping or waiting for input */
@@ -456,6 +495,224 @@ export interface paths {
         404: components['responses']['Error'];
         422: components['responses']['Error'];
         503: components['responses']['Error'];
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/runs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List node runs
+     * @description Runs of the key's tenant, of the nodes the key may run (its allowlist), newest first.
+     *     Summaries only (no content, no steps). Page with `cursor` (`next_cursor` of the previous page;
+     *     `null` on the last).
+     */
+    get: {
+      parameters: {
+        query?: {
+          node?: string;
+          /** @description Comma-separated run statuses */
+          status?: string;
+          created_after?: string;
+          created_before?: string;
+          limit?: number;
+          cursor?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['NodeRunList'];
+          };
+        };
+        400: components['responses']['Error'];
+        401: components['responses']['Error'];
+        503: components['responses']['Error'];
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/runs/{runId}/events': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    /**
+     * Follow a run's events (SSE)
+     * @description The run's events from the journal, numbered from 1, so a client resumes on any worker or
+     *     router with `Last-Event-ID` (or `?after=`). Each SSE event has `id`, `event` (the type) and
+     *     `data` (a `RunEvent`). The stream ends after `run.finished`, or after `run.input_required`
+     *     while the run waits for that answer; that last event carries the run in `run`. Events never
+     *     carry step content; `run.input_required` carries the question.
+     */
+    get: {
+      parameters: {
+        query?: {
+          after?: number;
+        };
+        header?: {
+          'Last-Event-ID'?: string;
+        };
+        path: {
+          runId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description The event stream */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'text/event-stream': string;
+          };
+        };
+        401: components['responses']['Error'];
+        403: components['responses']['Error'];
+        404: components['responses']['Error'];
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/runs/{runId}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        runId: string;
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Cancel a node run
+     * @description Durable: a run that waits (pending, sleeping, input required) is `cancelled` at once (`200`);
+     *     a running run is asked to stop (`202`, `cancel_requested: true`) and stops at its next step
+     *     boundary on whichever worker runs it (the model call in flight completes and is recorded; a
+     *     failing one is not retried). Cancelling a cancelled run is `200`; a run that ended otherwise
+     *     is `409` (`run_already_ended`). Audited as `node.run.cancel`.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          runId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description The run is cancelled */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['NodeRun'];
+          };
+        };
+        /** @description The running run will stop at its next step */
+        202: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['NodeRun'];
+          };
+        };
+        401: components['responses']['Error'];
+        403: components['responses']['Error'];
+        404: components['responses']['Error'];
+        409: components['responses']['Error'];
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/mcp': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * The MCP server (Streamable HTTP, stateless)
+     * @description JSON-RPC over Streamable HTTP. Authenticate with the tenant API key as bearer token (`401`
+     *     otherwise). `tools/list`: the published nodes the key may run (input schema: the node's).
+     *     `tools/call`: runs the node, waits at most `CALIBAN_NODE_SYNC_WAIT_SECS`. With
+     *     `CALIBAN_MCP_TASKS=true`, clients declaring the tasks extension get a task (its id is the run
+     *     id) and use `tasks/get`, `tasks/update`, `tasks/cancel`. See core/docs/nodes.md.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            [key: string]: unknown;
+          };
+        };
+      };
+      responses: {
+        /** @description The JSON-RPC answer */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              [key: string]: unknown;
+            };
+          };
+        };
+        401: components['responses']['Error'];
       };
     };
     delete?: never;
@@ -529,7 +786,9 @@ export interface paths {
      *
      *     A step named `<step>@approve` is the approval of a write whose arguments carry untrusted taint
      *     labels: answer `{"approve": true}` or `{"approve": false}` (a refusal fails the call). The
-     *     decision is journaled as an `approval` step (see docs/tools.md).
+     *     decision is journaled as an `approval` step (see docs/tools.md). Answers and approval decisions
+     *     are audited (`node.run.answer`, `node.write.approve`, `node.write.deny`) in the control
+     *     plane's hash-chained log, with who answered.
      */
     post: {
       parameters: {
@@ -918,6 +1177,346 @@ export interface paths {
     };
     options?: never;
     head?: never;
+    /**
+     * Change an API key's node allowlist and datasource scopes
+     * @description Absent fields are kept; `null` lifts a restriction (every published node; every scope of the
+     *     nodes it runs). Changing node access needs `nodes.run` on the tenant (`403` otherwise).
+     *     Audited as `api_key.update` with the old and new values; routers apply it with their next
+     *     snapshot.
+     */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          keyId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            nodes?: string[] | null;
+            datasource_scopes?: string[] | null;
+          };
+        };
+      };
+      responses: {
+        /** @description The key */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ApiKeyInfo'];
+          };
+        };
+        403: components['responses']['Error'];
+        404: components['responses']['Error'];
+        422: components['responses']['Error'];
+      };
+    };
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/runs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+      };
+      cookie?: never;
+    };
+    /**
+     * The tenant's node runs (console)
+     * @description Newest first, from the node journal (the database's, or a standalone process's in-memory
+     *     one; `503` when the control plane has none). Permission `runs.read`.
+     */
+    get: {
+      parameters: {
+        query?: {
+          node?: string;
+          /** @description Comma-separated run statuses */
+          status?: string;
+          created_after?: string;
+          created_before?: string;
+          limit?: number;
+          cursor?: string;
+        };
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['NodeRunList'];
+          };
+        };
+        400: components['responses']['Error'];
+        403: components['responses']['Error'];
+        404: components['responses']['Error'];
+        503: components['responses']['Error'];
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/runs/{runId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+        runId: string;
+      };
+      cookie?: never;
+    };
+    /**
+     * A node run (console)
+     * @description Metadata with `runs.read`: status, budget, cost, usage, steps (vertex, kind, status, timings,
+     *     tokens, cost, taint labels). With `runs.data` also the content (`input`, `output`, each
+     *     step's `output`, the awaited `question`); `content_visible` says which.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          runId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ConsoleRun'];
+          };
+        };
+        403: components['responses']['Error'];
+        404: components['responses']['Error'];
+        503: components['responses']['Error'];
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/runs/{runId}/input': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+        runId: string;
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Answer a question or approve or deny a tainted write (console)
+     * @description As the signed-in user (permission `runs.answer`): journaled with the user's identity and
+     *     recorded in the audit chain (`node.run.answer`, `node.write.approve`, `node.write.deny`). An
+     *     approval takes `{"approve": true}` or `{"approve": false}`. `409` when the run is not waiting
+     *     (or not for `step`).
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          runId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Any JSON value */
+            answer: unknown;
+            step?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Accepted; a worker resumes the run */
+        202: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ConsoleRun'];
+          };
+        };
+        403: components['responses']['Error'];
+        404: components['responses']['Error'];
+        409: components['responses']['Error'];
+        503: components['responses']['Error'];
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/inbox': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+      };
+      cookie?: never;
+    };
+    /**
+     * Runs waiting for a human (console)
+     * @description Questions and approvals of tainted writes, oldest wait first (permission `runs.read`; the
+     *     question with `runs.data`).
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {string} */
+              object: 'list';
+              content_visible: boolean;
+              data: {
+                run_id: string;
+                node: string;
+                version: number;
+                step: string;
+                /** @enum {string} */
+                kind: 'question' | 'approval';
+                question?: string | null;
+                invoker?: string;
+                /** Format: date-time */
+                waiting_since: string;
+                /**
+                 * Format: date-time
+                 * @description When the human step times out (its `timeout_s`)
+                 */
+                expires_at?: string | null;
+              }[];
+            };
+          };
+        };
+        403: components['responses']['Error'];
+        404: components['responses']['Error'];
+        503: components['responses']['Error'];
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/node-spend': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+      };
+      cookie?: never;
+    };
+    /**
+     * The tenant's node spend today and this month, against its caps
+     * @description What the tenant's node runs spent on model calls (USD, priced like the metering) today and
+     *     this month (UTC), across every worker, from the node journal (`503` without one), next to
+     *     its `node_spend_caps`. Permission `usage.read`.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              tenant_id: string;
+              /** @description YYYY-MM-DD (UTC) */
+              day: string;
+              /** @description YYYY-MM (UTC) */
+              month: string;
+              today_usd: number;
+              month_usd: number;
+              caps: {
+                daily_usd?: number | null;
+                monthly_usd?: number | null;
+              };
+              remaining: {
+                /** @description `null`: no cap */
+                daily_usd?: number | null;
+                monthly_usd?: number | null;
+              };
+              /** @description A cap is reached: runs stop at their next model call */
+              capped: boolean;
+            };
+          };
+        };
+        403: components['responses']['Error'];
+        404: components['responses']['Error'];
+        503: components['responses']['Error'];
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
     patch?: never;
     trace?: never;
   };
@@ -1176,9 +1775,12 @@ export interface paths {
      *     `node_caps`; `mcp://` tools are pinned (resolving them against an approved tool registry
      *     comes with the MCP client). The spec is then sealed under the tenant's data key (created on
      *     first use; needs `CALIBAN_KEK`, else 400) and ships to routers and workers in the signed
-     *     snapshot. With `promote` (default `true`) it also becomes the live version. Needs
-     *     `nodes.publish`; audited as `node.publish`. A version that is not a draft is a 409; a
-     *     validation failure is a 422 listing every problem.
+     *     snapshot. With `promote` (default `true`) it also becomes the live version, which needs the
+     *     node's promotion bar met: a version with write tools (or a node with a golden bar) is
+     *     refused (`422`, problems of kind `eval_gate`) since a draft has no evals yet; publish it with
+     *     `{"promote": false}`, run its evals, then promote it. Needs `nodes.publish`; audited as
+     *     `node.publish` (with the evals that met the bar, under `evals`). A version that is not a
+     *     draft is a 409; a validation failure is a 422 listing every problem.
      */
     post: {
       parameters: {
@@ -1236,9 +1838,10 @@ export interface paths {
     put?: never;
     /**
      * Retire a published version
-     * @description The version leaves the data-plane snapshot (new runs of it are refused; runs in flight fail
-     *     when they next need it). If it was live, the node has no live version until another is
-     *     promoted. A version still called (`node://`) by another published version is a 409.
+     * @description The version leaves the data-plane snapshot: new runs of it are refused (`404`), and runs
+     *     already started finish on the version they started on (each run keeps the specs of the
+     *     versions it can reach, sealed in the journal). If it was live, the node has no live version
+     *     until another is promoted. A version still called (`node://`) by another published version is a 409.
      *     Retirement is final. Needs `nodes.publish`; audited as `node.retire`.
      */
     post: {
@@ -1288,9 +1891,12 @@ export interface paths {
     /**
      * Move the promotion pointer (promote or roll back)
      * @description Makes a published version the live one (what `POST /v1/nodes/{name}/runs` without a version
-     *     runs). Its budgets are checked against the tenant's current `node_caps` (422). A draft or a
-     *     retired version is a 409. Needs `nodes.publish`; audited as `node.promote` with the
-     *     previous live version.
+     *     runs). Its budgets are checked against the tenant's current `node_caps` (422). The node's
+     *     promotion bar must be met by the version's latest finished evals (422, problems of kind
+     *     `eval_gate`): the golden bar when the node sets one, and for a version with write tools
+     *     always an injection eval (default bar: every attack blocked). A draft or a retired version
+     *     is a 409. Needs `nodes.publish`; audited as `node.promote` with the previous live version
+     *     and the evals that met the bar (`evals`).
      */
     post: {
       parameters: {
@@ -1394,6 +2000,491 @@ export interface paths {
     };
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/nodes/{nodeName}/versions/{version}/golden-set': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+        nodeName: components['parameters']['NodeName'];
+        version: components['parameters']['NodeVersion'];
+      };
+      cookie?: never;
+    };
+    /**
+     * The golden set of a version
+     * @description Metadata with `nodes.read`; the cases (tenant content, sealed at rest) also with `runs.data`. 503 without a node journal.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          nodeName: components['parameters']['NodeName'];
+          version: components['parameters']['NodeVersion'];
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['GoldenSet'];
+          };
+        };
+        404: components['responses']['Error'];
+        503: components['responses']['Error'];
+      };
+    };
+    /**
+     * Create or replace the golden set of a version
+     * @description At most 200 cases, unique ids, at least one check each; inputs are checked against the
+     *     version's `prompt.input_schema` (422 listing every problem, kind `golden_set`). Sealed under
+     *     the tenant's data key. Needs `nodes.write`; audited as `node.golden_set.update` (counts and
+     *     hashes, never cases).
+     */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          nodeName: components['parameters']['NodeName'];
+          version: components['parameters']['NodeVersion'];
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            cases: components['schemas']['GoldenCase'][];
+          };
+        };
+      };
+      responses: {
+        /** @description Stored */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['GoldenSet'];
+          };
+        };
+        404: components['responses']['Error'];
+        422: components['responses']['Error'];
+      };
+    };
+    post?: never;
+    /**
+     * Delete the golden set of a version
+     * @description Needs `nodes.write`; audited as `node.golden_set.delete`.
+     */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          nodeName: components['parameters']['NodeName'];
+          version: components['parameters']['NodeVersion'];
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Deleted */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        404: components['responses']['Error'];
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/nodes/{nodeName}/eval-policy': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+        nodeName: components['parameters']['NodeName'];
+      };
+      cookie?: never;
+    };
+    /**
+     * The node's promotion bar
+     * @description `nodes.read`. `injection_bar` is the bar in effect for versions with write tools.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          nodeName: components['parameters']['NodeName'];
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {string} */
+              object?: 'node.eval_policy';
+              node?: string;
+              policy?: components['schemas']['EvalPolicy'];
+              injection_bar?: number;
+              /** Format: date-time */
+              updated_at?: string | null;
+              updated_by?: string | null;
+            };
+          };
+        };
+      };
+    };
+    /**
+     * Set the node's promotion bar
+     * @description Needs `nodes.publish` (it decides what may be promoted); audited as `node.eval_policy.update` with the old and new bar.
+     */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          nodeName: components['parameters']['NodeName'];
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': components['schemas']['EvalPolicy'];
+        };
+      };
+      responses: {
+        /** @description Stored */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        422: components['responses']['Error'];
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/nodes/{nodeName}/versions/{version}/evals': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+        nodeName: components['parameters']['NodeName'];
+        version: components['parameters']['NodeVersion'];
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Start an eval of a published version
+     * @description `golden`: every case of the version's golden set (or `cases`) runs `k` times (default 3) as
+     *     ordinary node runs on workers, through the request pipeline, as the API key `api_key_id`
+     *     (it must be active and allowed to run the node; its quotas apply and its usage is metered).
+     *     `injection`: the built-in injection suite against sandboxed tools (`k` default 1); the run
+     *     input is `input`, else the input of `input_case` (or the golden set's first case), whose
+     *     checks then measure utility under attack. Needs `nodes.run`; audited as `node.eval.start`.
+     *     A version that is not published is a 409.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          nodeName: components['parameters']['NodeName'];
+          version: components['parameters']['NodeVersion'];
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @enum {string} */
+            suite: 'golden' | 'injection';
+            api_key_id: string;
+            k?: number;
+            /** @default 4 */
+            concurrency?: number;
+            /** @description Golden: only these cases */
+            cases?: string[];
+            /** @description Golden: the default judge model (recorded in the summary) */
+            judge_model?: string;
+            /** @description Injection: the run input */
+            input?: unknown;
+            /** @description Injection: take the input (and its checks) from this golden case */
+            input_case?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Started */
+        202: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Eval'];
+          };
+        };
+        404: components['responses']['Error'];
+        409: components['responses']['Error'];
+        422: components['responses']['Error'];
+        503: components['responses']['Error'];
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/nodes/{nodeName}/versions/{version}/gate': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+        nodeName: components['parameters']['NodeName'];
+        version: components['parameters']['NodeVersion'];
+      };
+      cookie?: never;
+    };
+    /**
+     * What promoting the version would say
+     * @description `nodes.read`.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          nodeName: components['parameters']['NodeName'];
+          version: components['parameters']['NodeVersion'];
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              node?: string;
+              version?: number;
+              has_write_tools?: boolean;
+              allowed?: boolean;
+              /** @description The evals that meet the bar (`golden`, `injection`), null when no gate applies */
+              evidence?: unknown;
+              problems?: Record<string, never>[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/evals': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+      };
+      cookie?: never;
+    };
+    /**
+     * The tenant's evals, newest first
+     * @description `nodes.read`. Metrics included, content never.
+     */
+    get: {
+      parameters: {
+        query?: {
+          node?: string;
+          version?: number;
+          suite?: 'golden' | 'injection';
+          /** @description Comma separated */
+          status?: string;
+          limit?: number;
+          cursor?: string;
+        };
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {string} */
+              object?: 'list';
+              data?: components['schemas']['Eval'][];
+              next_cursor?: string | null;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/evals/{evalId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+        evalId: string;
+      };
+      cookie?: never;
+    };
+    /**
+     * An eval and its trials
+     * @description `nodes.read`; each trial's `detail` (outputs, what the scorers said, what sandboxed tools received) with `runs.data`.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          evalId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OK */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Eval'];
+          };
+        };
+        404: components['responses']['Error'];
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tenants/{tenantId}/evals/{evalId}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tenantId: components['parameters']['TenantId'];
+        evalId: string;
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Cancel an eval
+     * @description A pending eval ends at once (200); a running one stops, with its runs in flight, at its worker's next check (202). An eval that ended otherwise is a 409. Needs `nodes.run`; audited as `node.eval.cancel`.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          evalId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Cancelled */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Eval'];
+          };
+        };
+        /** @description Cancellation asked for */
+        202: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['Eval'];
+          };
+        };
+        404: components['responses']['Error'];
+        409: components['responses']['Error'];
+      };
+    };
     delete?: never;
     options?: never;
     head?: never;
@@ -1996,11 +3087,17 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List nodes (AI sub-apps) */
+    /**
+     * List nodes (AI sub-apps)
+     * @description Every version of every node by default (with its spec). `view=summary` lists one entry per
+     *     node instead (no specs): its live version, its latest version and state, version counts and
+     *     when it last changed.
+     */
     get: {
       parameters: {
         query?: {
           tenant_id?: components['parameters']['TenantQuery'];
+          view?: 'versions' | 'summary';
         };
         header?: never;
         path?: never;
@@ -2008,15 +3105,17 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description OK */
+        /** @description Versions (`Node`), or summaries (`NodeSummary`) with `view=summary` */
         200: {
           headers: {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['Node'][];
+            'application/json':
+              components['schemas']['Node'][] | components['schemas']['NodeSummary'][];
           };
         };
+        400: components['responses']['Error'];
       };
     };
     put?: never;
@@ -2141,7 +3240,7 @@ export interface paths {
     post?: never;
     /**
      * Delete a tool server (tools.write)
-     * @description Soft delete; its credential is wiped and its tools leave the data plane. `409` while a published node version uses it.
+     * @description Soft delete; its credential is wiped and its tools leave the data plane. `409` while a published node version uses it (change it in place with `PATCH` instead).
      */
     delete: {
       parameters: {
@@ -2168,7 +3267,53 @@ export interface paths {
     };
     options?: never;
     head?: never;
-    patch?: never;
+    /**
+     * Change a tool server (tools.write)
+     * @description Absent fields are kept. A new `credential` is sealed at once and never returned (rotation);
+     *     `null` removes it (refused when the auth method needs one). The auth method, the credential
+     *     and `trusted` keep the approvals; a new `url` withdraws every approval of the server's
+     *     manifests (discover and approve again; published versions calling its tools fail until then).
+     *     The URL (and an OAuth token URL) must pass the egress rules (`422`). Audited as
+     *     `tool_server.update`.
+     */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          tenantId: components['parameters']['TenantId'];
+          server: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            url?: string;
+            auth?: components['schemas']['ToolAuth'];
+            credential?: string | null;
+            trusted?: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description The server */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ToolServer'] & {
+              /** @description Approvals the URL change withdrew */
+              approvals_withdrawn: number;
+            };
+          };
+        };
+        400: components['responses']['Error'];
+        404: components['responses']['Error'];
+        422: components['responses']['Error'];
+      };
+    };
     trace?: never;
   };
   '/api/v1/tenants/{tenantId}/tool-servers/{server}/discover': {
@@ -2276,7 +3421,10 @@ export interface paths {
             manifests: {
               name: string;
               description: string;
-              input_schema: Record<string, never>;
+              /** @description The tool's input JSON Schema (any JSON object) */
+              input_schema: {
+                [key: string]: unknown;
+              };
             }[];
           };
         };
@@ -2482,7 +3630,9 @@ export interface paths {
      *     through `POST /api/v1/usage/ingest`), totals over all of them, including the days rolled up into
      *     `usage_daily` once raw events pass `CALIBAN_USAGE_RETENTION_DAYS` (the totals do not change). With the
      *     in-memory store, the last 10,000 events of the process. `node` and `run_id` filter node calls; `by_node`
-     *     totals each node version (cost per node); a `run_id` covers raw events only.
+     *     totals each node version (cost per node); a `run_id` covers raw events only. `from` and `to`
+     *     limit the events, the totals and `by_node` to `from <= ts < to`; a rolled-up day counts when its
+     *     start (00:00 UTC) is in the range.
      */
     get: {
       parameters: {
@@ -2490,6 +3640,10 @@ export interface paths {
           tenant_id?: components['parameters']['TenantQuery'];
           node?: string;
           run_id?: string;
+          /** @description Events at or after this time (RFC 3339) */
+          from?: string;
+          /** @description Events before this time; `400` unless after `from` */
+          to?: string;
           limit?: number;
         };
         header?: never;
@@ -3176,6 +4330,74 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/audit/ingest': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Run decisions from the data plane
+     * @description Authenticated with the router token. Workers deliver the decisions made on the data plane
+     *     (`node.run.answer`, `node.write.approve`, `node.write.deny`, `node.run.cancel`) at least once;
+     *     each event id is recorded once in the hash-chained audit log, so a retry appends nothing.
+     *     Other actions are `rejected`.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            router_id?: string;
+            events: {
+              /** @description Stable: `<run>/<step>/answer`, `<run>/cancel` */
+              id: string;
+              tenant_id: string;
+              actor: string;
+              action: string;
+              target?: string | null;
+              detail: {
+                [key: string]: unknown;
+              };
+              /** Format: date-time */
+              at: string;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Recorded */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              accepted: number;
+              duplicates: number;
+              rejected: number;
+            };
+          };
+        };
+        400: components['responses']['Error'];
+        401: components['responses']['Error'];
+        503: components['responses']['Error'];
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/snapshot': {
     parameters: {
       query?: never;
@@ -3251,8 +4473,24 @@ export interface components {
         message: string;
         /** @description e.g. invalid_request_error, authentication_error, permission_error, policy_violation, upstream_error, rate_limited */
         type: string;
-        /** @description For rate_limited: the limit that was hit (e.g. tokens_per_minute). */
+        /** @description For rate_limited: the limit that was hit (e.g. tokens_per_minute). `validation_failed` when a node version cannot be created, published or promoted (see `problems`). */
         code?: string | null;
+        /** @description Node version refusals (`422`, `validation_failed`): every reason, one by one, next to `message` (which joins them). */
+        problems?: {
+          /** @enum {string} */
+          kind:
+            | 'spec'
+            | 'tool'
+            | 'datasource_scope'
+            | 'budget'
+            | 'node_ref'
+            | 'cycle'
+            | 'eval_gate'
+            | 'golden_set';
+          message: string;
+          /** @description Where in the spec: `tools[0]`, `datasources.scopes[1]`, `budgets.steps`, `node://risk@v2` */
+          path?: string;
+        }[];
       };
     };
     Health: {
@@ -3444,6 +4682,7 @@ export interface components {
       node_caps?: components['schemas']['NodeCaps'] | null;
       /** @description Caps on what the tenant's node runs spend on model calls; `null`: none. */
       node_spend_caps?: components['schemas']['NodeSpendCaps'] | null;
+      node_routes?: components['schemas']['NodeRoutes'];
       /** Format: date-time */
       created_at: string;
       /**
@@ -3476,6 +4715,7 @@ export interface components {
       auto_cache_hit_fraction?: number | null;
       node_caps?: components['schemas']['NodeCaps'];
       node_spend_caps?: components['schemas']['NodeSpendCaps'];
+      node_routes?: components['schemas']['NodeRoutes'];
     };
     TenantUpdate: {
       /** @enum {string} */
@@ -3490,7 +4730,17 @@ export interface components {
       node_caps?: components['schemas']['NodeCaps'] | null;
       /** @description Daily and monthly caps on node spend; `null` removes them; absent keeps them. */
       node_spend_caps?: components['schemas']['NodeSpendCaps'] | null;
+      node_routes?: components['schemas']['NodeRoutes'];
     };
+    /**
+     * @description Intents `caliban/auto` hands to the tenant's nodes: intent id to `node/<name>` (the live
+     *     version), `node/<name>@published` (the same) or `node/<name>@v<N>`. Overrides
+     *     `[routing.tenants.<id>.routes]` of the config file, intent by intent. On update: `null`
+     *     clears it, absent keeps it.
+     */
+    NodeRoutes: {
+      [key: string]: string;
+    } | null;
     /**
      * @description Caps on what the tenant's node runs spend on model calls (USD, priced like the metering), per
      *     UTC day and month, across all workers: checked before every model call against the journal's
@@ -3749,6 +4999,152 @@ export interface components {
       published_at?: string | null;
       /** Format: date-time */
       retired_at?: string | null;
+      /** @description Broad `allow_tainted` entries (`*`, or a `tool:` pattern wider than one server): standing authority for tainted writes. Warnings, not refusals: the injection suite runs every version with its real allowlist. */
+      warnings?: {
+        /** @enum {string} */
+        kind: 'allowlist';
+        message: string;
+        /** @description e.g. `tools[1].allow_tainted[0]` */
+        path?: string;
+      }[];
+    };
+    GoldenCase: {
+      id: string;
+      /** @description The run input (checked against prompt.input_schema) */
+      input: unknown;
+      /** @description Shorthand for an exact check */
+      expected?: unknown;
+      checks?: components['schemas']['EvalCheck'][];
+      /** @description Scripted answers to human steps, by step id (`clarify#0`, `write#0@approve`) or vertex id (`clarify`, `write@approve`). A question without one fails the trial; a tainted write without one is denied. */
+      answers?: {
+        [key: string]: unknown;
+      };
+      tags?: string[];
+    };
+    /** @description A check of the run output. Text checks see the output as text (a string as is, other JSON compact). */
+    EvalCheck:
+      | {
+          /** @constant */
+          type: 'exact';
+          /** @description A string compares with the output text; any other JSON with the output parsed as JSON */
+          value: unknown;
+          /** @default true */
+          strip?: boolean;
+          /** @default true */
+          case_sensitive?: boolean;
+        }
+      | {
+          /** @constant */
+          type: 'contains';
+          value: string | string[];
+          /** @default true */
+          case_sensitive?: boolean;
+        }
+      | {
+          /** @constant */
+          type: 'regex';
+          pattern: string;
+          flags?: ('IGNORECASE' | 'MULTILINE' | 'DOTALL')[];
+        }
+      | {
+          /** @constant */
+          type: 'json_schema';
+          /** @description The JSON Schema subset node specs use */
+          schema: Record<string, never>;
+        }
+      | {
+          /** @constant */
+          type: 'llm_judge';
+          rubric: string;
+          /** @description Default: the eval's judge_model, else caliban/auto. Called through the gateway as the eval's API key. */
+          model?: string;
+          /** @default 0.5 */
+          threshold?: number;
+        };
+    GoldenSet: {
+      /** @enum {string} */
+      object: 'node.golden_set';
+      node: string;
+      version: number;
+      /** @description `sha256:<hex>` of the cases' canonical JSON */
+      hash: string;
+      case_count: number;
+      /** Format: date-time */
+      updated_at: string;
+      updated_by: string;
+      /** @description The caller holds runs.data: `cases` is included */
+      content_visible: boolean;
+      cases?: components['schemas']['GoldenCase'][];
+    };
+    EvalPolicy: {
+      golden?: {
+        /** @description Least pass^k: the share of cases whose k runs all passed */
+        min_pass_k: number;
+        /** @default 1 */
+        min_k?: number;
+        max_cost_per_success_usd?: number;
+        max_p95_latency_ms?: number;
+      };
+      injection?: {
+        /** @description Least share of attacks blocked. Default 1 (every attack). An injection eval is required for versions with write tools whatever the bar. */
+        min_pass_rate: number;
+      };
+    };
+    Eval: {
+      id: string;
+      /** @enum {string} */
+      object: 'node.eval';
+      node: string;
+      version: number;
+      hash: string;
+      /** @enum {string} */
+      suite: 'golden' | 'injection';
+      k: number;
+      concurrency?: number;
+      case_count: number;
+      /** @enum {string} */
+      status: 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+      created_by?: string;
+      api_key_id?: string | null;
+      /**
+       * @description Metrics only. Golden: `k`, `cases`, `trials`, `passed_trials`, `errors`, `pass_hat_k`
+       *     (pass^k), `pass_at_1`, `pass_at_k`, `cost_usd`, `cost_per_success_usd`,
+       *     `judge_cost_usd`, `tokens`, `latency_ms` (`p50`, `p95`), `by_case`, `golden_hash`,
+       *     `judge` (default model, prompt version and hash, temperature). Injection:
+       *     `suite_version`, `trials`, `blocked`, `pass_rate`, `attack_success_rate`,
+       *     `attacks_succeeded`, `attacked` (the model followed the injection),
+       *     `utility_under_attack`, `by_category`, `not_applicable` (`case`, `reason`), `cases`,
+       *     `cost_usd`, `latency_ms`.
+       */
+      summary?: Record<string, never> | null;
+      error?: string | null;
+      cancel_requested?: boolean;
+      cancelled_by?: string | null;
+      claims?: number;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      started_at?: string | null;
+      /** Format: date-time */
+      finished_at?: string | null;
+      /** @description Detail only. */
+      trials?: {
+        case?: string;
+        trial?: number;
+        run_id?: string | null;
+        /** @enum {string} */
+        status?: 'running' | 'passed' | 'failed' | 'error';
+        cost_usd?: number;
+        latency_ms?: number;
+        tokens?: number;
+        /** @description Metadata: checks passed (golden); category, attacked, succeeded, defenses, utility (injection) */
+        verdict?: Record<string, never>;
+        /** @description With runs.data only: the output and what the scorers said, or what the sandboxed tools received */
+        detail?: unknown;
+        /** Format: date-time */
+        finished_at?: string | null;
+      }[];
+      content_visible?: boolean;
     };
     NodeRun: {
       id: string;
@@ -3758,16 +5154,8 @@ export interface components {
       version: number;
       /** @description Content hash of the version that runs */
       hash: string;
-      /** @enum {string} */
-      status:
-        | 'pending'
-        | 'running'
-        | 'sleeping'
-        | 'input_required'
-        | 'succeeded'
-        | 'failed'
-        | 'budget_exhausted';
-      /** @description The run output; on budget_exhausted (and failed, when there is one) the partial result */
+      status: components['schemas']['RunStatus'];
+      /** @description The run output; on budget_exhausted and cancelled (and failed, when there is one) the partial result */
       output?: unknown;
       /** @description The run ended on a budget overrun: output is partial */
       partial?: boolean;
@@ -3799,25 +5187,174 @@ export interface components {
       };
       /** @description What the run spent on model calls so far (USD): the sum of `charged_usd` over its usage events */
       cost_usd?: number;
-      steps: {
-        /** @description Deterministic step id, e.g. classify#0, fanout#0/3, agent#2.1 */
-        id?: string;
-        vertex?: string;
-        kind?: string;
-        /** @enum {string} */
-        status?: 'completed' | 'failed';
-        tokens?: number;
-        usd?: number;
-        duration_ms?: number;
-      }[];
+      usage?: components['schemas']['RunUsage'];
+      steps: components['schemas']['RunStep'][];
       /** @description How many times a worker claimed the run (more than 1 after a takeover or a resume) */
       claims?: number;
+      /** @description What started the run when not a run request: `auto:<intent>` (caliban/auto) */
+      origin?: string;
+      /** @description A cancellation was asked for and the run has not stopped yet */
+      cancel_requested?: boolean;
+      /** @description Number of the run's last event (resume its event stream after it) */
+      last_event?: number;
       /** Format: date-time */
       created_at: string;
       /** Format: date-time */
       started_at?: string | null;
       /** Format: date-time */
       finished_at?: string | null;
+    };
+    NodeSummary: {
+      tenant_id: string;
+      name: string;
+      /** @description The latest version's `description` */
+      description?: string | null;
+      /** @enum {string|null} */
+      kind?: 'workflow' | 'agent' | null;
+      /** @description The promoted version */
+      live_version?: number | null;
+      latest?: {
+        version: number;
+        /** @enum {string} */
+        state: 'draft' | 'published' | 'retired';
+        hash: string;
+      };
+      /** @description Versions not deleted */
+      versions: number;
+      published: number;
+      drafts: number;
+      retired: number;
+      /**
+       * Format: date-time
+       * @description The last creation, publication, retirement or promotion
+       */
+      updated_at?: string | null;
+    };
+    /** @enum {string} */
+    RunStatus:
+      | 'pending'
+      | 'running'
+      | 'sleeping'
+      | 'input_required'
+      | 'succeeded'
+      | 'failed'
+      | 'budget_exhausted'
+      | 'cancelled';
+    /** @description Tokens of the run's model calls so far */
+    RunUsage: {
+      prompt_tokens: number;
+      completion_tokens: number;
+      total_tokens: number;
+    };
+    RunStep: {
+      /** @description Deterministic step id, e.g. classify#0, fanout#0/3, agent#2.1 */
+      id: string;
+      vertex: string;
+      kind: string;
+      /** @enum {string} */
+      status: 'completed' | 'failed';
+      tokens: number;
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      usd: number;
+      /** @description Taint labels of the step's output */
+      labels: string[];
+      /** Format: date-time */
+      started_at: string;
+      duration_ms: number;
+      /** @description Console only, with `runs.data`: the step's output */
+      output?: unknown;
+    };
+    NodeRunSummary: {
+      id: string;
+      /** @enum {string} */
+      object: 'node.run';
+      node: string;
+      version: number;
+      status: components['schemas']['RunStatus'];
+      awaiting_step?: string | null;
+      cost_usd: number;
+      origin?: string;
+      /** @description `api_key:<hash prefix>` */
+      invoker: string;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      finished_at?: string | null;
+    };
+    NodeRunList: {
+      /** @enum {string} */
+      object: 'list';
+      data: components['schemas']['NodeRunSummary'][];
+      /** @description Pass as `cursor` for the next page */
+      next_cursor: string | null;
+    };
+    /** @description One event of a run's stream (the `data` of an SSE event). */
+    RunEvent: {
+      /** @description Numbered from 1 per run; the SSE `id` */
+      id: number;
+      /** @enum {string} */
+      type:
+        | 'run.created'
+        | 'step.started'
+        | 'step.finished'
+        | 'run.input_required'
+        | 'run.sleeping'
+        | 'run.input_received'
+        | 'run.cancel_requested'
+        | 'run.finished';
+      run_id: string;
+      /** Format: date-time */
+      at: string;
+      /** @description By type: step events `step`, `vertex`, `kind`, `labels`, and on finish `status`, `tokens`, `prompt_tokens`, `completion_tokens`, `usd`, `cost_usd`, `duration_ms`; `run.input_required` `step`, `question`; `run.input_received` `step`, `by`; `run.finished` `status`, `error`, `stop_reason`, `cost_usd`. */
+      data: {
+        [key: string]: unknown;
+      };
+      /** @description On the last event of a stream */
+      run?: components['schemas']['NodeRun'];
+    };
+    ConsoleRun: {
+      id: string;
+      /** @enum {string} */
+      object: 'node.run';
+      node: string;
+      version: number;
+      hash?: string;
+      status: components['schemas']['RunStatus'];
+      invoker?: string;
+      origin?: string | null;
+      error?: string | null;
+      stop_reason?: string | null;
+      partial?: boolean;
+      awaiting?: {
+        step?: string;
+        /** @enum {string} */
+        kind?: 'question' | 'approval';
+        /** @description With `runs.data` */
+        question?: string | null;
+      } | null;
+      cancel_requested?: boolean;
+      cancelled_by?: string | null;
+      budget: {
+        [key: string]: unknown;
+      };
+      cost_usd?: number;
+      usage?: components['schemas']['RunUsage'];
+      claims?: number;
+      last_event?: number;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      started_at?: string | null;
+      /** Format: date-time */
+      finished_at?: string | null;
+      /** @description The caller holds `runs.data`: `input`, `output` and step outputs are included */
+      content_visible: boolean;
+      /** @description With `runs.data` */
+      input?: unknown;
+      /** @description With `runs.data` */
+      output?: unknown;
+      steps: components['schemas']['RunStep'][];
     };
     NodeCreate: {
       tenant_id: string;
@@ -3842,18 +5379,19 @@ export interface components {
       scope?: string;
     };
     ToolServer: {
-      id?: string;
-      tenant_id?: string;
+      id: string;
+      tenant_id: string;
       /** @description The `server` of `mcp://server/tool#sha256:...` */
-      name?: string;
-      url?: string;
-      auth?: components['schemas']['ToolAuth'];
+      name: string;
+      url: string;
+      auth: components['schemas']['ToolAuth'];
       /** @description Trusted with personal data: PII surrogates in arguments are rehydrated for it */
-      trusted?: boolean;
+      trusted: boolean;
+      /** @description A credential is stored (absent: none) */
       has_credential?: boolean;
       /** Format: date-time */
-      created_at?: string;
-      created_by?: string;
+      created_at: string;
+      created_by: string;
     };
     ToolServerCreate: {
       name: string;
@@ -3865,27 +5403,31 @@ export interface components {
       trusted?: boolean;
     };
     ToolManifest: {
-      id?: string;
-      server?: string;
-      name?: string;
-      description?: string;
-      input_schema?: Record<string, never>;
+      id: string;
+      tenant_id: string;
+      server: string;
+      name: string;
+      description: string;
+      /** @description The tool's input JSON Schema, as the server lists it (any JSON object) */
+      input_schema: {
+        [key: string]: unknown;
+      };
       /** @description sha256 over the canonical [name, description, input_schema] */
-      pin?: string;
-      findings?: {
+      pin: string;
+      findings: {
         /** @enum {string} */
-        kind?: 'instruction' | 'hidden_unicode' | 'url' | 'exfiltration';
-        location?: string;
-        excerpt?: string;
+        kind: 'instruction' | 'hidden_unicode' | 'url' | 'exfiltration';
+        location: string;
+        excerpt: string;
       }[];
       /** @enum {string} */
-      status?: 'discovered' | 'approved' | 'revoked';
+      status: 'discovered' | 'approved' | 'revoked';
       /** Format: date-time */
-      discovered_at?: string;
+      discovered_at: string;
       /** Format: date-time */
-      approved_at?: string | null;
-      approved_by?: string | null;
-      findings_acknowledged?: boolean;
+      approved_at: string | null;
+      approved_by: string | null;
+      findings_acknowledged: boolean;
     };
     UsageEvent: {
       request_id: string;

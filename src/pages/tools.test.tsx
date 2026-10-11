@@ -24,14 +24,14 @@ const PIN_A = `sha256:${'a'.repeat(64)}`;
 const PIN_B = `sha256:${'b'.repeat(64)}`;
 const find: ToolManifest = {
   id: 'tm1',
+  tenant_id: 't1',
   server: 'crm',
   name: 'find_customer',
   description: 'Finds a customer by email.',
-  // The contract types an input schema as an empty object.
   input_schema: {
     type: 'object',
     properties: { email: { type: 'string' } },
-  } as unknown as ToolManifest['input_schema'],
+  },
   pin: PIN_A,
   findings: [],
   status: 'discovered',

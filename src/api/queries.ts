@@ -4,6 +4,7 @@ import type {
   ApiKeyCreate,
   DatasourceCreate,
   ModelCreate,
+  Node,
   ProviderKeyCreate,
   RoleBindingCreate,
   ReviewDecision,
@@ -161,13 +162,17 @@ export const ontologyQuery = (tenantId: string) =>
       unwrap(api.GET('/api/v1/ontology', { params: { query: { tenant_id: tenantId } } })),
   });
 
+/**
+ * Every version of every node (the default `view=versions`; `view=summary`
+ * answers with `NodeSummary` rows instead, which the console does not use).
+ */
 export const nodesQuery = (tenantId?: string) =>
   queryOptions({
     queryKey: qk.nodes(tenantId),
     queryFn: () =>
       unwrap(
         api.GET('/api/v1/nodes', { params: { query: tenantId ? { tenant_id: tenantId } : {} } }),
-      ),
+      ) as Promise<Node[]>,
   });
 
 /** Node call filters of the usage report. */
