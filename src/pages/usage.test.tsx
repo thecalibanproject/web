@@ -20,9 +20,6 @@ const events: UsageEvent[] = [
     request_id: 'req-auto-miss',
     model: 'local/qwen3-8b',
     requested_model: 'caliban/auto',
-    intent: 'sql',
-    intent_confidence: 0.87,
-    route_stage: 'knn',
     cache: 'miss',
     cost_usd: 0.0005,
     routed_model_cost_usd: 0.0005,
@@ -34,9 +31,6 @@ const events: UsageEvent[] = [
     request_id: 'req-semantic-hit',
     model: 'local/qwen3-8b',
     requested_model: 'caliban/auto',
-    intent: 'chitchat',
-    intent_confidence: 1,
-    route_stage: 'rules',
     cache: 'hit',
     cache_tier: 'semantic',
     tokens_saved: 150,
@@ -51,7 +45,6 @@ const events: UsageEvent[] = [
     request_id: 'req-pinned-exact',
     model: 'gpt-4o',
     requested_model: 'gpt-4o',
-    intent: 'pinned',
     cache: 'hit',
     cache_tier: 'exact',
     tokens_saved: 150,
@@ -103,7 +96,7 @@ function shownRequests() {
 }
 
 describe('UsagePage', () => {
-  it('shows the route (requested → routed model, stage, confidence) and the cache tier', async () => {
+  it('shows the route (requested → routed model) and the cache tier', async () => {
     mockUsage();
     await renderApp('/usage');
     const table = await screen.findByRole('table', { name: 'Usage events' });
@@ -111,18 +104,18 @@ describe('UsagePage', () => {
       .getAllByRole('columnheader')
       .map((h) => h.textContent);
     expect(headers).toEqual(expect.arrayContaining(['Route', 'Cache', 'Cache tier']));
+    // Routing decisions are not kept per event.
+    expect(headers).not.toContain('Intent');
 
     const auto = row('req-auto-miss');
     expect(within(auto).getByText('caliban/auto')).toBeInTheDocument();
     expect(within(auto).getByText('routed to')).toBeInTheDocument();
     expect(within(auto).getByText('local/qwen3-8b')).toBeInTheDocument();
-    expect(within(auto).getByText('kNN · 87%')).toBeInTheDocument();
 
     const semantic = row('req-semantic-hit');
-    expect(within(semantic).getByText('Rules · 100%')).toBeInTheDocument();
     expect(within(semantic).getByText('Semantic')).toBeInTheDocument();
 
-    // A pinned request served by the model it named shows the model once, with no stage.
+    // A pinned request served by the model it named shows the model once.
     const pinned = row('req-pinned-exact');
     expect(within(pinned).getAllByText('gpt-4o')).toHaveLength(1);
     expect(within(pinned).queryByText('routed to')).not.toBeInTheDocument();
@@ -131,6 +124,41 @@ describe('UsagePage', () => {
     const embedding = row('req-embedding');
     expect(within(embedding).getByText('local/bge-m3')).toBeInTheDocument();
     expect(within(embedding).queryByText('routed to')).not.toBeInTheDocument();
+  });
+
+  it('shows the daily routing counts, and says they are not kept per node or run', async () => {
+    const user = userEvent.setup();
+    mockUsage({
+      events,
+      totals,
+      by_route: [
+        {
+          tenant_id: 't1',
+          day: '2026-10-08',
+          intent: 'sql',
+          route_stage: 'knn',
+          route_fallback: '',
+          requests: 3,
+        },
+        {
+          tenant_id: 't1',
+          day: '2026-10-09',
+          intent: 'chitchat',
+          route_stage: 'rules',
+          route_fallback: 'low_confidence',
+          requests: 7,
+        },
+      ],
+    });
+    await renderApp('/usage');
+    const table = await screen.findByRole('table', { name: 'Routing per day' });
+    const rows = within(table).getAllByRole('row');
+    expect(rows[1]).toHaveTextContent('2026-10-09AcmechitchatRuleslow_confidence7');
+    expect(rows[2]).toHaveTextContent('2026-10-08AcmesqlkNNnone3');
+
+    await user.type(screen.getByPlaceholderText('Run id'), 'run_1');
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(await screen.findByText('Not counted per node or run')).toBeInTheDocument();
   });
 
   it('filters by cache tier alongside the cache status filter, and keeps it in the URL', async () => {

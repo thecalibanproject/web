@@ -5,6 +5,7 @@ import { tenantsQuery, usageQuery } from '@/api/queries';
 import { CACHE_STATUSES, CACHE_TIERS, type CacheStatus, type CacheTier } from '@/api/types';
 import { AutoMarginCard } from '@/components/auto-margin-card';
 import { NodeCostCard } from '@/components/node-cost-card';
+import { RouteCountsCard } from '@/components/route-counts-card';
 import { TenantFilter } from '@/components/tenant-select';
 import { UsageTable } from '@/components/usage-table';
 import {
@@ -67,7 +68,7 @@ export function UsagePage() {
     <>
       <PageHeader
         title="Usage"
-        description="Per-request events: routing, tokens, cache outcome, PII entities, cost and latency. Model calls made by node runs carry their node and run."
+        description="Per-request events: requested and routed model, tokens, cache outcome, PII entities, cost and latency. Model calls made by node runs carry their node and run."
       />
       {usage.isSuccess && (
         <div className="mb-6 flex flex-col gap-6">
@@ -76,6 +77,11 @@ export function UsagePage() {
             byNode={usage.data.by_node}
             selected={node}
             onSelect={(n) => setSearch({ node: n })}
+          />
+          <RouteCountsCard
+            byRoute={usage.data.by_route}
+            filtered={Boolean(node || run)}
+            tenantNames={names}
           />
         </div>
       )}

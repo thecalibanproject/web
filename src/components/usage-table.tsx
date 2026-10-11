@@ -1,18 +1,16 @@
 import type { UsageEvent } from '@/api/types';
-import { formatDateTime, formatInt, formatMs, formatPercent, formatUsd } from '@/lib/format';
-import { ROUTE_STAGE_LABEL } from '@/lib/labels';
+import { formatDateTime, formatInt, formatMs, formatUsd } from '@/lib/format';
 import { CacheBadge, CacheTierBadge } from './badges';
 import { Table, TBody, TD, TH, THead, TR } from './ui';
 
 /**
- * Requested model (e.g. `caliban/auto`) → routed model, and under it the
- * stage that decided the intent with its confidence. A pinned request that
- * was served by the model it named shows the model once.
+ * Requested model (e.g. `caliban/auto`) → routed model. A pinned request that
+ * was served by the model it named shows the model once. How the intent was
+ * decided is not kept per event (routing decisions are content-class): see
+ * the daily routing counts.
  */
 function RouteCell({ event: e }: { event: UsageEvent }) {
   const requested = e.requested_model && e.requested_model !== e.model ? e.requested_model : null;
-  const stage = e.route_stage ? ROUTE_STAGE_LABEL[e.route_stage] : null;
-  const confidence = e.intent_confidence;
   return (
     <TD className="max-w-72">
       <span className="flex min-w-0 items-center gap-1 font-mono text-[12px]">
@@ -31,19 +29,6 @@ function RouteCell({ event: e }: { event: UsageEvent }) {
           {e.model}
         </span>
       </span>
-      {stage && (
-        <span
-          className="block text-[11.5px] text-fg-subtle"
-          title={
-            confidence != null
-              ? `Intent decided by ${stage} with ${formatPercent(confidence)} confidence`
-              : `Intent decided by ${stage}`
-          }
-        >
-          {stage}
-          {confidence != null && ` · ${formatPercent(confidence)}`}
-        </span>
-      )}
     </TD>
   );
 }
@@ -95,7 +80,6 @@ export function UsageTable({
           <TH>Tenant</TH>
           {!compact && <TH>Node</TH>}
           {compact ? <TH>Model</TH> : <TH>Route</TH>}
-          {!compact && <TH>Intent</TH>}
           <TH className="text-right">Prompt</TH>
           <TH className="text-right">Completion</TH>
           {!compact && <TH className="text-right">Cached</TH>}
@@ -145,11 +129,6 @@ export function UsageTable({
               </TD>
             ) : (
               <RouteCell event={e} />
-            )}
-            {!compact && (
-              <TD className="max-w-40 truncate text-fg-muted" title={e.intent}>
-                {e.intent ?? '—'}
-              </TD>
             )}
             <TD className="text-right">{formatInt(e.prompt_tokens)}</TD>
             <TD className="text-right">{formatInt(e.completion_tokens)}</TD>
