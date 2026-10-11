@@ -67,6 +67,17 @@ export const IconNodes = (p: IconProps) => (
     <path d="M10 6.5h4a3 3 0 0 1 3 3V14" />
   </Svg>
 );
+export const IconRuns = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 12h4l3-8 4 16 3-8h4" />
+  </Svg>
+);
+export const IconInbox = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 13h5l1.5 3h5L16 13h5" />
+    <path d="M5.5 5h13L21 13v6a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19v-6z" />
+  </Svg>
+);
 export const IconTools = (p: IconProps) => (
   <Svg {...p}>
     <path d="M14.7 6.3a4 4 0 0 0 5 5L21 12.6l-8.4 8.4a2.1 2.1 0 0 1-3-3L18 9.6" />

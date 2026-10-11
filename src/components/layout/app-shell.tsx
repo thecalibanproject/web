@@ -11,11 +11,13 @@ import { Button, EmptyState } from '../ui';
 import {
   IconAudit,
   IconDatasources,
+  IconInbox,
   IconLogout,
   IconModels,
   IconNodes,
   IconOntology,
   IconOverview,
+  IconRuns,
   IconSettings,
   IconTenants,
   IconTools,
@@ -32,6 +34,8 @@ type NavTo =
   | '/datasources'
   | '/ontology'
   | '/nodes'
+  | '/runs'
+  | '/inbox'
   | '/tools'
   | '/usage'
   | '/audit'
@@ -55,6 +59,8 @@ const NAV: Array<{
   { to: '/datasources', label: 'Datasources', icon: IconDatasources, perm: 'datasources.read' },
   { to: '/ontology', label: 'Ontology', icon: IconOntology, perm: 'ontology.read' },
   { to: '/nodes', label: 'Nodes', icon: IconNodes, perm: 'nodes.read' },
+  { to: '/runs', label: 'Runs', icon: IconRuns, perm: 'runs.read' },
+  { to: '/inbox', label: 'Inbox', icon: IconInbox, perm: 'runs.read' },
   { to: '/tools', label: 'Tools', icon: IconTools, perm: 'tools.read' },
   { to: '/usage', label: 'Usage', icon: IconUsage, perm: 'usage.read' },
   { to: '/audit', label: 'Audit', icon: IconAudit, perm: 'audit.read' },

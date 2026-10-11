@@ -1,4 +1,16 @@
-import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  infiniteQueryOptions,
+  queryOptions,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
+import {
+  isRunActive,
+  sinceIso,
+  statusParam,
+  type RunSince,
+  type RunStatusFilter,
+} from '@/lib/runs';
 import { api, ApiError, slashPreservingPath, unwrap } from './client';
 import type {
   ApiKeyCreate,
@@ -56,6 +68,11 @@ export const qk = {
   authState: ['auth', 'state'] as const,
   roleBindings: ['role-bindings'] as const,
   users: ['users'] as const,
+  /** Prefix of every run query of a tenant: lists, details and the inbox. */
+  runs: (tenantId: string) => ['runs', tenantId] as const,
+  runList: (tenantId: string, filter: RunFilter) => ['runs', tenantId, 'list', filter] as const,
+  run: (tenantId: string, runId: string) => ['runs', tenantId, 'run', runId] as const,
+  inbox: (tenantId: string) => ['runs', tenantId, 'inbox'] as const,
 };
 
 // ───────────── Queries ─────────────
@@ -272,6 +289,72 @@ export const roleBindingsQuery = () =>
 /** Users known from the identity provider, with their bindings and active sessions. */
 export const usersQuery = () =>
   queryOptions({ queryKey: qk.users, queryFn: () => unwrap(api.GET('/api/v1/users')) });
+
+/** Server-side filters of the run list. */
+export interface RunFilter {
+  node?: string;
+  status?: RunStatusFilter;
+  since?: RunSince;
+}
+
+/** Runs refresh this often while a run is on screen and has not ended. */
+export const RUN_POLL_MS = 3_000;
+/** The inbox refreshes this often. */
+export const INBOX_POLL_MS = 15_000;
+
+/**
+ * The tenant's runs, newest first, a page at a time (`next_cursor`). Summaries
+ * only: no content and no steps.
+ */
+export const runsQuery = (tenantId: string, filter: RunFilter = {}) =>
+  infiniteQueryOptions({
+    queryKey: qk.runList(tenantId, filter),
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) => {
+      const status = statusParam(filter.status);
+      return unwrap(
+        api.GET('/api/v1/tenants/{tenantId}/runs', {
+          params: {
+            path: { tenantId },
+            query: {
+              limit: 50,
+              ...(filter.node ? { node: filter.node } : {}),
+              ...(status ? { status } : {}),
+              ...(filter.since ? { created_after: sinceIso(filter.since) } : {}),
+              ...(pageParam ? { cursor: pageParam } : {}),
+            },
+          },
+        }),
+      );
+    },
+    getNextPageParam: (last) => last.next_cursor ?? undefined,
+  });
+
+/**
+ * One run with its steps; its content (input, output, step outputs, the
+ * awaited question) only for roles with `runs.data`. Polled until it ends.
+ */
+export const runQuery = (tenantId: string, runId: string) =>
+  queryOptions({
+    queryKey: qk.run(tenantId, runId),
+    queryFn: () =>
+      unwrap(
+        api.GET('/api/v1/tenants/{tenantId}/runs/{runId}', {
+          params: { path: { tenantId, runId } },
+        }),
+      ),
+    refetchInterval: (q) =>
+      q.state.data && isRunActive(q.state.data.status) ? RUN_POLL_MS : false,
+  });
+
+/** Questions and approvals of tainted writes waiting for a human, oldest wait first. */
+export const inboxQuery = (tenantId: string) =>
+  queryOptions({
+    queryKey: qk.inbox(tenantId),
+    queryFn: () =>
+      unwrap(api.GET('/api/v1/tenants/{tenantId}/inbox', { params: { path: { tenantId } } })),
+    refetchInterval: INBOX_POLL_MS,
+  });
 
 // ───────────── Mutations ─────────────
 
@@ -740,5 +823,30 @@ export function useRevokeUserSessions() {
     mutationFn: (userId: string) =>
       unwrap(api.DELETE('/api/v1/users/{userId}/sessions', { params: { path: { userId } } })),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.users }),
+  });
+}
+
+/**
+ * Answers the human step a run waits for, as the signed-in user: a question's
+ * answer, or `{"approve": true | false}` for a tainted write. Journaled with
+ * the user and audited (`node.run.answer`, `node.write.approve`,
+ * `node.write.deny`). A 409 when the run no longer waits for that step.
+ */
+export function useAnswerRun(tenantId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ runId, step, answer }: { runId: string; step: string; answer: unknown }) =>
+      unwrap(
+        api.POST('/api/v1/tenants/{tenantId}/runs/{runId}/input', {
+          params: { path: { tenantId, runId } },
+          body: { answer, step },
+        }),
+      ),
+    onSuccess: (run) => {
+      qc.setQueryData(qk.run(tenantId, run.id), run);
+      return qc.invalidateQueries({ queryKey: qk.runs(tenantId) });
+    },
+    // Someone else may have answered first (409): show what the run does now.
+    onError: () => qc.invalidateQueries({ queryKey: qk.runs(tenantId) }),
   });
 }

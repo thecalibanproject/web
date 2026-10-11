@@ -13,6 +13,7 @@ import { qk } from '@/api/queries';
 import { CACHE_STATUSES, CACHE_TIERS, type CacheStatus, type CacheTier } from '@/api/types';
 import { AppShell } from '@/components/layout/app-shell';
 import { AUDIT_LIMITS } from '@/lib/audit';
+import { isRunStatusFilter, RUN_SINCE, type RunSince, type RunStatusFilter } from '@/lib/runs';
 import { isAuthenticated, onAuthChange, takeSessionExpired } from '@/lib/auth';
 import { safeRedirect } from '@/lib/urls';
 import { LoginPage } from '@/pages/login';
@@ -171,6 +172,41 @@ const nodeDetailRoute = createRoute({
   component: lazyRouteComponent(() => import('@/pages/node-detail'), 'NodeDetailPage'),
 });
 
+export interface RunsSearch {
+  tenant?: string;
+  node?: string;
+  /** Filtered in the console: the run list API has no version filter. */
+  version?: number;
+  status?: RunStatusFilter;
+  since?: RunSince;
+}
+
+const runsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: 'runs',
+  validateSearch: (s: Record<string, unknown>): RunsSearch => ({
+    tenant: str(s.tenant),
+    node: str(s.node),
+    version: posInt(s.version),
+    status: isRunStatusFilter(s.status) ? s.status : undefined,
+    since: RUN_SINCE.find((r) => r === s.since),
+  }),
+  component: lazyRouteComponent(() => import('@/pages/runs'), 'RunsPage'),
+});
+
+const runDetailRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: 'runs/$tenantId/$runId',
+  component: lazyRouteComponent(() => import('@/pages/run-detail'), 'RunDetailPage'),
+});
+
+const inboxRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: 'inbox',
+  validateSearch: tenantSearch,
+  component: lazyRouteComponent(() => import('@/pages/inbox'), 'InboxPage'),
+});
+
 const usageRoute = createRoute({
   getParentRoute: () => appRoute,
   path: 'usage',
@@ -238,6 +274,9 @@ export const routeTree = rootRoute.addChildren([
     ontologyRoute,
     nodesRoute,
     nodeDetailRoute,
+    runsRoute,
+    runDetailRoute,
+    inboxRoute,
     toolsRoute,
     usageRoute,
     auditRoute,

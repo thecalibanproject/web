@@ -33,6 +33,9 @@ const ALL: Permission[] = [
   'tools.read',
   'tools.write',
   'tools.approve',
+  'runs.read',
+  'runs.data',
+  'runs.answer',
   'usage.read',
 ];
 
@@ -56,6 +59,7 @@ const VIEWER: Permission[] = [
   'ontology.read',
   'nodes.read',
   'tools.read',
+  'runs.read',
   'usage.read',
 ];
 
@@ -76,6 +80,8 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'nodes.run',
     'tools.write',
     'tools.approve',
+    'runs.data',
+    'runs.answer',
   ],
   developer: [
     ...VIEWER,
@@ -85,6 +91,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'nodes.write',
     'nodes.run',
     'tools.write',
+    'runs.data',
   ],
   viewer: VIEWER,
   billing: ['catalog.read', 'tenant.read', 'usage.read'],
@@ -136,7 +143,11 @@ export function meWith(
     user,
     groups: [],
     roles,
-    permissions: { deployment: ALL.filter((p) => deployment.has(p)), tenants },
+    // The contract's Permission enum does not list the run permissions yet.
+    permissions: {
+      deployment: ALL.filter((p) => deployment.has(p)),
+      tenants,
+    } as Me['permissions'],
     ...(method === 'session'
       ? {
           csrf_token: 'csrf-test-token',

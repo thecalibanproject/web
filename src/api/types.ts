@@ -47,6 +47,16 @@ export type NodeVersions =
 export type NodeDiff =
   paths['/api/v1/tenants/{tenantId}/nodes/{nodeName}/diff']['get']['responses'][200]['content']['application/json'];
 export type NodeDiffChange = NonNullable<NodeDiff['changes']>[number];
+export type RunStatus = S['RunStatus'];
+export type RunStep = S['RunStep'];
+export type RunUsage = S['RunUsage'];
+export type NodeRunSummary = S['NodeRunSummary'];
+export type NodeRunList = S['NodeRunList'];
+export type ConsoleRun = S['ConsoleRun'];
+/** `GET .../inbox`: runs waiting for a human, oldest wait first. */
+export type Inbox =
+  paths['/api/v1/tenants/{tenantId}/inbox']['get']['responses'][200]['content']['application/json'];
+export type InboxItem = Inbox['data'][number];
 export type ToolAuth = S['ToolAuth'];
 export type ToolAuthMethod = ToolAuth['method'];
 export type ToolServer = S['ToolServer'];
@@ -75,7 +85,13 @@ export type ReviewDecision = 'approve' | 'reject';
 export type AuthConfig = S['AuthConfig'];
 export type Me = S['Me'];
 export type Role = S['Role'];
-export type Permission = S['Permission'];
+/**
+ * The contract's permissions, plus the run permissions `/auth/me` already
+ * reports but the OpenAPI `Permission` enum does not list yet (`runs.read`:
+ * run lists, the inbox and run metadata; `runs.data`: run content;
+ * `runs.answer`: answer questions and approve or deny tainted writes).
+ */
+export type Permission = S['Permission'] | 'runs.read' | 'runs.data' | 'runs.answer';
 export type User = S['User'];
 export type RoleBinding = S['RoleBinding'];
 export type RoleBindingCreate = S['RoleBindingCreate'];
@@ -165,6 +181,17 @@ export const TOOL_FINDING_KINDS = [
 export const CACHE_STATUSES = ['hit', 'miss', 'bypass'] as const satisfies readonly CacheStatus[];
 
 export const CACHE_TIERS = ['exact', 'semantic'] as const satisfies readonly CacheTier[];
+
+export const RUN_STATUSES = [
+  'pending',
+  'running',
+  'sleeping',
+  'input_required',
+  'succeeded',
+  'failed',
+  'budget_exhausted',
+  'cancelled',
+] as const satisfies readonly RunStatus[];
 
 export const ROUTE_STAGES = ['rules', 'knn', 'keyword'] as const satisfies readonly RouteStage[];
 

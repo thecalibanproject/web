@@ -90,6 +90,7 @@ const WHAT: Partial<Record<Permission, string>> = {
   'nodes.run': 'grant node access to API keys',
   'tools.write': 'register, discover or delete tool servers',
   'tools.approve': 'approve or revoke tools',
+  'runs.answer': 'answer questions or approve writes of node runs',
   'tenant.write': 'change tenant settings',
   'api_keys.write': 'mint or revoke API keys',
 };
