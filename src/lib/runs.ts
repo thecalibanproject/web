@@ -77,43 +77,6 @@ export function elapsedMs(
   return Number.isFinite(ms) && ms >= 0 ? ms : null;
 }
 
-/** A tainted write waiting for approval, read from the question the executor asks. */
-export interface ApprovalRequest {
-  /** The tool reference (`mcp://server/tool#sha256:...`). */
-  tool: string;
-  /** The untrusted taint labels its arguments carry (`tool:crm/find`, `datasource`, ...). */
-  labels: string[];
-  /** The arguments, parsed when they are complete JSON. */
-  args: unknown;
-  /** The executor cut the arguments at 2000 characters: `args` is the raw text. */
-  truncated: boolean;
-}
-
-// The question `approve_write` (core, caliban-nodes executor/graph.rs) asks.
-const APPROVAL =
-  /^Approve this write\? Tool (\S+) \(effect: write\) would be called with arguments derived from untrusted data \(([^)]*)\): ([\s\S]*)\. Answer \{"approve": true\} or \{"approve": false\}\.$/;
-
-/**
- * The tool, taint labels and arguments of an approval question. Null when the
- * question has another shape: the caller then shows it as it is.
- */
-export function parseApproval(question: string | null | undefined): ApprovalRequest | null {
-  if (!question) return null;
-  const m = APPROVAL.exec(question);
-  if (!m) return null;
-  const raw = m[3]!;
-  const labels = m[2]!
-    .split(',')
-    .map((l) => l.trim())
-    .filter(Boolean);
-  if (raw.endsWith('...')) return { tool: m[1]!, labels, args: raw, truncated: true };
-  try {
-    return { tool: m[1]!, labels, args: JSON.parse(raw) as unknown, truncated: false };
-  } catch {
-    return { tool: m[1]!, labels, args: raw, truncated: true };
-  }
-}
-
 /** One step placed on the run's timeline, in percent of the run's span. */
 export interface TimelineStep {
   step: RunStep;

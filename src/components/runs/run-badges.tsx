@@ -14,6 +14,9 @@ export function RunStatusBadge({ status }: { status: RunStatus }) {
 function taintOf(label: string): { tone: Tone; hint: string } {
   if (label === 'pii') return { tone: 'danger', hint: 'Holds personal data.' };
   if (label === 'datasource') return { tone: 'info', hint: 'Read from a tenant datasource.' };
+  if (label === 'caller') {
+    return { tone: 'warn', hint: 'Untrusted data the caller passed in the run input.' };
+  }
   if (label === 'retrieved') return { tone: 'warn', hint: 'Retrieved from a document store.' };
   if (label.startsWith('tool:')) {
     return { tone: 'warn', hint: `Came from the output of the untrusted tool ${label.slice(5)}.` };

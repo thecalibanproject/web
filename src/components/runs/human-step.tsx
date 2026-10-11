@@ -3,7 +3,8 @@ import { usePermissions } from '@/api/auth';
 import { ApiError } from '@/api/client';
 import { useAnswerRun } from '@/api/queries';
 import { deniedReason } from '@/lib/permissions';
-import { parseApproval, prettyJson } from '@/lib/runs';
+import type { Approval } from '@/api/types';
+import { prettyJson } from '@/lib/runs';
 import { Checkbox, CodeBlock, ConfirmDialog, Field, FormError, GatedButton, Textarea } from '../ui';
 import { TaintLabels } from './run-badges';
 
@@ -23,44 +24,52 @@ function AnswerError({ error }: { error: unknown }) {
   return <FormError error={error} />;
 }
 
-/** The tool, the untrusted taint labels and the arguments of a write waiting for approval. */
+/**
+ * The tool, its effect, the untrusted taint labels and (with runs.data) the
+ * arguments of a call waiting for approval. Without the structured approval
+ * (a run from a worker that recorded none) the question is shown as it is.
+ */
 export function ApprovalDetails({
+  approval,
   question,
   contentVisible,
 }: {
+  approval: Approval | null | undefined;
   question: string | null | undefined;
   contentVisible: boolean;
 }) {
-  if (!contentVisible) return <p className="text-[12.5px] text-fg-muted">{HIDDEN}</p>;
-  const approval = parseApproval(question);
   if (!approval) {
+    if (!contentVisible) return <p className="text-[12.5px] text-fg-muted">{HIDDEN}</p>;
     return question ? (
       <p className="text-[13px] break-words whitespace-pre-wrap">{question}</p>
     ) : (
-      <p className="text-[12.5px] text-fg-muted">The run did not say what it would write.</p>
+      <p className="text-[12.5px] text-fg-muted">The run did not say what it would do.</p>
     );
   }
   return (
     <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-[12.5px]">
       <dt className="text-fg-muted">Tool</dt>
       <dd className="min-w-0">
-        <code className="font-mono text-[12px] break-all">{approval.tool}</code>{' '}
-        <span className="text-fg-subtle">(effect: write)</span>
+        <code className="font-mono text-[12px] break-all">{approval.tool}</code>
+        {approval.effect && <span className="text-fg-subtle"> (effect: {approval.effect})</span>}
       </dd>
       <dt className="text-fg-muted">Untrusted data</dt>
       <dd className="min-w-0">
-        <TaintLabels labels={approval.labels} />
+        <TaintLabels labels={approval.labels ?? []} />
       </dd>
       <dt className="text-fg-muted">Arguments</dt>
       <dd className="min-w-0">
-        <CodeBlock
-          label="Arguments"
-          language={approval.truncated ? undefined : 'json'}
-          code={prettyJson(approval.args)}
-          className="max-h-72"
-        />
-        {approval.truncated && (
-          <p className="mt-1 text-[12px] text-fg-subtle">Cut at 2000 characters by the executor.</p>
+        {contentVisible ? (
+          <CodeBlock
+            label="Arguments"
+            language="json"
+            code={prettyJson(approval.arguments ?? null)}
+            className="max-h-72"
+          />
+        ) : (
+          <span className="text-fg-muted">
+            Hidden: arguments are run content (needs runs.data).
+          </span>
         )}
       </dd>
     </dl>
@@ -69,7 +78,7 @@ export function ApprovalDetails({
 
 /**
  * Answers the human step a run waits for, as the signed-in user: approve or
- * deny a tainted write, or answer a question. `onAnswered` gets a sentence
+ * deny a tainted call, or answer a question. `onAnswered` gets a sentence
  * for the page's status line.
  */
 export function HumanStepActions({
@@ -77,6 +86,7 @@ export function HumanStepActions({
   runId,
   step,
   kind,
+  approval,
   question,
   contentVisible,
   onAnswered,
@@ -85,6 +95,7 @@ export function HumanStepActions({
   runId: string;
   step: string;
   kind: 'question' | 'approval';
+  approval?: Approval | null;
   question: string | null | undefined;
   contentVisible: boolean;
   onAnswered?: (message: string) => void;
@@ -110,7 +121,6 @@ export function HumanStepActions({
     );
 
   if (kind === 'approval') {
-    const approval = parseApproval(question);
     return (
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
@@ -119,7 +129,7 @@ export function HumanStepActions({
             variant="primary"
             deniedReason={denied}
             disabled={answer.isPending}
-            aria-label={`Approve the write of run ${runId}`}
+            aria-label={`Approve the call of run ${runId}`}
             onClick={() => {
               answer.reset();
               setConfirming(true);
@@ -132,8 +142,8 @@ export function HumanStepActions({
             variant="danger"
             deniedReason={denied}
             loading={answer.isPending && !confirming}
-            aria-label={`Deny the write of run ${runId}`}
-            onClick={() => send({ approve: false }, `Denied the write of run ${runId}.`)}
+            aria-label={`Deny the call of run ${runId}`}
+            onClick={() => send({ approve: false }, `Denied the call of run ${runId}.`)}
           >
             Deny
           </GatedButton>
@@ -141,12 +151,12 @@ export function HumanStepActions({
         <AnswerError error={answer.error} />
         <ConfirmDialog
           open={confirming}
-          title="Approve this write?"
-          confirmLabel="Approve write"
+          title="Approve this call?"
+          confirmLabel="Approve call"
           confirmVariant="primary"
           loading={answer.isPending}
           onCancel={() => setConfirming(false)}
-          onConfirm={() => send({ approve: true }, `Approved the write of run ${runId}.`)}
+          onConfirm={() => send({ approve: true }, `Approved the call of run ${runId}.`)}
         >
           <p>
             {approval ? (
@@ -157,10 +167,15 @@ export function HumanStepActions({
             ) : (
               'The tool is called once'
             )}{' '}
-            with arguments derived from untrusted data. The approval covers this step only, and is
-            recorded under your name in the audit log.
+            with arguments derived from untrusted data
+            {approval?.labels?.length ? ` (${approval.labels.join(', ')})` : ''}. The approval
+            covers this step only, and is recorded under your name in the audit log.
           </p>
-          <ApprovalDetails question={question} contentVisible={contentVisible} />
+          <ApprovalDetails
+            approval={approval}
+            question={question}
+            contentVisible={contentVisible}
+          />
         </ConfirmDialog>
       </div>
     );

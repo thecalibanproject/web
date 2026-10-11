@@ -307,6 +307,7 @@ export const usersQuery = () =>
 /** Server-side filters of the run list. */
 export interface RunFilter {
   node?: string;
+  version?: number;
   status?: RunStatusFilter;
   since?: RunSince;
 }
@@ -333,6 +334,7 @@ export const runsQuery = (tenantId: string, filter: RunFilter = {}) =>
             query: {
               limit: 50,
               ...(filter.node ? { node: filter.node } : {}),
+              ...(filter.version ? { version: filter.version } : {}),
               ...(status ? { status } : {}),
               ...(filter.since ? { created_after: sinceIso(filter.since) } : {}),
               ...(pageParam ? { cursor: pageParam } : {}),
@@ -1018,5 +1020,27 @@ export function useCancelEval(tenantId: string) {
       );
       return qc.invalidateQueries({ queryKey: qk.evalList(tenantId, e.node, e.version) });
     },
+  });
+}
+
+/**
+ * Cancels a run as the signed-in user (`runs.answer`), audited as
+ * `node.run.cancel`: a waiting run ends at once, a running one stops at its
+ * next step. A 409 when it already ended otherwise.
+ */
+export function useCancelRun(tenantId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (runId: string) =>
+      unwrap(
+        api.POST('/api/v1/tenants/{tenantId}/runs/{runId}/cancel', {
+          params: { path: { tenantId, runId } },
+        }),
+      ),
+    onSuccess: (run) => {
+      qc.setQueryData(qk.run(tenantId, run.id), run);
+      return qc.invalidateQueries({ queryKey: qk.runs(tenantId) });
+    },
+    onError: () => qc.invalidateQueries({ queryKey: qk.runs(tenantId) }),
   });
 }

@@ -185,7 +185,6 @@ const nodeDetailRoute = createRoute({
 export interface RunsSearch {
   tenant?: string;
   node?: string;
-  /** Filtered in the console: the run list API has no version filter. */
   version?: number;
   status?: RunStatusFilter;
   since?: RunSince;

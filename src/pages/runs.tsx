@@ -48,7 +48,7 @@ export function RunsPage() {
   const { node, version, status, since } = search;
 
   const runs = useInfiniteQuery({
-    ...runsQuery(tenantId ?? '', { node, status, since }),
+    ...runsQuery(tenantId ?? '', { node, version, status, since }),
     enabled: Boolean(tenantId),
   });
   const nodes = useQuery({ ...nodesQuery(tenantId), enabled: Boolean(tenantId) });
@@ -62,12 +62,7 @@ export function RunsPage() {
   const setSearch = (patch: Partial<typeof search>) =>
     void navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
 
-  const loaded = useMemo(() => runs.data?.pages.flatMap((p) => p.data) ?? [], [runs.data]);
-  // The run list API has no version filter: the version is filtered here, on what is loaded.
-  const rows = useMemo(
-    () => (version ? loaded.filter((r) => r.version === version) : loaded),
-    [loaded, version],
-  );
+  const rows = useMemo(() => runs.data?.pages.flatMap((p) => p.data) ?? [], [runs.data]);
 
   const applyVersion = (e: FormEvent) => {
     e.preventDefault();
@@ -121,7 +116,6 @@ export function RunsPage() {
                 onChange={(e) => setVersionText(e.target.value)}
                 inputMode="numeric"
                 placeholder="Any"
-                title="Filters the runs loaded so far: the run list API has no version filter."
                 className="w-20"
               />
             </label>
@@ -204,21 +198,8 @@ export function RunsPage() {
             title={filtered ? 'No runs match' : 'No runs yet'}
             description={
               filtered
-                ? version && runs.hasNextPage
-                  ? `No run of v${version} among the runs loaded so far. Load older runs to look further.`
-                  : 'Try another node, version, status or time range.'
+                ? 'Try another node, version, status or time range.'
                 : 'Runs of published nodes appear here, from the API, MCP or caliban/auto.'
-            }
-            action={
-              version && runs.hasNextPage ? (
-                <Button
-                  size="sm"
-                  loading={runs.isFetchingNextPage}
-                  onClick={() => void runs.fetchNextPage()}
-                >
-                  Load older runs
-                </Button>
-              ) : undefined
             }
           />
         ) : (

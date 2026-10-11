@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { Fragment, useState, type ReactNode } from 'react';
-import { runQuery, tenantsQuery } from '@/api/queries';
+import { usePermissions } from '@/api/auth';
+import { ApiError } from '@/api/client';
+import { inboxQuery, runQuery, tenantsQuery, useCancelRun } from '@/api/queries';
 import type { ConsoleRun } from '@/api/types';
 import { ApprovalDetails, HumanStepActions } from '@/components/runs/human-step';
 import { RunStatusBadge, TaintLabels } from '@/components/runs/run-badges';
@@ -11,9 +13,11 @@ import {
   Card,
   CardHeader,
   CodeBlock,
+  ConfirmDialog,
   CopyButton,
   EmptyState,
   ErrorState,
+  GatedButton,
   LoadingState,
   PageHeader,
   Table,
@@ -26,6 +30,7 @@ import {
 import { isNotFound } from '@/lib/errors';
 import { formatDateTime, formatInt, formatMs, formatUsd } from '@/lib/format';
 import { shortHash } from '@/lib/nodes';
+import { deniedReason } from '@/lib/permissions';
 import {
   budgetRows,
   elapsedMs,
@@ -92,6 +97,14 @@ function Summary({ run }: { run: ConsoleRun }) {
       ) : (
         '-'
       ),
+    ],
+    [
+      'Input labels',
+      <TaintLabels
+        key="l"
+        labels={run.input_labels ?? []}
+        empty="none: the caller marked no input as untrusted"
+      />,
     ],
     ['Created', formatDateTime(run.created_at)],
     ['Started', formatDateTime(run.started_at)],
@@ -310,6 +323,12 @@ function Content({ run }: { run: ConsoleRun }) {
 function Waiting({ tenantId, run }: { tenantId: string; run: ConsoleRun }) {
   const [done, setDone] = useState<string | null>(null);
   const awaiting = run.awaiting;
+  // The run detail has no structured approval: the inbox entry of this run has it.
+  const inbox = useQuery({
+    ...inboxQuery(tenantId),
+    enabled: run.status === 'input_required' && awaiting?.kind === 'approval',
+  });
+  const item = inbox.data?.data.find((i) => i.run_id === run.id && i.step === awaiting?.step);
   if (!awaiting?.step || run.status !== 'input_required') {
     return done ? (
       <p role="status" className="mb-4 text-[12.5px] text-ok">
@@ -318,11 +337,12 @@ function Waiting({ tenantId, run }: { tenantId: string; run: ConsoleRun }) {
     ) : null;
   }
   const kind = awaiting.kind ?? (awaiting.step.endsWith('@approve') ? 'approval' : 'question');
+  const approval = kind === 'approval' ? item?.approval : null;
   return (
     <Card className="mb-4 border-warn/50">
       <CardHeader
         title={
-          kind === 'approval' ? 'Waiting for approval of a tainted write' : 'Waiting for an answer'
+          kind === 'approval' ? 'Waiting for approval of a tainted call' : 'Waiting for an answer'
         }
         description={
           <>
@@ -333,7 +353,11 @@ function Waiting({ tenantId, run }: { tenantId: string; run: ConsoleRun }) {
       />
       <div className="flex flex-col gap-3 p-4">
         {kind === 'approval' ? (
-          <ApprovalDetails question={awaiting.question} contentVisible={run.content_visible} />
+          <ApprovalDetails
+            approval={approval}
+            question={awaiting.question}
+            contentVisible={run.content_visible}
+          />
         ) : run.content_visible ? (
           <p className="text-[13px] break-words whitespace-pre-wrap">
             {awaiting.question ?? 'The run asks for input without a question.'}
@@ -344,12 +368,52 @@ function Waiting({ tenantId, run }: { tenantId: string; run: ConsoleRun }) {
           runId={run.id}
           step={awaiting.step}
           kind={kind}
+          approval={approval}
           question={awaiting.question}
           contentVisible={run.content_visible}
           onAnswered={setDone}
         />
       </div>
     </Card>
+  );
+}
+
+function CancelRun({ tenantId, run }: { tenantId: string; run: ConsoleRun }) {
+  const cancel = useCancelRun(tenantId);
+  const denied = deniedReason(usePermissions(), 'runs.answer', tenantId);
+  const [confirming, setConfirming] = useState(false);
+  if (!isRunActive(run.status) || run.cancel_requested) return null;
+  const ended = cancel.error instanceof ApiError && cancel.error.status === 409;
+  return (
+    <>
+      <GatedButton
+        size="sm"
+        variant="danger"
+        deniedReason={denied}
+        onClick={() => {
+          cancel.reset();
+          setConfirming(true);
+        }}
+      >
+        Cancel run
+      </GatedButton>
+      <ConfirmDialog
+        open={confirming}
+        title={`Cancel run ${run.id}?`}
+        confirmLabel="Cancel run"
+        loading={cancel.isPending}
+        error={ended ? new Error('The run already ended.') : cancel.error}
+        onCancel={() => setConfirming(false)}
+        onConfirm={() => cancel.mutate(run.id, { onSuccess: () => setConfirming(false) })}
+      >
+        <p>
+          {run.status === 'running'
+            ? 'The run stops at its next step: the model call in flight completes and is recorded.'
+            : 'The run is waiting, so it ends at once.'}{' '}
+          The cancellation is recorded under your name in the audit log.
+        </p>
+      </ConfirmDialog>
+    </>
   );
 }
 
@@ -410,6 +474,7 @@ export function RunDetailPage() {
               >
                 Model calls in Usage
               </Link>
+              <CancelRun tenantId={tenantId} run={r} />
             </>
           )
         }

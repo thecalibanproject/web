@@ -108,9 +108,14 @@ function mockRuns(extra: Parameters<typeof mockApi>[0] = {}) {
 
 const listCalls = (calls: RecordedCall[]) => calls.filter((c) => c.path === R);
 
-async function openDetail(roles: Grant[] | null, body: ConsoleRun) {
+async function openDetail(
+  roles: Grant[] | null,
+  body: ConsoleRun,
+  extra: Parameters<typeof mockApi>[0] = {},
+) {
   const calls = mockRuns({
     [`GET ${R}/run_7`]: () => ({ body }),
+    ...extra,
     ...(roles ? ssoRoutes(meWith(roles)) : {}),
   });
   await renderApp('/runs/t1/run_7', { token: roles ? null : 'test-admin-token' });
@@ -159,7 +164,7 @@ describe('RunsPage', () => {
     expect(Date.now() - after).toBeGreaterThanOrEqual(7 * 86_400_000 - 60_000);
   });
 
-  it('filters the loaded runs by version, and loads older pages with the cursor', async () => {
+  it('loads older pages with the cursor, and filters by version through the API', async () => {
     const user = userEvent.setup();
     const calls = mockRuns();
     await renderApp('/runs?tenant=t1');
@@ -172,10 +177,8 @@ describe('RunsPage', () => {
 
     await user.type(screen.getByLabelText('Version'), '1');
     await user.click(screen.getByRole('button', { name: 'Apply' }));
-    await waitFor(() => expect(within(table).queryByText('run_3')).not.toBeInTheDocument());
-    expect(within(table).getByText('run_2')).toBeInTheDocument();
-    // The run list API has no version filter.
-    expect(listCalls(calls).every((c) => !c.query.has('version'))).toBe(true);
+    await waitFor(() => expect(listCalls(calls).at(-1)!.query.get('version')).toBe('1'));
+    expect(listCalls(calls).at(-1)!.query.has('cursor')).toBe(false);
   });
 
   it('is in the menu for roles with runs.read only', async () => {
@@ -233,18 +236,77 @@ describe('RunDetailPage', () => {
     expect(screen.queryByLabelText('Output of classify#0')).not.toBeInTheDocument();
   });
 
-  it('offers the approval of a waiting write only to roles with runs.answer', async () => {
+  it('shows a waiting call with its structured approval, offered only with runs.answer', async () => {
     const waiting: ConsoleRun = {
       ...run,
       status: 'input_required',
       finished_at: null,
       awaiting: { step: 'write#0@approve', kind: 'approval', question: null },
     };
-    await openDetail([{ role: 'developer', tenant_id: 't1' }], waiting);
-    expect(screen.getByText('Waiting for approval of a tainted write')).toBeInTheDocument();
-    const approve = screen.getByRole('button', { name: 'Approve the write of run run_7' });
+    await openDetail([{ role: 'viewer', tenant_id: 't1' }], waiting, {
+      'GET /api/v1/tenants/t1/inbox': () => ({
+        body: {
+          object: 'list',
+          content_visible: false,
+          data: [
+            {
+              run_id: 'run_7',
+              node: 'triage',
+              version: 2,
+              step: 'write#0@approve',
+              kind: 'approval',
+              question: null,
+              waiting_since: '2026-10-11T10:00:01Z',
+              approval: {
+                tool: 'mcp://crm/update_ticket#sha256:abc',
+                effect: 'write',
+                labels: ['caller'],
+              },
+            },
+          ],
+        },
+      }),
+    });
+    expect(screen.getByText('Waiting for approval of a tainted call')).toBeInTheDocument();
+    expect(await screen.findByText('mcp://crm/update_ticket#sha256:abc')).toBeInTheDocument();
+    expect(screen.getByText('(effect: write)')).toBeInTheDocument();
+    const approve = screen.getByRole('button', { name: 'Approve the call of run run_7' });
     expect(approve).toHaveAttribute('aria-disabled', 'true');
     expect(approve).toHaveAccessibleDescription(/needs runs\.answer/);
+    expect(screen.getByRole('button', { name: 'Cancel run' })).toHaveAccessibleDescription(
+      /needs runs\.answer/,
+    );
+  });
+
+  it('cancels a run that has not ended, as the signed-in user', async () => {
+    const user = userEvent.setup();
+    let current: ConsoleRun = { ...run, status: 'running', finished_at: null };
+    const calls = await openDetail([{ role: 'tenant_admin', tenant_id: 't1' }], current, {
+      [`GET ${R}/run_7`]: () => ({ body: current }),
+      [`POST ${R}/run_7/cancel`]: () => {
+        current = { ...current, cancel_requested: true };
+        return { status: 202, body: current };
+      },
+    });
+    await user.click(screen.getByRole('button', { name: 'Cancel run' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Cancel run run_7?' });
+    expect(dialog).toHaveTextContent('stops at its next step');
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel run' }));
+    await waitFor(() =>
+      expect(calls.some((c) => c.method === 'POST' && c.path === `${R}/run_7/cancel`)).toBe(true),
+    );
+    expect(
+      await screen.findByText('Requested: the run stops at its next step'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cancel run' })).not.toBeInTheDocument();
+  });
+
+  it('shows the taint labels the run input carries', async () => {
+    await openDetail(null, { ...run, input_labels: ['caller'] });
+    expect(screen.getByText('caller')).toHaveAttribute(
+      'title',
+      'Untrusted data the caller passed in the run input.',
+    );
   });
 
   it('says when the run does not exist', async () => {

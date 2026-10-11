@@ -20,6 +20,12 @@ const approval: InboxItem = {
   invoker: 'api_key:ab12cd',
   waiting_since: '2026-10-11T10:00:00Z',
   expires_at: null,
+  approval: {
+    tool: 'mcp://crm/update_ticket#sha256:abc',
+    effect: 'write',
+    labels: ['tool:mail/read_inbox', 'pii'],
+    arguments: { id: 7, note: 'Refund to pat@example.com' },
+  },
 };
 const question: InboxItem = {
   run_id: 'run_q',
@@ -58,7 +64,13 @@ function mockInbox(
       body: {
         object: 'list',
         content_visible: contentVisible,
-        data: contentVisible ? items : items.map((i) => ({ ...i, question: null })),
+        data: contentVisible
+          ? items
+          : items.map((i) => ({
+              ...i,
+              question: null,
+              approval: i.approval && { ...i.approval, arguments: undefined },
+            })),
       },
     }),
     'POST /api/v1/tenants/t1/runs/run_a/input': answer('run_a'),
@@ -81,7 +93,7 @@ describe('InboxPage', () => {
   it('shows the tool, the taint labels and the arguments of a write waiting for approval', async () => {
     await openInbox(null);
     const a = card('run_a');
-    expect(a).toHaveTextContent('Approve a tainted write');
+    expect(a).toHaveTextContent('Approve a tainted call');
     expect(a).toHaveTextContent('write#0@approve');
     expect(within(a).getByText('mcp://crm/update_ticket#sha256:abc')).toBeInTheDocument();
     expect(within(a).getByText('tool:mail/read_inbox')).toBeInTheDocument();
@@ -96,10 +108,10 @@ describe('InboxPage', () => {
   it('approves a write as the signed-in user, after a confirmation', async () => {
     const user = userEvent.setup();
     const { calls } = await openInbox([{ role: 'tenant_admin', tenant_id: 't1' }]);
-    await user.click(screen.getByRole('button', { name: 'Approve the write of run run_a' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Approve this write?' });
+    await user.click(screen.getByRole('button', { name: 'Approve the call of run run_a' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Approve this call?' });
     expect(dialog).toHaveTextContent('covers this step only');
-    await user.click(within(dialog).getByRole('button', { name: 'Approve write' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Approve call' }));
 
     await waitFor(() =>
       expect(calls.find((c) => c.path.endsWith('/runs/run_a/input'))?.body).toEqual({
@@ -107,7 +119,7 @@ describe('InboxPage', () => {
         step: 'write#0@approve',
       }),
     );
-    expect(await screen.findByText('Approved the write of run run_a.')).toBeInTheDocument();
+    expect(await screen.findByText('Approved the call of run run_a.')).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.queryByRole('link', { name: 'Open run run_a' })).not.toBeInTheDocument(),
     );
@@ -116,14 +128,14 @@ describe('InboxPage', () => {
   it('denies a write at once', async () => {
     const user = userEvent.setup();
     const { calls } = await openInbox(null);
-    await user.click(screen.getByRole('button', { name: 'Deny the write of run run_a' }));
+    await user.click(screen.getByRole('button', { name: 'Deny the call of run run_a' }));
     await waitFor(() =>
       expect(calls.find((c) => c.path.endsWith('/runs/run_a/input'))?.body).toEqual({
         answer: { approve: false },
         step: 'write#0@approve',
       }),
     );
-    expect(await screen.findByText('Denied the write of run run_a.')).toBeInTheDocument();
+    expect(await screen.findByText('Denied the call of run run_a.')).toBeInTheDocument();
   });
 
   it('answers a question as text, or as JSON when asked to', async () => {
@@ -148,22 +160,39 @@ describe('InboxPage', () => {
   it('says when the run no longer waits (someone else answered)', async () => {
     const user = userEvent.setup();
     await openInbox(null, { conflict: true });
-    await user.click(screen.getByRole('button', { name: 'Deny the write of run run_a' }));
+    await user.click(screen.getByRole('button', { name: 'Deny the call of run run_a' }));
     expect(await screen.findByText(/This run no longer waits for this step/)).toBeInTheDocument();
   });
 
-  it('hides questions and arguments without runs.data, and answers without runs.answer', async () => {
+  it('shows the tool and labels but hides arguments and questions without runs.data', async () => {
     await openInbox([{ role: 'viewer', tenant_id: 't1' }], { contentVisible: false });
     const a = card('run_a');
-    expect(a).toHaveTextContent('Run content is hidden');
+    expect(within(a).getByText('mcp://crm/update_ticket#sha256:abc')).toBeInTheDocument();
+    expect(within(a).getByText('pii')).toBeInTheDocument();
+    expect(a).toHaveTextContent('Hidden: arguments are run content (needs runs.data)');
     expect(within(a).queryByLabelText('Arguments')).not.toBeInTheDocument();
-    const approve = within(a).getByRole('button', { name: 'Approve the write of run run_a' });
+    expect(
+      within(card('run_q')).queryByText('How long has the pain lasted?'),
+    ).not.toBeInTheDocument();
+    const approve = within(a).getByRole('button', { name: 'Approve the call of run run_a' });
     expect(approve).toHaveAttribute('aria-disabled', 'true');
     expect(approve).toHaveAccessibleDescription(/needs runs\.answer/);
     expect(within(card('run_q')).getByRole('button', { name: 'Send answer' })).toHaveAttribute(
       'aria-disabled',
       'true',
     );
+  });
+
+  it('shows the question as it is when the run recorded no structured approval', async () => {
+    mockApi({
+      'GET /api/v1/tenants': () => ({ body: tenants }),
+      'GET /api/v1/tenants/t1/inbox': () => ({
+        body: { object: 'list', content_visible: true, data: [{ ...approval, approval: null }] },
+      }),
+    });
+    await renderApp('/inbox');
+    await screen.findByRole('list', { name: 'Waiting runs' });
+    expect(card('run_a')).toHaveTextContent(QUESTION);
   });
 
   it('says when nothing is waiting', async () => {

@@ -57,6 +57,8 @@ export type ConsoleRun = S['ConsoleRun'];
 export type Inbox =
   paths['/api/v1/tenants/{tenantId}/inbox']['get']['responses'][200]['content']['application/json'];
 export type InboxItem = Inbox['data'][number];
+/** What a call waiting for approval would do: tool, effect, labels, arguments (with runs.data). */
+export type Approval = NonNullable<InboxItem['approval']>;
 export type GoldenCase = S['GoldenCase'];
 export type EvalCheck = S['EvalCheck'];
 export type GoldenSet = S['GoldenSet'];

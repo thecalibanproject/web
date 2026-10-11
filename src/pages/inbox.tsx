@@ -29,7 +29,7 @@ function InboxCard({
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2.5">
           <div className="flex min-w-0 flex-wrap items-center gap-2 text-[13px]">
             <Badge tone={approval ? 'warn' : 'info'} dot>
-              {approval ? 'Approve a tainted write' : 'Question'}
+              {approval ? 'Approve a tainted call' : 'Question'}
             </Badge>
             <Link
               to="/nodes/$tenantId/$nodeName"
@@ -58,7 +58,11 @@ function InboxCard({
         </div>
         <div className="flex flex-col gap-3 p-4">
           {approval ? (
-            <ApprovalDetails question={item.question} contentVisible={contentVisible} />
+            <ApprovalDetails
+              approval={item.approval}
+              question={item.question}
+              contentVisible={contentVisible}
+            />
           ) : contentVisible ? (
             <p className="text-[13px] break-words whitespace-pre-wrap">
               {item.question ?? 'The run asks for input without a question.'}
@@ -74,6 +78,7 @@ function InboxCard({
             runId={item.run_id}
             step={item.step}
             kind={item.kind}
+            approval={item.approval}
             question={item.question}
             contentVisible={contentVisible}
             onAnswered={onAnswered}
@@ -104,7 +109,7 @@ export function InboxPage() {
     <>
       <PageHeader
         title="Inbox"
-        description="Node runs waiting for a human: questions, and writes whose arguments carry untrusted data. Your answer or decision is recorded under your name in the audit log."
+        description="Node runs waiting for a human: questions, and writes (or reads that reach the network) whose arguments carry untrusted data. Your answer or decision is recorded under your name in the audit log."
       />
       <Card className="mb-4">
         <div className="flex flex-wrap items-center gap-3 px-4 py-2.5">
@@ -155,7 +160,7 @@ export function InboxPage() {
         <Card>
           <EmptyState
             title="Nothing waiting"
-            description="Runs that ask a question, or want to write with arguments derived from untrusted data, wait here until someone answers."
+            description="Runs that ask a question, or want to call a write tool (or a read that reaches the network) with arguments derived from untrusted data, wait here until someone answers."
           />
         </Card>
       ) : (
