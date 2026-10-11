@@ -1,4 +1,16 @@
-import type { Eval, EvalPolicy, EvalStatus, GoldenCase, Node } from '@/api/types';
+import type {
+  Eval,
+  EvalPolicy,
+  EvalStatus,
+  EvalTrial,
+  GateEvidence,
+  GoldenCase,
+  GoldenSummary,
+  GoldenVerdict,
+  InjectionSummary,
+  InjectionVerdict,
+  Node,
+} from '@/api/types';
 import type { Tone } from '@/components/ui';
 
 export const EVAL_STATUS_TONE: Record<EvalStatus, Tone> = {
@@ -31,85 +43,43 @@ export function isEvalActive(status: EvalStatus): boolean {
   return status === 'pending' || status === 'running';
 }
 
-interface Latency {
-  p50?: number | null;
-  p95?: number | null;
-}
-
-/** A golden eval's `summary` (metrics only; untyped in the contract). */
-export interface GoldenSummary {
-  k?: number;
-  cases?: number;
-  trials?: number;
-  passed_trials?: number;
-  errors?: number;
-  /** pass^k: the share of cases whose k runs all passed. */
-  pass_hat_k?: number | null;
-  /** The share of trials that passed. */
-  pass_at_1?: number | null;
-  /** The share of cases with at least one passing run. */
-  pass_at_k?: number | null;
-  cost_usd?: number | null;
-  /** Null without a success. */
-  cost_per_success_usd?: number | null;
-  judge_cost_usd?: number | null;
-  tokens?: number;
-  latency_ms?: Latency;
-  by_case?: Array<{ case: string; trials: number; passed: number; all_passed: boolean }>;
-  golden_hash?: string;
-  judge?: Record<string, unknown> | null;
-}
-
-/** An injection eval's `summary`. */
-export interface InjectionSummary {
-  suite_version?: number;
-  trials?: number;
-  /** Attacks blocked. */
-  blocked?: number;
-  /** The share of attacks blocked. */
-  pass_rate?: number | null;
-  attack_success_rate?: number | null;
-  attacks_succeeded?: number;
-  /** Trials where the model followed the injection. */
-  attacked?: number;
-  /** Runs that still did their job under attack. */
-  utility_under_attack?: number | null;
-  errors?: number;
-  by_category?: Record<string, { trials: number; blocked: number; pass_rate: number | null }>;
-  not_applicable?: Array<string | { case: string; reason?: string }>;
-  cost_usd?: number | null;
-  latency_ms?: Latency;
-}
-
 export function goldenSummary(e: Pick<Eval, 'suite' | 'summary'>): GoldenSummary | null {
-  return e.suite === 'golden' && e.summary ? e.summary : null;
+  return e.summary?.suite === 'golden' ? e.summary : null;
 }
 
 export function injectionSummary(e: Pick<Eval, 'suite' | 'summary'>): InjectionSummary | null {
-  return e.suite === 'injection' && e.summary ? e.summary : null;
+  return e.summary?.suite === 'injection' ? e.summary : null;
 }
 
-/** A case of the suite the version offers no surface for, with the reason when given. */
-export function notApplicable(s: InjectionSummary): Array<{ case: string; reason: string | null }> {
-  return (s.not_applicable ?? []).map((n) =>
-    typeof n === 'string' ? { case: n, reason: null } : { case: n.case, reason: n.reason ?? null },
-  );
+/** A trial's verdict (metadata only): golden checks, an injection verdict, or why it failed. */
+export type TrialVerdict = NonNullable<EvalTrial['verdict']>;
+
+export function isInjectionVerdict(v: TrialVerdict | undefined): v is InjectionVerdict {
+  return Boolean(v && 'category' in v);
 }
 
-/** A trial's verdict (metadata only; untyped in the contract). */
-export interface TrialVerdict {
-  run_status?: string;
-  checks?: Array<{ type: string; passed: boolean; score?: number | null }>;
-  category?: string;
-  attacked?: boolean;
-  succeeded?: boolean;
-  defenses?: string[];
-  utility?: boolean | null;
-  error?: string;
+export function isGoldenVerdict(v: TrialVerdict | undefined): v is GoldenVerdict {
+  return Boolean(v && 'checks' in v);
 }
 
-export function verdictOf(v: unknown): TrialVerdict {
-  return v && typeof v === 'object' ? v : {};
+/** The error of a trial whose run could not be created. */
+export function verdictError(v: TrialVerdict | undefined): string | null {
+  return v && 'error' in v && typeof v.error === 'string' ? v.error : null;
+}
+
+/** The evals that met the bar, by suite, then those of each pinned subnode version. */
+export function evidenceEvals(
+  evidence: GateEvidence | null | undefined,
+  prefix = '',
+): Array<{ label: string; eval: string }> {
+  if (!evidence) return [];
+  const out: Array<{ label: string; eval: string }> = [];
+  if (evidence.golden) out.push({ label: `${prefix}golden`, eval: evidence.golden.eval });
+  if (evidence.injection) out.push({ label: `${prefix}injection`, eval: evidence.injection.eval });
+  for (const [sub, e] of Object.entries(evidence.subnodes ?? {})) {
+    out.push(...evidenceEvals(e, `${prefix}${sub} `));
+  }
+  return out;
 }
 
 // ───────────── The promotion bar form ─────────────

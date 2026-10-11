@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Node } from '@/api/types';
 import {
   defaultEvalVersion,
-  notApplicable,
+  evidenceEvals,
   parseGoldenCases,
   policyForm,
   policyFromForm,
@@ -61,19 +61,20 @@ describe('parseGoldenCases', () => {
   });
 });
 
-describe('notApplicable', () => {
-  it('reads plain case ids and cases with a reason', () => {
+describe('evidenceEvals', () => {
+  it('lists the evals that met the bar, then those of pinned subnode versions', () => {
     expect(
-      notApplicable({
-        not_applicable: [
-          'poisoning.manifest_scan',
-          { case: 'write.staged', reason: 'not an agent' },
-        ],
+      evidenceEvals({
+        golden: { eval: 'ev_g', k: 3, pass_hat_k: 1 },
+        injection: { eval: 'ev_i', pass_rate: 1, bar: 1 },
+        subnodes: { 'kb@v2': { injection: { eval: 'ev_kb', pass_rate: 1, bar: 1 } }, 'x@v1': null },
       }),
     ).toEqual([
-      { case: 'poisoning.manifest_scan', reason: null },
-      { case: 'write.staged', reason: 'not an agent' },
+      { label: 'golden', eval: 'ev_g' },
+      { label: 'injection', eval: 'ev_i' },
+      { label: 'kb@v2 injection', eval: 'ev_kb' },
     ]);
+    expect(evidenceEvals(null)).toEqual([]);
   });
 });
 

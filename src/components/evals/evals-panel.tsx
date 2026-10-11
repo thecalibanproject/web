@@ -6,6 +6,7 @@ import type { Eval, Node } from '@/api/types';
 import {
   defaultEvalVersion,
   EVAL_SUITE_LABEL,
+  evidenceEvals,
   goldenSummary,
   injectionSummary,
   isEvalActive,
@@ -45,18 +46,6 @@ import { EvalDetail } from './eval-detail';
 import { GoldenSetCard } from './golden-set-card';
 import { StartEvalDrawer } from './start-eval';
 
-function evidenceIds(evidence: unknown): Array<[string, string]> {
-  if (!evidence || typeof evidence !== 'object') return [];
-  return Object.entries(evidence as Record<string, unknown>).flatMap(([suite, v]) => {
-    if (typeof v === 'string') return [[suite, v] as [string, string]];
-    // `{"eval": "<id>", ...}` with the metrics that met the bar.
-    if (v && typeof v === 'object' && 'eval' in v && typeof v.eval === 'string') {
-      return [[suite, v.eval] as [string, string]];
-    }
-    return [];
-  });
-}
-
 function GateCard({
   tenantId,
   name,
@@ -79,12 +68,9 @@ function GateCard({
   const cannotPublish = deniedReason(usePermissions(), 'nodes.publish', tenantId);
   const [promoting, setPromoting] = useState(false);
   const g = gate.data;
-  const problems = (g?.problems ?? []).map((p) =>
-    typeof (p as { message?: unknown }).message === 'string'
-      ? (p as { message: string }).message
-      : JSON.stringify(p),
-  );
-  const evidence = evidenceIds(g?.evidence);
+  // `path` names a pinned subnode version whose own gate failed.
+  const problems = (g?.problems ?? []).map((p) => (p.path ? `${p.path}: ${p.message}` : p.message));
+  const evidence = evidenceEvals(g?.evidence);
   return (
     <Card>
       <CardHeader
@@ -139,10 +125,10 @@ function GateCard({
             {evidence.length > 0 && (
               <p className="text-fg-muted">
                 Met by{' '}
-                {evidence.map(([suite, id], i) => (
+                {evidence.map(({ label, eval: id }, i) => (
                   <span key={id}>
                     {i > 0 && ', '}
-                    the {suite} eval{' '}
+                    the {label} eval{' '}
                     <button
                       type="button"
                       className="font-mono text-accent hover:underline"

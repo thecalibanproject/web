@@ -62,8 +62,7 @@ export type EvalCheck = S['EvalCheck'];
 export type GoldenSet = S['GoldenSet'];
 export type EvalPolicy = S['EvalPolicy'];
 /** `GET .../nodes/{name}/eval-policy`: the bar, and the injection bar in effect. */
-export type EvalPolicyView =
-  paths['/api/v1/tenants/{tenantId}/nodes/{nodeName}/eval-policy']['get']['responses'][200]['content']['application/json'];
+export type EvalPolicyView = S['EvalPolicyView'];
 export type Eval = S['Eval'];
 export type EvalSuite = Eval['suite'];
 export type EvalStatus = Eval['status'];
@@ -73,7 +72,12 @@ export type EvalStart =
 /** `GET .../versions/{v}/gate`: what promoting the version would say. */
 export type PromotionGate =
   paths['/api/v1/tenants/{tenantId}/nodes/{nodeName}/versions/{version}/gate']['get']['responses'][200]['content']['application/json'];
-export type ProblemDetail = NonNullable<ApiErrorBody['error']['problems']>[number];
+export type ProblemDetail = S['Problem'];
+export type GateEvidence = S['GateEvidence'];
+export type GoldenSummary = S['GoldenSummary'];
+export type InjectionSummary = S['InjectionSummary'];
+export type GoldenVerdict = S['GoldenVerdict'];
+export type InjectionVerdict = S['InjectionVerdict'];
 export type ToolAuth = S['ToolAuth'];
 export type ToolAuthMethod = ToolAuth['method'];
 export type ToolServer = S['ToolServer'];
@@ -102,13 +106,7 @@ export type ReviewDecision = 'approve' | 'reject';
 export type AuthConfig = S['AuthConfig'];
 export type Me = S['Me'];
 export type Role = S['Role'];
-/**
- * The contract's permissions, plus the run permissions `/auth/me` already
- * reports but the OpenAPI `Permission` enum does not list yet (`runs.read`:
- * run lists, the inbox and run metadata; `runs.data`: run content;
- * `runs.answer`: answer questions and approve or deny tainted writes).
- */
-export type Permission = S['Permission'] | 'runs.read' | 'runs.data' | 'runs.answer';
+export type Permission = S['Permission'];
 export type User = S['User'];
 export type RoleBinding = S['RoleBinding'];
 export type RoleBindingCreate = S['RoleBindingCreate'];

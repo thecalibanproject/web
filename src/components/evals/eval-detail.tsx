@@ -3,17 +3,17 @@ import { Link } from '@tanstack/react-router';
 import { Fragment, useState, type ReactNode } from 'react';
 import { usePermissions } from '@/api/auth';
 import { evalQuery, useCancelEval } from '@/api/queries';
-import type { Eval } from '@/api/types';
+import type { Eval, GoldenSummary, InjectionSummary } from '@/api/types';
 import {
   EVAL_SUITE_LABEL,
   goldenSummary,
   injectionSummary,
   isEvalActive,
+  isGoldenVerdict,
+  isInjectionVerdict,
   NO_RUN,
-  notApplicable,
-  verdictOf,
-  type GoldenSummary,
-  type InjectionSummary,
+  verdictError,
+  type TrialVerdict,
 } from '@/lib/evals';
 import { formatDateTime, formatInt, formatMs, formatPercent, formatUsd } from '@/lib/format';
 import { shortHash } from '@/lib/nodes';
@@ -114,7 +114,7 @@ function GoldenMetrics({ s }: { s: GoldenSummary }) {
 }
 
 function InjectionMetrics({ s }: { s: InjectionSummary }) {
-  const na = notApplicable(s);
+  const na = s.not_applicable;
   const categories = Object.entries(s.by_category ?? {});
   return (
     <>
@@ -184,19 +184,17 @@ function InjectionMetrics({ s }: { s: InjectionSummary }) {
   );
 }
 
-function Verdict({ verdict, injection }: { verdict: unknown; injection: boolean }) {
-  const v = verdictOf(verdict);
-  if (v.error) return <span className="text-danger">{v.error}</span>;
-  if (injection) {
+function Verdict({ verdict: v }: { verdict: TrialVerdict | undefined }) {
+  const error = verdictError(v);
+  if (error) return <span className="text-danger">{error}</span>;
+  if (isInjectionVerdict(v)) {
     return (
       <span className="inline-flex flex-wrap items-center gap-1">
-        {v.category && <Badge>{v.category}</Badge>}
-        {v.attacked != null && (
-          <Badge tone={v.attacked ? 'warn' : 'neutral'}>
-            {v.attacked ? 'model followed' : 'model ignored'}
-          </Badge>
-        )}
-        {(v.defenses ?? []).map((d) => (
+        <Badge>{v.category}</Badge>
+        <Badge tone={v.attacked ? 'warn' : 'neutral'}>
+          {v.attacked ? 'model followed' : 'model ignored'}
+        </Badge>
+        {v.defenses.map((d) => (
           <Badge key={d} tone="ok" className="font-mono">
             {d}
           </Badge>
@@ -207,7 +205,7 @@ function Verdict({ verdict, injection }: { verdict: unknown; injection: boolean 
       </span>
     );
   }
-  const checks = v.checks ?? [];
+  const checks = isGoldenVerdict(v) ? v.checks : [];
   if (checks.length === 0) return <span className="text-fg-subtle">-</span>;
   const passed = checks.filter((c) => c.passed).length;
   return (
@@ -271,7 +269,7 @@ function Trials({ e, tenantId }: { e: Eval; tenantId: string }) {
                   <TrialStatusBadge status={t.status} injection={injection} />
                 </TD>
                 <TD>
-                  <Verdict verdict={t.verdict} injection={injection} />
+                  <Verdict verdict={t.verdict} />
                 </TD>
                 <TD className="text-right whitespace-nowrap tabular-nums">
                   {formatUsd(t.cost_usd)}

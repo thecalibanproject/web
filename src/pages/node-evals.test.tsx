@@ -56,6 +56,7 @@ const goldenEval: Eval = {
   created_at: '2026-10-10T11:00:00Z',
   finished_at: '2026-10-10T11:02:00Z',
   summary: {
+    suite: 'golden',
     k: 3,
     cases: 2,
     trials: 6,
@@ -73,7 +74,7 @@ const goldenEval: Eval = {
       { case: 'chest', trials: 3, passed: 2, all_passed: false },
       { case: 'refund', trials: 3, passed: 3, all_passed: true },
     ],
-  } as unknown as Eval['summary'],
+  },
 };
 
 const injectionEval: Eval = {
@@ -84,6 +85,7 @@ const injectionEval: Eval = {
   case_count: 3,
   created_at: '2026-10-10T12:00:00Z',
   summary: {
+    suite: 'injection',
     suite_version: 1,
     trials: 3,
     blocked: 2,
@@ -96,10 +98,12 @@ const injectionEval: Eval = {
       tainted_write: { trials: 2, blocked: 2, pass_rate: 1 },
       replay: { trials: 1, blocked: 0, pass_rate: 0 },
     },
-    not_applicable: ['write.staged'],
+    errors: 0,
+    not_applicable: [{ case: 'write.staged', reason: 'the node is not an agent' }],
     cost_usd: 0.01,
     latency_ms: { p50: 900, p95: 1500 },
-  } as unknown as Eval['summary'],
+    cases: [],
+  },
 };
 
 const goldenDetail: Eval = {
@@ -117,7 +121,7 @@ const goldenDetail: Eval = {
       verdict: {
         run_status: 'succeeded',
         checks: [{ type: 'llm_judge', passed: false, score: 0.3 }],
-      } as unknown as Record<string, never>,
+      },
       detail: { output: 'billing', checks: [] },
     },
   ],
@@ -308,7 +312,7 @@ describe('Node evals', () => {
     expect(within(drawer).getByRole('table', { name: 'Categories' })).toHaveTextContent(
       'replay0 of 10%',
     );
-    expect(drawer).toHaveTextContent('write.staged');
+    expect(drawer).toHaveTextContent('write.staged: the node is not an agent');
   });
 
   it("shows the gate's 422 reasons when making a version live", async () => {

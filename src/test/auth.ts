@@ -143,11 +143,7 @@ export function meWith(
     user,
     groups: [],
     roles,
-    // The contract's Permission enum does not list the run permissions yet.
-    permissions: {
-      deployment: ALL.filter((p) => deployment.has(p)),
-      tenants,
-    } as Me['permissions'],
+    permissions: { deployment: ALL.filter((p) => deployment.has(p)), tenants },
     ...(method === 'session'
       ? {
           csrf_token: 'csrf-test-token',
