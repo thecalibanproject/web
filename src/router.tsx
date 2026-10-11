@@ -153,21 +153,31 @@ const posInt = (v: unknown): number | undefined => {
   return Number.isInteger(n) && n > 0 ? n : undefined;
 };
 
+export type NodeTab = 'versions' | 'evals';
+
 export interface NodeDetailSearch {
+  tab?: NodeTab;
   /** The version whose spec is open. */
   version?: number;
   /** The versions compared. */
   from?: number;
   to?: number;
+  /** Evals tab: the version shown. */
+  ev?: number;
+  /** Evals tab: the eval open. */
+  eval?: string;
 }
 
 const nodeDetailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: 'nodes/$tenantId/$nodeName',
   validateSearch: (s: Record<string, unknown>): NodeDetailSearch => ({
+    tab: s.tab === 'evals' || s.tab === 'versions' ? s.tab : undefined,
     version: posInt(s.version),
     from: posInt(s.from),
     to: posInt(s.to),
+    ev: posInt(s.ev),
+    eval: str(s.eval),
   }),
   component: lazyRouteComponent(() => import('@/pages/node-detail'), 'NodeDetailPage'),
 });

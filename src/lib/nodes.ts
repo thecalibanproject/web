@@ -1,5 +1,5 @@
 import { ApiError } from '@/api/client';
-import type { Node } from '@/api/types';
+import type { Node, ProblemDetail } from '@/api/types';
 
 /**
  * Node names (and tool server names): 1 to 64 characters of a-z, 0-9, '-'
@@ -62,7 +62,8 @@ export function shortHash(hash: string): string {
   return algo ? `${algo}:${head}` : head;
 }
 
-export type ProblemKind = 'pin' | 'tool' | 'scope' | 'cap' | 'code' | 'reference' | 'spec';
+export type ProblemKind =
+  'pin' | 'tool' | 'scope' | 'cap' | 'code' | 'reference' | 'gate' | 'golden' | 'spec';
 
 export interface NodeProblem {
   kind: ProblemKind;
@@ -95,6 +96,14 @@ export const PROBLEM_KIND: Record<ProblemKind, { label: string; hint: string }> 
     label: 'Node reference',
     hint: 'node://name@vN must name a published version of this tenant, and node references must not form a cycle.',
   },
+  gate: {
+    label: 'Promotion bar not met',
+    hint: "Run the version's evals on the node's Evals tab until its latest evals meet the bar. A version with write tools always needs an injection eval. Someone with nodes.publish can change the bar. A draft is published without making it live, evaluated, then made live.",
+  },
+  golden: {
+    label: 'Golden set',
+    hint: "Every case needs a unique id and at least one check, and its input must match the version's prompt.input_schema. At most 200 cases.",
+  },
   spec: {
     label: 'Spec',
     hint: 'See docs/nodes.md in core for the spec format.',
@@ -122,7 +131,26 @@ const CONTINUATIONS = new Set(['publish it first']);
  * `cannot publish name@vN: a; b; c` when publishing (every problem), or one
  * static check when a draft is created (`MCP tool '…' must be pinned …`).
  */
-export function nodeProblems(message: string): { title: string | null; problems: NodeProblem[] } {
+export function nodeProblems(
+  message: string,
+  details: readonly ProblemDetail[] = [],
+): { title: string | null; problems: NodeProblem[] } {
+  const promote = /^(\S+) cannot be promoted: /.exec(message);
+  if (details.length > 0) {
+    const publishing = /^cannot publish (\S+): /.exec(message);
+    return {
+      title: publishing
+        ? `Cannot publish ${publishing[1]!}`
+        : promote
+          ? `Cannot make ${promote[1]!} live`
+          : null,
+      problems: details.map((d) => ({
+        kind:
+          d.kind === 'eval_gate' ? 'gate' : d.kind === 'golden_set' ? 'golden' : kindOf(d.message),
+        text: d.message,
+      })),
+    };
+  }
   const publish = /^cannot publish (\S+): ([\s\S]*)$/.exec(message);
   const body = publish ? publish[2]! : message;
   const parts: string[] = [];

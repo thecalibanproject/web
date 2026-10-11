@@ -4,6 +4,7 @@ import {
   useMutation,
   useQueryClient,
 } from '@tanstack/react-query';
+import { isEvalActive } from '@/lib/evals';
 import {
   isRunActive,
   sinceIso,
@@ -15,6 +16,9 @@ import { api, ApiError, slashPreservingPath, unwrap } from './client';
 import type {
   ApiKeyCreate,
   DatasourceCreate,
+  EvalPolicy,
+  EvalStart,
+  GoldenCase,
   ModelCreate,
   Node,
   ProviderKeyCreate,
@@ -73,6 +77,16 @@ export const qk = {
   runList: (tenantId: string, filter: RunFilter) => ['runs', tenantId, 'list', filter] as const,
   run: (tenantId: string, runId: string) => ['runs', tenantId, 'run', runId] as const,
   inbox: (tenantId: string) => ['runs', tenantId, 'inbox'] as const,
+  /** Prefix of every eval query of a node: golden sets, the bar, the gate and evals. */
+  nodeEvals: (tenantId: string, name: string) => ['evals', tenantId, name] as const,
+  goldenSet: (tenantId: string, name: string, version: number) =>
+    ['evals', tenantId, name, 'golden-set', version] as const,
+  evalPolicy: (tenantId: string, name: string) => ['evals', tenantId, name, 'policy'] as const,
+  gate: (tenantId: string, name: string, version: number) =>
+    ['evals', tenantId, name, 'gate', version] as const,
+  evalList: (tenantId: string, name: string, version: number) =>
+    ['evals', tenantId, name, 'list', version] as const,
+  eval: (tenantId: string, evalId: string) => ['eval', tenantId, evalId] as const,
 };
 
 // ───────────── Queries ─────────────
@@ -354,6 +368,82 @@ export const inboxQuery = (tenantId: string) =>
     queryFn: () =>
       unwrap(api.GET('/api/v1/tenants/{tenantId}/inbox', { params: { path: { tenantId } } })),
     refetchInterval: INBOX_POLL_MS,
+  });
+
+/** Evals refresh this often while one of them has not ended. */
+export const EVAL_POLL_MS = 5_000;
+
+/**
+ * A version's golden set; its cases (tenant content) only with `runs.data`.
+ * Null when the version has none (404).
+ */
+export const goldenSetQuery = (tenantId: string, name: string, version: number) =>
+  queryOptions({
+    queryKey: qk.goldenSet(tenantId, name, version),
+    queryFn: async () => {
+      try {
+        return await unwrap(
+          api.GET('/api/v1/tenants/{tenantId}/nodes/{nodeName}/versions/{version}/golden-set', {
+            params: { path: { tenantId, nodeName: name, version } },
+          }),
+        );
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) return null;
+        throw e;
+      }
+    },
+  });
+
+/** The node's promotion bar, and the injection bar in effect. */
+export const evalPolicyQuery = (tenantId: string, name: string) =>
+  queryOptions({
+    queryKey: qk.evalPolicy(tenantId, name),
+    queryFn: () =>
+      unwrap(
+        api.GET('/api/v1/tenants/{tenantId}/nodes/{nodeName}/eval-policy', {
+          params: { path: { tenantId, nodeName: name } },
+        }),
+      ),
+  });
+
+/** What promoting the version would say: allowed, the evidence, or the problems. */
+export const gateQuery = (tenantId: string, name: string, version: number) =>
+  queryOptions({
+    queryKey: qk.gate(tenantId, name, version),
+    queryFn: () =>
+      unwrap(
+        api.GET('/api/v1/tenants/{tenantId}/nodes/{nodeName}/versions/{version}/gate', {
+          params: { path: { tenantId, nodeName: name, version } },
+        }),
+      ),
+  });
+
+/** The evals of one version, newest first (metrics, never content). Polled while one runs. */
+export const evalsQuery = (tenantId: string, name: string, version: number) =>
+  queryOptions({
+    queryKey: qk.evalList(tenantId, name, version),
+    queryFn: () =>
+      unwrap(
+        api.GET('/api/v1/tenants/{tenantId}/evals', {
+          params: { path: { tenantId }, query: { node: name, version, limit: 50 } },
+        }),
+      ),
+    refetchInterval: (q) =>
+      q.state.data?.data?.some((e) => isEvalActive(e.status)) ? EVAL_POLL_MS : false,
+  });
+
+/** An eval with its trials; each trial's detail only with `runs.data`. Polled until it ends. */
+export const evalQuery = (tenantId: string, evalId: string) =>
+  queryOptions({
+    queryKey: qk.eval(tenantId, evalId),
+    queryFn: () =>
+      unwrap(
+        api.GET('/api/v1/tenants/{tenantId}/evals/{evalId}', {
+          params: { path: { tenantId, evalId } },
+        }),
+      ),
+    refetchInterval: (q) =>
+      q.state.data && isEvalActive(q.state.data.status) ? EVAL_POLL_MS : false,
   });
 
 // ───────────── Mutations ─────────────
@@ -848,5 +938,85 @@ export function useAnswerRun(tenantId: string) {
     },
     // Someone else may have answered first (409): show what the run does now.
     onError: () => qc.invalidateQueries({ queryKey: qk.runs(tenantId) }),
+  });
+}
+
+/**
+ * Creates or replaces a version's golden set (a 422 lists every problem, kind
+ * `golden_set`). Audited with counts and hashes, never cases.
+ */
+export function usePutGoldenSet(tenantId: string, name: string, version: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (cases: GoldenCase[]) =>
+      unwrap(
+        api.PUT('/api/v1/tenants/{tenantId}/nodes/{nodeName}/versions/{version}/golden-set', {
+          params: { path: { tenantId, nodeName: name, version } },
+          body: { cases },
+        }),
+      ),
+    onSuccess: (set) => qc.setQueryData(qk.goldenSet(tenantId, name, version), set),
+  });
+}
+
+export function useDeleteGoldenSet(tenantId: string, name: string, version: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      deleteOrGone(
+        api.DELETE('/api/v1/tenants/{tenantId}/nodes/{nodeName}/versions/{version}/golden-set', {
+          params: { path: { tenantId, nodeName: name, version } },
+        }),
+      ),
+    onSuccess: () => qc.setQueryData(qk.goldenSet(tenantId, name, version), null),
+  });
+}
+
+/** Sets the node's promotion bar (`nodes.publish`); the gate of every version may change. */
+export function usePutEvalPolicy(tenantId: string, name: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (policy: EvalPolicy) =>
+      unwrap(
+        api.PUT('/api/v1/tenants/{tenantId}/nodes/{nodeName}/eval-policy', {
+          params: { path: { tenantId, nodeName: name } },
+          body: policy,
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.nodeEvals(tenantId, name) }),
+  });
+}
+
+/** Starts an eval of a published version, run as the API key it names. */
+export function useStartEval(tenantId: string, name: string, version: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: EvalStart) =>
+      unwrap(
+        api.POST('/api/v1/tenants/{tenantId}/nodes/{nodeName}/versions/{version}/evals', {
+          params: { path: { tenantId, nodeName: name, version } },
+          body,
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.evalList(tenantId, name, version) }),
+  });
+}
+
+/** Cancels an eval: a pending one at once, a running one at its worker's next check. */
+export function useCancelEval(tenantId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (evalId: string) =>
+      unwrap(
+        api.POST('/api/v1/tenants/{tenantId}/evals/{evalId}/cancel', {
+          params: { path: { tenantId, evalId } },
+        }),
+      ),
+    onSuccess: (e) => {
+      qc.setQueryData(qk.eval(tenantId, e.id), (prev: typeof e | undefined) =>
+        prev ? { ...prev, ...e } : e,
+      );
+      return qc.invalidateQueries({ queryKey: qk.evalList(tenantId, e.node, e.version) });
+    },
   });
 }

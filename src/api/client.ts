@@ -2,20 +2,29 @@ import createClient, { type Middleware } from 'openapi-fetch';
 import { clearToken, getCsrfToken, getToken, markSessionExpired } from '@/lib/auth';
 import { apiBaseUrl } from '@/lib/urls';
 import type { paths } from './schema';
-import type { ApiErrorBody } from './types';
+import type { ApiErrorBody, ProblemDetail } from './types';
 
 /** Error thrown by `unwrap` for any non-2xx response. */
 export class ApiError extends Error {
   readonly status: number;
   readonly type: string | undefined;
   readonly code: string | null | undefined;
+  /** Node version refusals (422 `validation_failed`): every reason, one by one. */
+  readonly problems: ProblemDetail[];
 
-  constructor(status: number, message: string, type?: string, code?: string | null) {
+  constructor(
+    status: number,
+    message: string,
+    type?: string,
+    code?: string | null,
+    problems: ProblemDetail[] = [],
+  ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.type = type;
     this.code = code;
+    this.problems = problems;
   }
 }
 
@@ -99,7 +108,13 @@ export async function unwrap<T>(
   const { data, error, response } = result;
   if (!response.ok) {
     if (isErrorBody(error)) {
-      throw new ApiError(response.status, error.error.message, error.error.type, error.error.code);
+      throw new ApiError(
+        response.status,
+        error.error.message,
+        error.error.type,
+        error.error.code,
+        error.error.problems ?? [],
+      );
     }
     throw new ApiError(
       response.status,

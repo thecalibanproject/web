@@ -5,13 +5,20 @@ import { IconAlert } from '../ui/icons';
 /**
  * The control plane's refusal of a node version, problem by problem, grouped
  * by kind (unpinned tools, unknown scopes, caps exceeded, unsupported code
- * vertices, ...) with what to do about each. Other errors (a conflict, the
+ * vertices, the promotion bar, ...) with what to do about each. Other errors (a conflict, the
  * network, a role) fall back to the plain form error.
  */
-export function NodeProblems({ error }: { error: unknown }) {
+export function NodeProblems({
+  error,
+  title: fallback = 'The control plane refused this spec',
+}: {
+  error: unknown;
+  /** The heading when the refusal does not name what was refused. */
+  title?: string;
+}) {
   if (!error) return null;
   if (!isSpecRefusal(error)) return <FormError error={error} />;
-  const { title, problems } = nodeProblems(error.message);
+  const { title, problems } = nodeProblems(error.message, error.problems);
   const kinds = [...new Set(problems.map((p) => p.kind))] as ProblemKind[];
   const count = problems.length;
   return (
@@ -21,7 +28,7 @@ export function NodeProblems({ error }: { error: unknown }) {
     >
       <p className="flex items-center gap-1.5 font-medium text-danger">
         <IconAlert size={14} className="shrink-0" />
-        {title ?? 'The control plane refused this spec'}: {count} problem{count === 1 ? '' : 's'}
+        {title ?? fallback}: {count} problem{count === 1 ? '' : 's'}
       </p>
       <ul className="mt-2 flex flex-col gap-2.5">
         {kinds.map((kind) => (

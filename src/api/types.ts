@@ -57,6 +57,23 @@ export type ConsoleRun = S['ConsoleRun'];
 export type Inbox =
   paths['/api/v1/tenants/{tenantId}/inbox']['get']['responses'][200]['content']['application/json'];
 export type InboxItem = Inbox['data'][number];
+export type GoldenCase = S['GoldenCase'];
+export type EvalCheck = S['EvalCheck'];
+export type GoldenSet = S['GoldenSet'];
+export type EvalPolicy = S['EvalPolicy'];
+/** `GET .../nodes/{name}/eval-policy`: the bar, and the injection bar in effect. */
+export type EvalPolicyView =
+  paths['/api/v1/tenants/{tenantId}/nodes/{nodeName}/eval-policy']['get']['responses'][200]['content']['application/json'];
+export type Eval = S['Eval'];
+export type EvalSuite = Eval['suite'];
+export type EvalStatus = Eval['status'];
+export type EvalTrial = NonNullable<Eval['trials']>[number];
+export type EvalStart =
+  paths['/api/v1/tenants/{tenantId}/nodes/{nodeName}/versions/{version}/evals']['post']['requestBody']['content']['application/json'];
+/** `GET .../versions/{v}/gate`: what promoting the version would say. */
+export type PromotionGate =
+  paths['/api/v1/tenants/{tenantId}/nodes/{nodeName}/versions/{version}/gate']['get']['responses'][200]['content']['application/json'];
+export type ProblemDetail = NonNullable<ApiErrorBody['error']['problems']>[number];
 export type ToolAuth = S['ToolAuth'];
 export type ToolAuthMethod = ToolAuth['method'];
 export type ToolServer = S['ToolServer'];
@@ -192,6 +209,16 @@ export const RUN_STATUSES = [
   'budget_exhausted',
   'cancelled',
 ] as const satisfies readonly RunStatus[];
+
+export const EVAL_SUITES = ['golden', 'injection'] as const satisfies readonly EvalSuite[];
+
+export const EVAL_STATUSES = [
+  'pending',
+  'running',
+  'succeeded',
+  'failed',
+  'cancelled',
+] as const satisfies readonly EvalStatus[];
 
 export const ROUTE_STAGES = ['rules', 'knn', 'keyword'] as const satisfies readonly RouteStage[];
 

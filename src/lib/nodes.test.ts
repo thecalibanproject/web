@@ -74,6 +74,31 @@ describe('nodeProblems', () => {
   });
 });
 
+describe('nodeProblems with the problems of the error body', () => {
+  it('lists the promotion gate reasons of a refused promotion', () => {
+    const { title, problems } = nodeProblems(
+      'triage@v2 cannot be promoted: pass^k 0.5 is below the bar 0.9; no injection eval',
+      [
+        { kind: 'eval_gate', message: 'pass^k 0.5 is below the bar 0.9' },
+        { kind: 'eval_gate', message: 'no injection eval' },
+      ],
+    );
+    expect(title).toBe('Cannot make triage@v2 live');
+    expect(problems).toEqual([
+      { kind: 'gate', text: 'pass^k 0.5 is below the bar 0.9' },
+      { kind: 'gate', text: 'no injection eval' },
+    ]);
+  });
+
+  it('keeps classifying other kinds by their text', () => {
+    const { problems } = nodeProblems('cannot publish triage@v2: x', [
+      { kind: 'budget', message: "budgets.steps 150 exceeds the tenant's node cap 100" },
+      { kind: 'golden_set', message: "case 'a': input does not match" },
+    ]);
+    expect(problems.map((p) => p.kind)).toEqual(['cap', 'golden']);
+  });
+});
+
 describe('shortHash', () => {
   it('keeps the algorithm and 12 hex characters', () => {
     expect(shortHash('sha256:0123456789abcdef0123')).toBe('sha256:0123456789ab');

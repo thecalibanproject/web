@@ -109,7 +109,11 @@ function PublishDialog({
               : 'The node keeps no live version. Runs can still name this version.'
         }
       />
-      <p className="text-fg-muted">Versions are immutable: publishing never changes the spec.</p>
+      <p className="text-fg-muted">
+        Versions are immutable: publishing never changes the spec. Making it live also needs the
+        node&apos;s promotion bar: a draft has no evals yet, so a gated version is published without
+        making it live, evaluated, then made live.
+      </p>
       <NodeProblems error={publish.error} />
     </ConfirmDialog>
   );
@@ -149,7 +153,9 @@ function PromoteDialog({
         )}
       </p>
       <p className="text-fg-muted">
-        Its budgets are checked against the tenant&apos;s current node caps first.
+        Its budgets are checked against the tenant&apos;s current node caps first, and its latest
+        evals against the node&apos;s promotion bar (a version with write tools always needs an
+        injection eval).
       </p>
       <NodeProblems error={promote.error} />
     </ConfirmDialog>

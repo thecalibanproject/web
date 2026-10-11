@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { usePermissions } from '@/api/auth';
 import { nodeVersionsQuery, tenantsQuery } from '@/api/queries';
 import type { Node } from '@/api/types';
+import { EvalsPanel } from '@/components/evals/evals-panel';
 import { LiveBadge, NodeStateBadge } from '@/components/nodes/node-badges';
 import { NodeEditor } from '@/components/nodes/node-editor';
 import { VersionDialog, type VersionAction } from '@/components/nodes/version-dialogs';
@@ -22,6 +23,7 @@ import {
   LoadingState,
   PageHeader,
   Table,
+  Tabs,
   TBody,
   TD,
   TH,
@@ -33,8 +35,14 @@ import { isNotFound } from '@/lib/errors';
 import { formatDateTime } from '@/lib/format';
 import { shortHash } from '@/lib/nodes';
 import { deniedReason } from '@/lib/permissions';
+import type { NodeTab } from '@/router';
 
 const route = getRouteApi('/_app/nodes/$tenantId/$nodeName');
+
+const TABS: ReadonlyArray<{ value: NodeTab; label: string }> = [
+  { value: 'versions', label: 'Versions' },
+  { value: 'evals', label: 'Evals' },
+];
 
 /** Default comparison: the live version (or the one before the latest) against the latest. */
 function defaultPair(versions: Node[], live: number | null | undefined): [number, number] | null {
@@ -161,14 +169,23 @@ export function NodeDetailPage() {
         }
         actions={
           latest && (
-            <GatedButton
-              variant="primary"
-              icon={<IconPlus size={14} />}
-              deniedReason={cannotWrite}
-              onClick={() => setEditing(latest.spec)}
-            >
-              New version
-            </GatedButton>
+            <>
+              <Link
+                to="/runs"
+                search={{ tenant: tenantId, node: nodeName }}
+                className="text-[13px] text-accent hover:underline"
+              >
+                Runs
+              </Link>
+              <GatedButton
+                variant="primary"
+                icon={<IconPlus size={14} />}
+                deniedReason={cannotWrite}
+                onClick={() => setEditing(latest.spec)}
+              >
+                New version
+              </GatedButton>
+            </>
           )
         }
       />
@@ -196,93 +213,112 @@ export function NodeDetailPage() {
           <ErrorState error={versions.error} onRetry={() => void versions.refetch()} />
         </Card>
       ) : (
-        <>
-          <Card>
-            <CardHeader
-              title="Versions"
-              description="Versions are immutable. Drafts are published, published versions are made live or retired."
-              actions={
-                <p role="status" className="text-[12.5px] text-ok">
-                  {created != null ? `Draft v${created} created.` : ''}
-                </p>
-              }
+        <Tabs<NodeTab>
+          label="Node"
+          tabs={TABS}
+          value={search.tab ?? 'versions'}
+          onChange={(tab) => setSearch({ tab: tab === 'versions' ? undefined : tab })}
+        >
+          {search.tab === 'evals' ? (
+            <EvalsPanel
+              tenantId={tenantId}
+              name={nodeName}
+              versions={list}
+              version={search.ev}
+              evalId={search.eval}
+              onVersion={(ev) => setSearch({ ev })}
+              onEval={(id) => setSearch({ eval: id })}
             />
-            <Table label="Versions">
-              <THead>
-                <tr>
-                  <TH>Version</TH>
-                  <TH>State</TH>
-                  <TH>Hash</TH>
-                  <TH>Created by</TH>
-                  <TH>Created</TH>
-                  <TH>Published</TH>
-                  <TH>
-                    <span className="sr-only">Actions</span>
-                  </TH>
-                </tr>
-              </THead>
-              <TBody>
-                {[...list].reverse().map((v) => (
-                  <TR key={v.id}>
-                    <TD>
-                      <Badge>v{v.version}</Badge>
-                    </TD>
-                    <TD>
-                      <span className="inline-flex items-center gap-1.5">
-                        <NodeStateBadge state={v.state} />
-                        {v.live && <LiveBadge />}
-                      </span>
-                    </TD>
-                    <TD className="whitespace-nowrap">
-                      <code className="font-mono text-[12px] text-fg-muted" title={v.hash}>
-                        {shortHash(v.hash)}
-                      </code>
-                      <CopyButton value={v.hash} label={`Copy hash of v${v.version}`} compact />
-                    </TD>
-                    <TD className="max-w-56 truncate text-fg-muted" title={v.created_by ?? ''}>
-                      {v.created_by ?? '—'}
-                    </TD>
-                    <TD className="whitespace-nowrap text-fg-muted">
-                      {formatDateTime(v.created_at)}
-                    </TD>
-                    <TD className="whitespace-nowrap text-fg-muted">
-                      {formatDateTime(v.published_at)}
-                    </TD>
-                    <TD className="text-right whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          aria-label={`View spec of v${v.version}`}
-                          onClick={() => setSearch({ version: v.version })}
-                        >
-                          View spec
-                        </Button>
-                        {v.state === 'draft' &&
-                          action(v, 'publish', 'Publish', cannotPublish, 'primary')}
-                        {v.state === 'published' &&
-                          !v.live &&
-                          action(v, 'promote', 'Make live', cannotPublish)}
-                        {v.state === 'published' &&
-                          action(v, 'retire', 'Retire', cannotPublish, 'danger')}
-                        {v.state !== 'published' &&
-                          action(v, 'delete', 'Delete', cannotWrite, 'danger')}
-                      </span>
-                    </TD>
-                  </TR>
-                ))}
-              </TBody>
-            </Table>
-          </Card>
-          <VersionDiff
-            tenantId={tenantId}
-            name={nodeName}
-            versions={list}
-            from={from}
-            to={to}
-            onChange={(f, t) => setSearch({ from: f, to: t })}
-          />
-        </>
+          ) : (
+            <>
+              <Card>
+                <CardHeader
+                  title="Versions"
+                  description="Versions are immutable. Drafts are published, published versions are made live or retired."
+                  actions={
+                    <p role="status" className="text-[12.5px] text-ok">
+                      {created != null ? `Draft v${created} created.` : ''}
+                    </p>
+                  }
+                />
+                <Table label="Versions">
+                  <THead>
+                    <tr>
+                      <TH>Version</TH>
+                      <TH>State</TH>
+                      <TH>Hash</TH>
+                      <TH>Created by</TH>
+                      <TH>Created</TH>
+                      <TH>Published</TH>
+                      <TH>
+                        <span className="sr-only">Actions</span>
+                      </TH>
+                    </tr>
+                  </THead>
+                  <TBody>
+                    {[...list].reverse().map((v) => (
+                      <TR key={v.id}>
+                        <TD>
+                          <Badge>v{v.version}</Badge>
+                        </TD>
+                        <TD>
+                          <span className="inline-flex items-center gap-1.5">
+                            <NodeStateBadge state={v.state} />
+                            {v.live && <LiveBadge />}
+                          </span>
+                        </TD>
+                        <TD className="whitespace-nowrap">
+                          <code className="font-mono text-[12px] text-fg-muted" title={v.hash}>
+                            {shortHash(v.hash)}
+                          </code>
+                          <CopyButton value={v.hash} label={`Copy hash of v${v.version}`} compact />
+                        </TD>
+                        <TD className="max-w-56 truncate text-fg-muted" title={v.created_by ?? ''}>
+                          {v.created_by ?? '—'}
+                        </TD>
+                        <TD className="whitespace-nowrap text-fg-muted">
+                          {formatDateTime(v.created_at)}
+                        </TD>
+                        <TD className="whitespace-nowrap text-fg-muted">
+                          {formatDateTime(v.published_at)}
+                        </TD>
+                        <TD className="text-right whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              aria-label={`View spec of v${v.version}`}
+                              onClick={() => setSearch({ version: v.version })}
+                            >
+                              View spec
+                            </Button>
+                            {v.state === 'draft' &&
+                              action(v, 'publish', 'Publish', cannotPublish, 'primary')}
+                            {v.state === 'published' &&
+                              !v.live &&
+                              action(v, 'promote', 'Make live', cannotPublish)}
+                            {v.state === 'published' &&
+                              action(v, 'retire', 'Retire', cannotPublish, 'danger')}
+                            {v.state !== 'published' &&
+                              action(v, 'delete', 'Delete', cannotWrite, 'danger')}
+                          </span>
+                        </TD>
+                      </TR>
+                    ))}
+                  </TBody>
+                </Table>
+              </Card>
+              <VersionDiff
+                tenantId={tenantId}
+                name={nodeName}
+                versions={list}
+                from={from}
+                to={to}
+                onChange={(f, t) => setSearch({ from: f, to: t })}
+              />
+            </>
+          )}
+        </Tabs>
       )}
 
       <Drawer
