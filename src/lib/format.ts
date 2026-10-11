@@ -1,3 +1,6 @@
+/** Placeholder for a missing or not-applicable value, shared across the console. */
+export const EMPTY = 'n/a';
+
 const intFmt = new Intl.NumberFormat('en-US');
 const compactFmt = new Intl.NumberFormat('en-US', {
   notation: 'compact',
@@ -6,15 +9,15 @@ const compactFmt = new Intl.NumberFormat('en-US', {
 const pctFmt = new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 1 });
 
 export function formatInt(n: number | null | undefined): string {
-  return n == null ? '—' : intFmt.format(n);
+  return n == null ? EMPTY : intFmt.format(n);
 }
 
 export function formatCompact(n: number | null | undefined): string {
-  return n == null ? '—' : compactFmt.format(n);
+  return n == null ? EMPTY : compactFmt.format(n);
 }
 
 export function formatPercent(ratio: number | null | undefined): string {
-  return ratio == null || !Number.isFinite(ratio) ? '—' : pctFmt.format(ratio);
+  return ratio == null || !Number.isFinite(ratio) ? EMPTY : pctFmt.format(ratio);
 }
 
 /** Fraction digits `formatUsd` shows: 4 for sub-cent amounts, otherwise 2. */
@@ -45,7 +48,7 @@ export function isNegativeUsd(n: number | null | undefined): boolean {
  * to zero at the shown precision is "$0.00", never "-$0.00" or "$0.0000".
  */
 export function formatUsd(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n)) return '—';
+  if (n == null || !Number.isFinite(n)) return EMPTY;
   const value = roundUsd(n);
   const digits = usdDigits(value);
   return new Intl.NumberFormat('en-US', {
@@ -58,11 +61,11 @@ export function formatUsd(n: number | null | undefined): string {
 
 /** Price per million tokens, e.g. "$2.50 / Mtok". */
 export function formatPricePerMtok(n: number | null | undefined): string {
-  return n == null ? '—' : `${formatUsd(n)}`;
+  return n == null ? EMPTY : `${formatUsd(n)}`;
 }
 
 export function formatDateTime(iso: string | null | undefined): string {
-  if (!iso) return '—';
+  if (!iso) return EMPTY;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleString(undefined, {
@@ -76,13 +79,13 @@ export function formatDateTime(iso: string | null | undefined): string {
 }
 
 export function formatDate(iso: string | null | undefined): string {
-  if (!iso) return '—';
+  if (!iso) return EMPTY;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' });
 }
 
 export function formatMs(ms: number | null | undefined): string {
-  if (ms == null) return '—';
+  if (ms == null) return EMPTY;
   return ms >= 1000 ? `${(ms / 1000).toFixed(2)} s` : `${intFmt.format(ms)} ms`;
 }

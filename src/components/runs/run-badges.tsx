@@ -1,5 +1,6 @@
 import type { RunStatus } from '@/api/types';
 import { RUN_STATUS_LABEL, RUN_STATUS_TONE } from '@/lib/runs';
+import { EMPTY } from '@/lib/format';
 import { Badge, type Tone } from '../ui';
 
 export function RunStatusBadge({ status }: { status: RunStatus }) {
@@ -27,7 +28,7 @@ function taintOf(label: string): { tone: Tone; hint: string } {
 /** Taint labels of a value: where untrusted data in it came from. */
 export function TaintLabels({
   labels,
-  empty = '-',
+  empty = EMPTY,
 }: {
   labels: readonly string[];
   empty?: string;

@@ -4,7 +4,7 @@ import { usePermissions } from '@/api/auth';
 import { goldenSetQuery, useDeleteGoldenSet, usePutGoldenSet } from '@/api/queries';
 import type { GoldenCase } from '@/api/types';
 import { checkKinds, MAX_GOLDEN_CASES, parseGoldenCases } from '@/lib/evals';
-import { formatDateTime } from '@/lib/format';
+import { EMPTY, formatDateTime } from '@/lib/format';
 import { shortHash } from '@/lib/nodes';
 import { deniedReason } from '@/lib/permissions';
 import {
@@ -207,9 +207,9 @@ export function GoldenSetCard({
                       </span>
                     </TD>
                     <TD className="font-mono text-[12px] text-fg-muted">
-                      {Object.keys(c.answers ?? {}).join(', ') || '-'}
+                      {Object.keys(c.answers ?? {}).join(', ') || EMPTY}
                     </TD>
-                    <TD className="text-fg-muted">{(c.tags ?? []).join(', ') || '-'}</TD>
+                    <TD className="text-fg-muted">{(c.tags ?? []).join(', ') || EMPTY}</TD>
                   </TR>
                 ))}
               </TBody>

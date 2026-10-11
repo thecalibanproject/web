@@ -15,7 +15,7 @@ import {
   policyFromForm,
   type PolicyForm,
 } from '@/lib/evals';
-import { formatDateTime, formatMs, formatPercent, formatUsd } from '@/lib/format';
+import { EMPTY, formatDateTime, formatMs, formatPercent, formatUsd } from '@/lib/format';
 import { deniedReason } from '@/lib/permissions';
 import { LiveBadge, NodeStateBadge } from '../nodes/node-badges';
 import { VersionDialog } from '../nodes/version-dialogs';
@@ -257,7 +257,7 @@ function PolicyCard({ tenantId, name }: { tenantId: string; name: string }) {
   const p = q.data?.policy;
   const rows: Array<[string, string]> = p?.golden
     ? [
-        ['Least pass^k', pctText(p.golden.min_pass_k) ?? '-'],
+        ['Least pass^k', pctText(p.golden.min_pass_k) ?? EMPTY],
         ['Least k', String(p.golden.min_k ?? 1)],
         [
           'Most cost per success',
@@ -273,7 +273,7 @@ function PolicyCard({ tenantId, name }: { tenantId: string; name: string }) {
     : [['Golden bar', 'none']];
   rows.push([
     'Attacks blocked (versions with write tools)',
-    `${pctText(q.data?.injection_bar) ?? '-'}${p?.injection ? '' : ' (default)'}`,
+    `${pctText(q.data?.injection_bar) ?? EMPTY}${p?.injection ? '' : ' (default)'}`,
   ]);
   return (
     <Card>
@@ -344,7 +344,7 @@ function Metrics({ e }: { e: Eval }) {
       </span>
     );
   }
-  return <span className="text-fg-subtle">{e.error ?? '-'}</span>;
+  return <span className="text-fg-subtle">{e.error ?? EMPTY}</span>;
 }
 
 function EvalList({
@@ -408,7 +408,7 @@ function EvalList({
             </TD>
             <TD className="whitespace-nowrap text-fg-muted">{formatDateTime(e.created_at)}</TD>
             <TD className="max-w-48 truncate text-fg-muted" title={e.created_by}>
-              {e.created_by ?? '-'}
+              {e.created_by ?? EMPTY}
             </TD>
           </TR>
         ))}

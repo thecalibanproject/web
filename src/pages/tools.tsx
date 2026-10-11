@@ -33,7 +33,7 @@ import {
 } from '@/components/ui';
 import { IconPlus, IconRefresh, IconTrash } from '@/components/ui/icons';
 import { isNotFound } from '@/lib/errors';
-import { formatDateTime } from '@/lib/format';
+import { EMPTY, formatDateTime } from '@/lib/format';
 import { deniedReason } from '@/lib/permissions';
 import { TOOL_AUTH_LABEL } from '@/lib/tools';
 
@@ -258,7 +258,7 @@ function ServerList({
                           Sealed
                         </Badge>
                       ) : (
-                        <span className="text-fg-subtle">—</span>
+                        <span className="text-fg-subtle">{EMPTY}</span>
                       )}
                     </TD>
                     <TD className="whitespace-nowrap text-fg-muted">

@@ -22,7 +22,7 @@ import {
   TR,
 } from '@/components/ui';
 import { IconPlus, IconTrash } from '@/components/ui/icons';
-import { formatCompact, formatUsd } from '@/lib/format';
+import { EMPTY, formatCompact, formatUsd } from '@/lib/format';
 import { MODEL_KIND_LABEL, PROVIDER_SHORT, TRUST_TIER_LABEL } from '@/lib/labels';
 import { ModelForm } from './model-form';
 
@@ -157,7 +157,7 @@ export function CataloguePanel() {
                 <TD>
                   <ModelKindBadge kind={m.kind} />
                 </TD>
-                <TD className="font-mono text-[12px] text-fg-muted">{m.family ?? '—'}</TD>
+                <TD className="font-mono text-[12px] text-fg-muted">{m.family ?? EMPTY}</TD>
                 <TD>
                   <CapabilityBadges capabilities={m.capabilities} />
                 </TD>
@@ -172,13 +172,13 @@ export function CataloguePanel() {
                 <TD>
                   <TrustTierBadge tier={m.trust_tier} />
                 </TD>
-                <TD className="text-fg-muted">{m.licence ?? '—'}</TD>
+                <TD className="text-fg-muted">{m.licence ?? EMPTY}</TD>
                 <TD className="text-right">
-                  {m.context_window ? formatCompact(m.context_window) : '—'}
+                  {m.context_window ? formatCompact(m.context_window) : EMPTY}
                 </TD>
                 <TD className="text-right whitespace-nowrap">
                   {m.price_in_per_mtok == null && m.price_out_per_mtok == null
-                    ? '—'
+                    ? EMPTY
                     : `${formatUsd(m.price_in_per_mtok)} / ${formatUsd(m.price_out_per_mtok)}`}
                 </TD>
                 <TD className="text-right">

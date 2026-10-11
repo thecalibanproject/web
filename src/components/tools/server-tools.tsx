@@ -3,7 +3,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { usePermissions } from '@/api/auth';
 import { toolManifestsQuery, useRevokeTool } from '@/api/queries';
 import type { ToolServer } from '@/api/types';
-import { formatDateTime } from '@/lib/format';
+import { EMPTY, formatDateTime } from '@/lib/format';
 import { shortHash } from '@/lib/nodes';
 import { deniedReason } from '@/lib/permissions';
 import { manifestRows } from '@/lib/tools';
@@ -138,7 +138,7 @@ export function ServerTools({
                 >
                   <TD className="font-mono text-[12.5px] font-medium">{m.name}</TD>
                   <TD className="max-w-72 truncate text-fg-muted" title={m.description}>
-                    {m.description || '—'}
+                    {m.description || EMPTY}
                   </TD>
                   <TD className="whitespace-nowrap">
                     <code className="font-mono text-[12px] text-fg-muted" title={m.pin}>
@@ -168,7 +168,7 @@ export function ServerTools({
                     <FindingsBadge findings={m.findings} />
                   </TD>
                   <TD className="whitespace-nowrap text-fg-muted">
-                    {m.approved_at ? formatDateTime(m.approved_at) : '—'}
+                    {m.approved_at ? formatDateTime(m.approved_at) : EMPTY}
                     {m.approved_by && (
                       <span className="block text-[11.5px] text-fg-subtle">{m.approved_by}</span>
                     )}

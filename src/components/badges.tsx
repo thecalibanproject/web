@@ -7,7 +7,7 @@ import type {
   OntologyElement,
   TrustTier,
 } from '@/api/types';
-import { formatPercent } from '@/lib/format';
+import { EMPTY, formatPercent } from '@/lib/format';
 import {
   CACHE_TIER_LABEL,
   MODEL_KIND_LABEL,
@@ -153,7 +153,7 @@ export function CapabilityBadges({ capabilities: c }: { capabilities: ModelCapab
         (c.inline_think_tags ? ' <think> tags are moved to reasoning_content.' : ''),
     });
   }
-  if (items.length === 0) return <span className="text-fg-subtle">—</span>;
+  if (items.length === 0) return <span className="text-fg-subtle">{EMPTY}</span>;
   return (
     <span className="inline-flex flex-wrap gap-1">
       {items.map((i) => (

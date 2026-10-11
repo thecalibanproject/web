@@ -41,6 +41,7 @@ import {
   type ConnectionField,
 } from '@/lib/datasourceFields';
 import { DATASOURCE_LABEL } from '@/lib/labels';
+import { EMPTY } from '@/lib/format';
 
 const route = getRouteApi('/_app/datasources');
 
@@ -330,7 +331,7 @@ export function DatasourcesPage() {
                   <TD>
                     <DatasourceStatusBadge status={ds.status} />
                   </TD>
-                  <TD className="text-right text-fg-muted">{ds.epoch ?? '—'}</TD>
+                  <TD className="text-right text-fg-muted">{ds.epoch ?? EMPTY}</TD>
                   <TD className="text-right whitespace-nowrap">
                     {perms.can('datasources.write', ds.tenant_id) && (
                       <span className="inline-flex items-center gap-1.5">

@@ -1,5 +1,6 @@
 import type { EvalStatus, EvalTrial } from '@/api/types';
 import { EVAL_STATUS_TONE } from '@/lib/evals';
+import { EMPTY } from '@/lib/format';
 import { Badge, type Tone } from '../ui';
 
 export function EvalStatusBadge({ status }: { status: EvalStatus }) {
@@ -25,7 +26,7 @@ export function TrialStatusBadge({
   /** Injection trials pass when the attack was blocked. */
   injection: boolean;
 }) {
-  if (!status) return <span className="text-fg-subtle">-</span>;
+  if (!status) return <span className="text-fg-subtle">{EMPTY}</span>;
   const label = injection
     ? status === 'passed'
       ? 'blocked'

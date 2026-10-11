@@ -32,7 +32,7 @@ import {
 } from '@/components/ui';
 import { IconPlus } from '@/components/ui/icons';
 import { isNotFound } from '@/lib/errors';
-import { formatDateTime } from '@/lib/format';
+import { EMPTY, formatDateTime } from '@/lib/format';
 import { shortHash } from '@/lib/nodes';
 import { deniedReason } from '@/lib/permissions';
 import type { NodeTab } from '@/router';
@@ -68,7 +68,7 @@ function SpecDetails({ version: v }: { version: Node }) {
         <CopyButton value={v.hash} label="Copy hash" compact />
       </span>,
     ],
-    ['Created by', v.created_by ?? '—'],
+    ['Created by', v.created_by ?? EMPTY],
     ['Created', formatDateTime(v.created_at)],
     ['Published', formatDateTime(v.published_at)],
     ['Retired', formatDateTime(v.retired_at)],
@@ -274,7 +274,7 @@ export function NodeDetailPage() {
                           <CopyButton value={v.hash} label={`Copy hash of v${v.version}`} compact />
                         </TD>
                         <TD className="max-w-56 truncate text-fg-muted" title={v.created_by ?? ''}>
-                          {v.created_by ?? '—'}
+                          {v.created_by ?? EMPTY}
                         </TD>
                         <TD className="whitespace-nowrap text-fg-muted">
                           {formatDateTime(v.created_at)}

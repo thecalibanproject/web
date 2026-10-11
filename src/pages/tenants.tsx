@@ -27,7 +27,7 @@ import {
 } from '@/components/ui';
 import { IconChevronRight, IconPlus } from '@/components/ui/icons';
 import { cn } from '@/lib/cn';
-import { formatDate } from '@/lib/format';
+import { EMPTY, formatDate } from '@/lib/format';
 
 type Pii = NonNullable<TenantCreate['pii_default']>;
 
@@ -214,12 +214,12 @@ export function TenantsPage() {
                       )}
                     </TD>
                     <TD className="font-mono text-[12px] text-fg-muted">{t.id}</TD>
-                    <TD>{t.region ?? <span className="text-fg-subtle">—</span>}</TD>
+                    <TD>{t.region ?? <span className="text-fg-subtle">{EMPTY}</span>}</TD>
                     <TD>
                       {t.pii_default ? (
                         <Badge>{t.pii_default}</Badge>
                       ) : (
-                        <span className="text-fg-subtle">—</span>
+                        <span className="text-fg-subtle">{EMPTY}</span>
                       )}
                     </TD>
                     <TD className="text-fg-muted">{formatDate(t.created_at)}</TD>

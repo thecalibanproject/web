@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { nodeDiffQuery } from '@/api/queries';
 import type { Node, NodeDiffChange } from '@/api/types';
 import { shortHash } from '@/lib/nodes';
+import { EMPTY } from '@/lib/format';
 import {
   Badge,
   Card,
@@ -26,7 +27,7 @@ const OP_TONE: Record<NodeDiffChange['op'], Tone> = {
 };
 
 function Value({ value, present }: { value: unknown; present: boolean }) {
-  if (!present) return <span className="text-fg-subtle">—</span>;
+  if (!present) return <span className="text-fg-subtle">{EMPTY}</span>;
   const text = typeof value === 'string' ? JSON.stringify(value) : JSON.stringify(value, null, 2);
   return (
     <pre className="max-h-48 max-w-96 overflow-auto font-mono text-[12px] whitespace-pre-wrap break-words">

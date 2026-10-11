@@ -23,7 +23,7 @@ import {
   THead,
   TR,
 } from '@/components/ui';
-import { formatDateTime, formatMs, formatUsd } from '@/lib/format';
+import { EMPTY, formatDateTime, formatMs, formatUsd } from '@/lib/format';
 import {
   elapsedMs,
   isRunStatusFilter,
@@ -259,7 +259,7 @@ export function RunsPage() {
                         {formatDateTime(r.created_at)}
                       </TD>
                       <TD className="text-right whitespace-nowrap text-fg-muted tabular-nums">
-                        {ms != null ? formatMs(ms) : r.finished_at ? '-' : 'not ended'}
+                        {ms != null ? formatMs(ms) : r.finished_at ? EMPTY : 'not ended'}
                       </TD>
                     </TR>
                   );

@@ -1,5 +1,5 @@
 import type { UsageEvent } from '@/api/types';
-import { formatDateTime, formatInt, formatMs, formatUsd } from '@/lib/format';
+import { EMPTY, formatDateTime, formatInt, formatMs, formatUsd } from '@/lib/format';
 import { CacheBadge, CacheTierBadge } from './badges';
 import { Table, TBody, TD, TH, THead, TR } from './ui';
 
@@ -119,7 +119,7 @@ export function UsageTable({
                     )}
                   </span>
                 ) : (
-                  <span className="text-fg-subtle">—</span>
+                  <span className="text-fg-subtle">{EMPTY}</span>
                 )}
               </TD>
             )}
@@ -142,7 +142,7 @@ export function UsageTable({
                 {e.cache_tier ? (
                   <CacheTierBadge tier={e.cache_tier} />
                 ) : (
-                  <span className="text-fg-subtle">—</span>
+                  <span className="text-fg-subtle">{EMPTY}</span>
                 )}
               </TD>
             )}

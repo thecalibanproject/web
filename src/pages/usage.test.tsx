@@ -381,7 +381,7 @@ describe('UsagePage', () => {
       expect(within(node).getByText('triage')).toBeInTheDocument();
       expect(node).toHaveTextContent('triage v2');
       expect(within(node).getByTitle('Run run_123')).toBeInTheDocument();
-      expect(row('req-auto-miss').querySelector('td:nth-child(4)')).toHaveTextContent('—');
+      expect(row('req-auto-miss').querySelector('td:nth-child(4)')).toHaveTextContent('n/a');
     });
 
     it('filters by node from the cost table or the node filter, through the API', async () => {

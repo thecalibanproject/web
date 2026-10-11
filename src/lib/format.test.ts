@@ -31,11 +31,11 @@ describe('formatUsd', () => {
     expect(formatUsd(-0.009999)).toBe('-$0.01');
   });
 
-  it('shows a dash for missing or non-finite values', () => {
-    expect(formatUsd(null)).toBe('—');
-    expect(formatUsd(undefined)).toBe('—');
-    expect(formatUsd(Number.NaN)).toBe('—');
-    expect(formatUsd(Number.POSITIVE_INFINITY)).toBe('—');
+  it('shows n/a for missing or non-finite values', () => {
+    expect(formatUsd(null)).toBe('n/a');
+    expect(formatUsd(undefined)).toBe('n/a');
+    expect(formatUsd(Number.NaN)).toBe('n/a');
+    expect(formatUsd(Number.POSITIVE_INFINITY)).toBe('n/a');
   });
 });
 

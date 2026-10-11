@@ -15,7 +15,7 @@ import {
   verdictError,
   type TrialVerdict,
 } from '@/lib/evals';
-import { formatDateTime, formatInt, formatMs, formatPercent, formatUsd } from '@/lib/format';
+import { EMPTY, formatDateTime, formatInt, formatMs, formatPercent, formatUsd } from '@/lib/format';
 import { shortHash } from '@/lib/nodes';
 import { prettyJson } from '@/lib/runs';
 import {
@@ -206,7 +206,7 @@ function Verdict({ verdict: v }: { verdict: TrialVerdict | undefined }) {
     );
   }
   const checks = isGoldenVerdict(v) ? v.checks : [];
-  if (checks.length === 0) return <span className="text-fg-subtle">-</span>;
+  if (checks.length === 0) return <span className="text-fg-subtle">{EMPTY}</span>;
   const passed = checks.filter((c) => c.passed).length;
   return (
     <span
@@ -287,7 +287,7 @@ function Trials({ e, tenantId }: { e: Eval; tenantId: string }) {
                       {t.run_id}
                     </Link>
                   ) : (
-                    <span className="text-fg-subtle">-</span>
+                    <span className="text-fg-subtle">{EMPTY}</span>
                   )}
                 </TD>
                 {e.content_visible && (
@@ -375,7 +375,7 @@ export function EvalDetail({ tenantId, evalId }: { tenantId: string; evalId: str
         </dd>
         <dt className="text-fg-muted">Started by</dt>
         <dd className="break-all">
-          {e.created_by ?? '-'}
+          {e.created_by ?? EMPTY}
           {e.api_key_id && <span className="text-fg-muted"> as API key {e.api_key_id}</span>}
         </dd>
         <dt className="text-fg-muted">Created</dt>

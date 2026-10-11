@@ -28,7 +28,7 @@ import {
   TR,
 } from '@/components/ui';
 import { isNotFound } from '@/lib/errors';
-import { formatDateTime, formatInt, formatMs, formatUsd } from '@/lib/format';
+import { EMPTY, formatDateTime, formatInt, formatMs, formatUsd } from '@/lib/format';
 import { shortHash } from '@/lib/nodes';
 import { deniedReason } from '@/lib/permissions';
 import {
@@ -46,7 +46,7 @@ const CONTENT_HIDDEN =
   'Run content (input, output, step outputs, questions) is hidden: your role sees what happened, not what was said (needs runs.data).';
 
 function amount(row: BudgetRow, v: number | null): string {
-  if (v == null) return '-';
+  if (v == null) return EMPTY;
   if (row.unit === 'usd') return formatUsd(v);
   if (row.unit === 'ms') return formatMs(v);
   return formatInt(v);
@@ -72,7 +72,7 @@ function Summary({ run }: { run: ConsoleRun }) {
     [
       'Started by',
       <span key="i" className="font-mono text-[12px]">
-        {run.invoker ?? '-'}
+        {run.invoker ?? EMPTY}
       </span>,
     ],
     ...(run.origin
@@ -95,7 +95,7 @@ function Summary({ run }: { run: ConsoleRun }) {
           <CopyButton value={run.hash} label="Copy hash" compact />
         </span>
       ) : (
-        '-'
+        EMPTY
       ),
     ],
     [
@@ -109,13 +109,13 @@ function Summary({ run }: { run: ConsoleRun }) {
     ['Created', formatDateTime(run.created_at)],
     ['Started', formatDateTime(run.started_at)],
     ['Finished', formatDateTime(run.finished_at)],
-    ['Duration', ms != null ? formatMs(ms) : run.finished_at ? '-' : 'not ended'],
+    ['Duration', ms != null ? formatMs(ms) : run.finished_at ? EMPTY : 'not ended'],
     ['Cost', formatUsd(run.cost_usd)],
     [
       'Tokens',
       usage
         ? `${formatInt(usage.total_tokens)} (${formatInt(usage.prompt_tokens)} prompt, ${formatInt(usage.completion_tokens)} completion)`
-        : '-',
+        : EMPTY,
     ],
   ];
   if (run.claims != null && run.claims > 1) {
@@ -245,10 +245,10 @@ function Steps({ run }: { run: ConsoleRun }) {
                         : undefined
                     }
                   >
-                    {s.tokens ? formatInt(s.tokens) : '-'}
+                    {s.tokens ? formatInt(s.tokens) : EMPTY}
                   </TD>
                   <TD className="text-right whitespace-nowrap tabular-nums">
-                    {s.usd ? formatUsd(s.usd) : '-'}
+                    {s.usd ? formatUsd(s.usd) : EMPTY}
                   </TD>
                   <TD>
                     <TaintLabels labels={s.labels} />
