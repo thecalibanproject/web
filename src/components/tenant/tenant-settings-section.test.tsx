@@ -253,4 +253,28 @@ describe('TenantSettingsSection', () => {
     expect(controls().save).toBeEnabled();
     expect(calls).toHaveLength(0);
   });
+
+  it('turns the PII mode on for sovereign models, off by default', async () => {
+    let current = acme;
+    const calls = mockApi({
+      'GET /api/v1/tenants/acme': () => ({ body: current }),
+      'PATCH /api/v1/tenants/acme': (c) => {
+        current = { ...current, ...(c.body as Partial<Tenant>) };
+        return { body: current };
+      },
+    });
+    const user = userEvent.setup();
+    renderWithClient(<FromQuery />);
+    const sovereign = await screen.findByRole('switch', { name: 'PII mode on sovereign models' });
+    expect(sovereign).toHaveAttribute('aria-checked', 'false');
+    expect(sovereign).toHaveAccessibleDescription(/get the text as is/);
+
+    await user.click(sovereign);
+    await user.click(controls().save);
+
+    await waitFor(() => expect(sovereign).toHaveAttribute('aria-checked', 'true'));
+    expect(calls.filter((c) => c.method === 'PATCH').map((c) => c.body)).toEqual([
+      { pii_on_sovereign: true },
+    ]);
+  });
 });

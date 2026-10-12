@@ -6,6 +6,7 @@ import { ApiKeysPanel } from '@/components/tenant/api-keys-panel';
 import { IntentsPanel } from '@/components/tenant/intents-panel';
 import { DeleteTenantSection } from '@/components/tenant/delete-tenant-section';
 import { NodeLimitsSection } from '@/components/tenant/node-limits-section';
+import { PiiDetectorsSection } from '@/components/tenant/pii-detectors-section';
 import { ProviderKeysPanel } from '@/components/tenant/provider-keys-panel';
 import { TenantDeletedState } from '@/components/tenant/tenant-deleted-state';
 import { TenantSettingsSection } from '@/components/tenant/tenant-settings-section';
@@ -99,6 +100,9 @@ export function TenantDetailPage() {
           tenant={tenant.data}
           readOnly={!perms.can('tenant.write', tenantId)}
         />
+      )}
+      {tenant.isSuccess && (
+        <PiiDetectorsSection tenant={tenant.data} readOnly={!perms.can('tenant.write', tenantId)} />
       )}
       {tenant.isSuccess && (
         <NodeLimitsSection tenant={tenant.data} readOnly={!perms.can('tenant.write', tenantId)} />

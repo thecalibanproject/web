@@ -15,6 +15,8 @@ import { useSavedTenant } from './use-saved-tenant';
 interface Settings {
   pii_default: PiiMode;
   pii_surrogate_scope: SurrogateScope;
+  /** The PII mode also applies to sovereign and attested (t0, t1) models. */
+  pii_on_sovereign: boolean;
   semantic_cache: SemanticCacheMode;
   /**
    * Share of the flat caliban/auto price billed for a cache hit, as a percent
@@ -29,6 +31,7 @@ function savedSettings(t: Tenant): Settings {
   return {
     pii_default: t.pii_default ?? 'reversible',
     pii_surrogate_scope: t.pii_surrogate_scope ?? 'tenant',
+    pii_on_sovereign: t.pii_on_sovereign ?? false,
     semantic_cache: t.semantic_cache ?? 'off',
     // Rounded so 0.1 shows as 10, not 10.000000000000002.
     cache_hit_percent: f == null ? '' : String(Number((f * 100).toFixed(4))),
@@ -52,6 +55,9 @@ function changes(saved: Settings, draft: Settings): TenantUpdate {
   if (draft.pii_surrogate_scope !== saved.pii_surrogate_scope) {
     body.pii_surrogate_scope = draft.pii_surrogate_scope;
   }
+  if (draft.pii_on_sovereign !== saved.pii_on_sovereign) {
+    body.pii_on_sovereign = draft.pii_on_sovereign;
+  }
   if (draft.semantic_cache !== saved.semantic_cache) body.semantic_cache = draft.semantic_cache;
   const pct = draft.cache_hit_percent.trim();
   if (pct === '') {
@@ -65,7 +71,8 @@ function changes(saved: Settings, draft: Settings): TenantUpdate {
 
 /**
  * "Privacy and caching" settings on the tenant detail page: PII default,
- * surrogate scope, the semantic cache and the caliban/auto cache-hit price.
+ * surrogate scope, PII on sovereign models, the semantic cache and the
+ * caliban/auto cache-hit price.
  * Saved with PATCH /tenants/{id},
  * which the server audits as `tenant.update`.
  */
@@ -137,7 +144,7 @@ export function TenantSettingsSection({
         aria-label="Privacy and caching settings"
         className="flex flex-col gap-4 p-4"
       >
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <Field
             label="PII default mode"
             hint="Reversible pseudonymizes before the model and restores in the response."
@@ -176,6 +183,27 @@ export function TenantSettingsSection({
                   </option>
                 ))}
               </Select>
+            )}
+          </Field>
+          <Field
+            label="PII mode on sovereign models"
+            hint={
+              <>
+                Off by default: sovereign and attested models (trust tiers t0 and t1) are inside the
+                trust boundary and get the text as is. On applies the PII mode to them too. External
+                models always get it, and a node&apos;s{' '}
+                <code className="font-mono">guardrails.pii</code> applies to every model.
+              </>
+            }
+          >
+            {({ id, describedBy }) => (
+              <Switch
+                id={id}
+                aria-describedby={describedBy}
+                checked={values.pii_on_sovereign}
+                disabled={locked}
+                onChange={(on) => edit({ pii_on_sovereign: on })}
+              />
             )}
           </Field>
           <Field
