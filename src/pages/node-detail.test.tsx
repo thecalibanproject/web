@@ -399,4 +399,53 @@ describe('NodeDetailPage', () => {
       expect(screen.queryByRole('region', { name: 'Data access' })).not.toBeInTheDocument();
     });
   });
+
+  describe('answer and model calls', () => {
+    it('shows the answer guard and, per model vertex, reasoning and structured output', async () => {
+      const workflow: Node = {
+        ...v1,
+        spec: {
+          kind: 'workflow',
+          model_policy: { reasoning: 'low' },
+          guardrails: { answer: 'off', pii: 'mask' },
+          graph: {
+            vertices: [
+              { id: 'classify', type: 'router', config: { reasoning: 'off' } },
+              { id: 'lookup', type: 'tool', config: { tool: 'mcp://catalogue/search' } },
+              {
+                id: 'recommend',
+                type: 'llm',
+                config: { output_schema: { type: 'object' }, structured_output: 'prompt' },
+              },
+            ],
+          },
+          budgets: spec.budgets,
+        },
+      };
+      await openAs(null, [workflow, v2]);
+      const card = screen.getByRole('region', { name: 'Answer and model calls' });
+      expect(card).toHaveTextContent('Answer and model calls of v1');
+      expect(card).toHaveTextContent('what the node reads can steer what it tells the user');
+      expect(card).toHaveTextContent('mask on every model call, sovereign models included');
+      const rows = within(within(card).getByRole('table', { name: 'Model vertices' })).getAllByRole(
+        'row',
+      );
+      expect(rows).toHaveLength(3);
+      expect(rows[1]).toHaveTextContent(/^classifyrouteroffConstrained decoding$/);
+      expect(rows[2]).toHaveTextContent(/^recommendllmlow \(node default\)In the prompt$/);
+    });
+
+    it('shows the default answer guard of an agent, in its spec too', async () => {
+      const user = userEvent.setup();
+      await openAs(null);
+      const card = screen.getByRole('region', { name: 'Answer and model calls' });
+      expect(card).toHaveTextContent('redact(default)');
+      expect(within(card).queryByRole('table')).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'View spec of v1' }));
+      const drawer = await screen.findByRole('dialog', { name: 'triage v1' });
+      expect(
+        within(drawer).getByRole('region', { name: 'Answer and model calls' }),
+      ).toHaveTextContent("the tenant's PII settings apply");
+    });
+  });
 });

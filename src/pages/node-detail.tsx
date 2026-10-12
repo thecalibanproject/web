@@ -7,6 +7,7 @@ import type { Node } from '@/api/types';
 import { EvalsPanel } from '@/components/evals/evals-panel';
 import { LiveBadge, NodeStateBadge } from '@/components/nodes/node-badges';
 import { NodeEditor } from '@/components/nodes/node-editor';
+import { NodeBehavior } from '@/components/nodes/node-behavior';
 import { NodeScopes } from '@/components/nodes/node-scopes';
 import { VersionDialog, type VersionAction } from '@/components/nodes/version-dialogs';
 import { VersionDiff } from '@/components/nodes/version-diff';
@@ -89,6 +90,10 @@ function SpecDetails({ tenantId, version: v }: { tenantId: string; version: Node
         <h3 className="text-[12.5px] font-medium">Data access</h3>
         <NodeScopes tenantId={tenantId} spec={v.spec} />
       </section>
+      <section aria-label="Answer and model calls" className="mb-4 flex flex-col gap-1.5">
+        <h3 className="text-[12.5px] font-medium">Answer and model calls</h3>
+        <NodeBehavior spec={v.spec} />
+      </section>
     </>
   );
 }
@@ -112,6 +117,21 @@ function DataAccessCard({ tenantId, version: v }: { tenantId: string; version: N
       />
       <div className="px-4 py-3">
         <NodeScopes tenantId={tenantId} spec={v.spec} />
+      </div>
+    </Card>
+  );
+}
+
+/** The answer guard and the model calls of the live version (or the latest). */
+function BehaviorCard({ version: v }: { version: Node }) {
+  return (
+    <Card role="region" aria-label="Answer and model calls" className="mt-6">
+      <CardHeader
+        title={`Answer and model calls of v${v.version}`}
+        description={v.live ? 'The live version.' : 'The latest version (none is live).'}
+      />
+      <div className="px-4 py-3">
+        <NodeBehavior spec={v.spec} />
       </div>
     </Card>
   );
@@ -342,6 +362,7 @@ export function NodeDetailPage() {
                 </Table>
               </Card>
               {current && <DataAccessCard tenantId={tenantId} version={current} />}
+              {current && <BehaviorCard version={current} />}
               <VersionDiff
                 tenantId={tenantId}
                 name={nodeName}
