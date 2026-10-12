@@ -16,9 +16,31 @@ describe('policyFromForm', () => {
       maxCostPerSuccess: '0.02',
       maxP95: '',
       injectionMinPassRate: '',
+      injectionReadOnly: 'required',
     });
     expect(r.policy).toEqual({
       golden: { min_pass_k: 0.9, min_k: 3, max_cost_per_success_usd: 0.02 },
+    });
+  });
+
+  it('makes the injection eval optional for read-only versions, on the default bar', () => {
+    const form = {
+      minPassK: '',
+      minK: '',
+      maxCostPerSuccess: '',
+      maxP95: '',
+      injectionMinPassRate: '',
+      injectionReadOnly: 'optional' as const,
+    };
+    expect(policyFromForm(form).policy).toEqual({
+      injection: { min_pass_rate: 1, read_only: 'optional' },
+    });
+    expect(policyFromForm({ ...form, injectionMinPassRate: '95' }).policy).toEqual({
+      injection: { min_pass_rate: 0.95, read_only: 'optional' },
+    });
+    expect(policyForm({ injection: { min_pass_rate: 1, read_only: 'optional' } })).toMatchObject({
+      injectionReadOnly: 'optional',
+      injectionMinPassRate: '100',
     });
   });
 
@@ -29,6 +51,7 @@ describe('policyFromForm', () => {
       maxCostPerSuccess: '0',
       maxP95: '',
       injectionMinPassRate: '120',
+      injectionReadOnly: 'required',
     });
     expect(r.errors).toEqual({
       minPassK: 'Set the least pass^k to use the other golden bars.',

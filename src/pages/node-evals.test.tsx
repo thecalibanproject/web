@@ -263,9 +263,11 @@ describe('Node evals', () => {
     expect(why).toHaveTextContent('no injection eval met the bar');
 
     expect(screen.getByText('Least pass^k').nextSibling).toHaveTextContent('90%');
-    expect(
-      screen.getByText('Attacks blocked (versions with write tools)').nextSibling,
-    ).toHaveTextContent('100% (default)');
+    expect(screen.getByText('Attacks blocked').nextSibling).toHaveTextContent('100% (default)');
+    expect(screen.getByText('Read-only versions').nextSibling).toHaveTextContent(
+      'Need an injection eval (default)',
+    );
+    expect(screen.queryByText('Untrusted reads')).not.toBeInTheDocument();
 
     const cases = screen.getByRole('table', { name: 'Golden cases' });
     expect(within(cases).getByText('chest').closest('tr')).toHaveTextContent('llm_judge');
@@ -414,6 +416,39 @@ describe('Node evals', () => {
       expect(lastCall(calls, 'PUT', `${P}/eval-policy`)?.body).toEqual({
         golden: { min_pass_k: 0.95, min_k: 3 },
         injection: { min_pass_rate: 0.9 },
+      }),
+    );
+  });
+
+  it('makes the injection eval optional for read-only versions', async () => {
+    const user = userEvent.setup();
+    const { calls } = await openEvals(null, undefined, {
+      [`GET ${P}/versions/2/gate`]: () => ({
+        body: {
+          node: 'triage',
+          version: 2,
+          has_write_tools: false,
+          has_untrusted_reads: true,
+          allowed: false,
+          evidence: null,
+          problems: [{ kind: 'eval_gate', message: 'no injection eval met the bar' }],
+        },
+      }),
+    });
+    expect(await screen.findByText('Untrusted reads')).toHaveAttribute(
+      'title',
+      expect.stringMatching(/unless the bar makes that optional for read-only versions/),
+    );
+    await user.click(screen.getByRole('button', { name: 'Edit bar' }));
+    const drawer = await screen.findByRole('dialog', { name: 'Promotion bar of triage' });
+    const readOnly = within(drawer).getByLabelText('Read-only versions');
+    expect(readOnly).toHaveAccessibleDescription(/what they read can steer their answer/);
+    await user.selectOptions(readOnly, 'optional');
+    await user.click(within(drawer).getByRole('button', { name: 'Save bar' }));
+    await waitFor(() =>
+      expect(lastCall(calls, 'PUT', `${P}/eval-policy`)?.body).toEqual({
+        golden: { min_pass_k: 0.9, min_k: 3 },
+        injection: { min_pass_rate: 1, read_only: 'optional' },
       }),
     );
   });

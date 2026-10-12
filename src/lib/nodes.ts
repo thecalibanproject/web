@@ -98,7 +98,7 @@ export const PROBLEM_KIND: Record<ProblemKind, { label: string; hint: string }> 
   },
   gate: {
     label: 'Promotion bar not met',
-    hint: "Run the version's evals on the node's Evals tab until its latest evals meet the bar. A version with write tools always needs an injection eval. Someone with nodes.publish can change the bar. A draft is published without making it live, evaluated, then made live.",
+    hint: "Run the version's evals on the node's Evals tab until its latest evals meet the bar. A version with write tools always needs an injection eval, and so does a read-only version whose tools bring data in, unless the bar makes it optional for those. Someone with nodes.publish can change the bar. A draft is published without making it live, evaluated, then made live.",
   },
   golden: {
     label: 'Golden set',

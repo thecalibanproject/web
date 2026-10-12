@@ -91,6 +91,8 @@ export interface PolicyForm {
   maxCostPerSuccess: string;
   maxP95: string;
   injectionMinPassRate: string;
+  /** Whether read-only versions (read tools, no write tool) need an injection eval. */
+  injectionReadOnly: 'required' | 'optional';
 }
 
 const pct = (r: number | undefined) => (r == null ? '' : String(Math.round(r * 10000) / 100));
@@ -103,16 +105,21 @@ export function policyForm(p: EvalPolicy | undefined): PolicyForm {
       p?.golden?.max_cost_per_success_usd != null ? String(p.golden.max_cost_per_success_usd) : '',
     maxP95: p?.golden?.max_p95_latency_ms != null ? String(p.golden.max_p95_latency_ms) : '',
     injectionMinPassRate: pct(p?.injection?.min_pass_rate),
+    injectionReadOnly: p?.injection?.read_only ?? 'required',
   };
 }
+
+/** The text fields of the bar form. */
+export type PolicyTextField = Exclude<keyof PolicyForm, 'injectionReadOnly'>;
+export type PolicyErrors = Partial<Record<PolicyTextField, string>>;
 
 /** The bar to PUT, or every reason it cannot be saved. */
 export function policyFromForm(
   f: PolicyForm,
-): { policy: EvalPolicy; errors: null } | { policy: null; errors: Partial<PolicyForm> } {
-  const errors: Partial<PolicyForm> = {};
+): { policy: EvalPolicy; errors: null } | { policy: null; errors: PolicyErrors } {
+  const errors: PolicyErrors = {};
   const n = (s: string) => (s.trim() === '' ? undefined : Number(s.trim()));
-  const percent = (key: keyof PolicyForm) => {
+  const percent = (key: PolicyTextField) => {
     const v = n(f[key]);
     if (v === undefined) return undefined;
     if (!Number.isFinite(v) || v < 0 || v > 100) {
@@ -149,7 +156,13 @@ export function policyFromForm(
       ...(p95 !== undefined ? { max_p95_latency_ms: p95 } : {}),
     };
   }
-  if (injection !== undefined) policy.injection = { min_pass_rate: injection };
+  // `optional` needs a bar to sit in: the default, every attack blocked.
+  if (injection !== undefined || f.injectionReadOnly === 'optional') {
+    policy.injection = {
+      min_pass_rate: injection ?? 1,
+      ...(f.injectionReadOnly === 'optional' ? { read_only: 'optional' as const } : {}),
+    };
+  }
   return { policy, errors: null };
 }
 

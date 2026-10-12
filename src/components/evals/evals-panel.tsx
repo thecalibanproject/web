@@ -13,7 +13,9 @@ import {
   NO_RUN,
   policyForm,
   policyFromForm,
+  type PolicyErrors,
   type PolicyForm,
+  type PolicyTextField,
 } from '@/lib/evals';
 import { EMPTY, formatDateTime, formatMs, formatPercent, formatUsd } from '@/lib/format';
 import { deniedReason } from '@/lib/permissions';
@@ -115,11 +117,20 @@ function GateCard({
                   Write tools
                 </Badge>
               )}
+              {g?.has_untrusted_reads && !g.has_write_tools && (
+                <Badge
+                  tone="info"
+                  title="Read tools that bring data in (MCP, datasource_query, rag_search): what it reads can steer its answer, so it needs an injection eval unless the bar makes that optional for read-only versions."
+                >
+                  Untrusted reads
+                </Badge>
+              )}
               {version.live && <LiveBadge />}
             </p>
             {g?.allowed && evidence.length === 0 && (
               <p className="text-fg-muted">
-                No bar applies: the node sets no golden bar and the version has no write tools.
+                No bar applies: the node sets no golden bar, and the version has no write tools and
+                no reads that need an injection eval.
               </p>
             )}
             {evidence.length > 0 && (
@@ -179,8 +190,8 @@ function PolicyEditor({
 }) {
   const put = usePutEvalPolicy(tenantId, name);
   const [form, setForm] = useState(initial);
-  const [errors, setErrors] = useState<Partial<PolicyForm>>({});
-  const set = (k: keyof PolicyForm) => (v: string) => {
+  const [errors, setErrors] = useState<PolicyErrors>({});
+  const set = (k: PolicyTextField) => (v: string) => {
     setForm((f) => ({ ...f, [k]: v }));
     setErrors((e) => ({ ...e, [k]: undefined }));
   };
@@ -193,7 +204,7 @@ function PolicyEditor({
     }
     put.mutate(r.policy, { onSuccess: onClose });
   };
-  const field = (k: keyof PolicyForm, label: string, hint: string, unit?: string) => (
+  const field = (k: PolicyTextField, label: string, hint: string, unit?: string) => (
     <Field label={label} hint={hint} error={errors[k]}>
       {({ id, describedBy, invalid }) => (
         <span className="flex items-center gap-2">
@@ -244,6 +255,28 @@ function PolicyEditor({
           'Empty: 100%, every attack blocked. Versions with write tools always need an injection eval, whatever the bar.',
           '%',
         )}
+        <Field
+          label="Read-only versions"
+          hint="Versions with read tools that bring data in (MCP, datasource_query, rag_search) and no write tool: what they read can steer their answer, their only effect. Optional lets them be made live without an injection eval; one that ran is still checked against the bar."
+        >
+          {({ id, describedBy }) => (
+            <Select
+              id={id}
+              aria-describedby={describedBy}
+              value={form.injectionReadOnly}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  injectionReadOnly: e.target.value === 'optional' ? 'optional' : 'required',
+                }))
+              }
+              className="w-auto"
+            >
+              <option value="required">Need an injection eval (default)</option>
+              <option value="optional">Injection eval optional</option>
+            </Select>
+          )}
+        </Field>
         <FormError error={put.error} />
       </form>
     </Drawer>
@@ -272,8 +305,14 @@ function PolicyCard({ tenantId, name }: { tenantId: string; name: string }) {
       ]
     : [['Golden bar', 'none']];
   rows.push([
-    'Attacks blocked (versions with write tools)',
+    'Attacks blocked',
     `${pctText(q.data?.injection_bar) ?? EMPTY}${p?.injection ? '' : ' (default)'}`,
+  ]);
+  rows.push([
+    'Read-only versions',
+    p?.injection?.read_only === 'optional'
+      ? 'Injection eval optional'
+      : 'Need an injection eval (default)',
   ]);
   return (
     <Card>
