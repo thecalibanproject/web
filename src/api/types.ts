@@ -92,6 +92,24 @@ export type ToolImport =
   paths['/api/v1/tenants/{tenantId}/tool-servers/{server}/tools']['post']['requestBody']['content']['application/json'];
 export type ToolApproved =
   paths['/api/v1/tenants/{tenantId}/tool-servers/{server}/tools/{tool}/approve']['post']['responses'][200]['content']['application/json'];
+export type RagCollection = S['RagCollection'];
+export type RagCollectionCreate = S['RagCollectionCreate'];
+export type RagCollectionSettings = S['RagCollectionSettings'];
+export type RagTrust = NonNullable<RagCollectionSettings['default_trust']>;
+/** `GET .../rag/collections/{c}`: the collection and the published versions that search it. */
+export type RagCollectionDetail =
+  paths['/api/v1/tenants/{tenantId}/rag/collections/{collection}']['get']['responses'][200]['content']['application/json'];
+export type RagDocument = S['RagDocument'];
+export type RagDocumentStatus = S['RagDocumentStatus'];
+export type RagFinding = S['RagFinding'];
+export type RagDocumentIngest = S['RagDocumentIngest'];
+/** `GET .../documents`: the newest version of each document, with the version served. */
+export type RagDocumentPage =
+  paths['/api/v1/tenants/{tenantId}/rag/collections/{collection}/documents']['get']['responses'][200]['content']['application/json'];
+export type RagDocumentSummary = RagDocumentPage['documents'][number];
+/** `GET .../documents/{docId}`: every version, newest first. */
+export type RagDocumentVersions =
+  paths['/api/v1/tenants/{tenantId}/rag/collections/{collection}/documents/{docId}']['get']['responses'][200]['content']['application/json'];
 export type ApiKeyCreate = NonNullable<
   paths['/api/v1/tenants/{tenantId}/api-keys']['post']['requestBody']
 >['content']['application/json'];
@@ -194,6 +212,18 @@ export const TOOL_FINDING_KINDS = [
   'url',
   'exfiltration',
 ] as const satisfies readonly ToolFindingKind[];
+
+export const RAG_TRUSTS = ['trusted', 'untrusted'] as const satisfies readonly RagTrust[];
+
+export const RAG_DOCUMENT_STATUSES = [
+  'pending',
+  'indexing',
+  'ready',
+  'quarantined',
+  'failed',
+  'superseded',
+  'deleted',
+] as const satisfies readonly RagDocumentStatus[];
 
 export const CACHE_STATUSES = ['hit', 'miss', 'bypass'] as const satisfies readonly CacheStatus[];
 
