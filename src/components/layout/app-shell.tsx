@@ -17,6 +17,7 @@ import {
   IconNodes,
   IconOntology,
   IconOverview,
+  IconRetrieval,
   IconRuns,
   IconSettings,
   IconTenants,
@@ -37,6 +38,7 @@ type NavTo =
   | '/runs'
   | '/inbox'
   | '/tools'
+  | '/rag'
   | '/usage'
   | '/audit'
   | '/users'
@@ -62,6 +64,7 @@ const NAV: Array<{
   { to: '/runs', label: 'Runs', icon: IconRuns, perm: 'runs.read' },
   { to: '/inbox', label: 'Inbox', icon: IconInbox, perm: 'runs.read' },
   { to: '/tools', label: 'Tools', icon: IconTools, perm: 'tools.read' },
+  { to: '/rag', label: 'Retrieval', icon: IconRetrieval, perm: 'rag.read' },
   { to: '/usage', label: 'Usage', icon: IconUsage, perm: 'usage.read' },
   { to: '/audit', label: 'Audit', icon: IconAudit, perm: 'audit.read' },
   { to: '/users', label: 'Users and roles', icon: IconUsers, perm: 'rbac.read' },

@@ -148,6 +148,25 @@ const toolsRoute = createRoute({
   component: lazyRouteComponent(() => import('@/pages/tools'), 'ToolsPage'),
 });
 
+export interface RagSearch {
+  tenant?: string;
+  /** The collection whose documents are shown. */
+  collection?: string;
+  /** The document open in the drawer. */
+  doc?: string;
+}
+
+const ragRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: 'rag',
+  validateSearch: (s: Record<string, unknown>): RagSearch => ({
+    tenant: str(s.tenant),
+    collection: str(s.collection),
+    doc: str(s.doc),
+  }),
+  component: lazyRouteComponent(() => import('@/pages/rag'), 'RagPage'),
+});
+
 const posInt = (v: unknown): number | undefined => {
   const n = Number(v);
   return Number.isInteger(n) && n > 0 ? n : undefined;
@@ -287,6 +306,7 @@ export const routeTree = rootRoute.addChildren([
     runDetailRoute,
     inboxRoute,
     toolsRoute,
+    ragRoute,
     usageRoute,
     auditRoute,
     usersRoute,

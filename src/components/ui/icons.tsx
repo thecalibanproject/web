@@ -85,6 +85,14 @@ export const IconTools = (p: IconProps) => (
     <path d="m3 21 4.5-4.5" />
   </Svg>
 );
+export const IconRetrieval = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 19.5V5a2 2 0 0 1 2-2h11v14H6a2 2 0 0 0-2 2.5Z" />
+    <path d="M6 21h11" />
+    <circle cx="16.5" cy="16.5" r="3" />
+    <path d="m21 21-2.4-2.4" />
+  </Svg>
+);
 export const IconUsage = (p: IconProps) => (
   <Svg {...p}>
     <path d="M3 3v18h18" />

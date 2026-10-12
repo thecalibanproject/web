@@ -1,0 +1,260 @@
+import { useQuery } from '@tanstack/react-query';
+import { useState, type ReactNode } from 'react';
+import { usePermissions } from '@/api/auth';
+import { ragDocumentQuery, useReleaseRagDocument } from '@/api/queries';
+import type { RagCollection, RagDocument, RagFinding } from '@/api/types';
+import { EMPTY, formatDateTime, formatInt } from '@/lib/format';
+import { deniedReason } from '@/lib/permissions';
+import {
+  contentTypeLabel,
+  findingHint,
+  findingLabel,
+  formatBytes,
+  formatSeconds,
+  settingsOf,
+  vettingOf,
+} from '@/lib/rag';
+import { Badge, Checkbox, ErrorState, FormError, GatedButton, LoadingState } from '../ui';
+import { IconAlert, IconCheck } from '../ui/icons';
+import { DocumentStatusBadge, TrustBadge, VettingBadge } from './rag-badges';
+
+/** What the ingest checks flagged in a version. No excerpts: document text stays sealed. */
+function Findings({
+  findings,
+  acknowledged,
+  quarantined,
+  trusted,
+}: {
+  findings: RagFinding[];
+  acknowledged: boolean;
+  quarantined: boolean;
+  trusted: boolean;
+}) {
+  return (
+    <section
+      aria-label="Scan findings"
+      className="rounded-md border border-danger/50 bg-danger-soft p-3 text-[12.5px]"
+    >
+      <h4 className="flex items-center gap-1.5 text-[13px] font-semibold text-danger">
+        <IconAlert size={15} className="shrink-0" />
+        The ingest checks flagged {findings.length} finding{findings.length === 1 ? '' : 's'}
+      </h4>
+      <p className="mt-1 text-fg-muted">
+        {quarantined
+          ? 'This version is quarantined: rag_search does not see it. '
+          : trusted && !acknowledged
+            ? 'The source is trusted, so these findings were recorded without quarantining it. '
+            : ''}
+        The document text stays sealed, so a finding names the chunk it is in, not the text: check
+        that part of the original before releasing it.
+        {acknowledged && ' An approver acknowledged these findings.'}
+      </p>
+      <ul className="mt-2.5 flex flex-col gap-2">
+        {findings.map((f, i) => (
+          <li
+            key={i}
+            className="flex flex-col gap-1 rounded border border-danger/30 bg-surface p-2.5"
+          >
+            <span className="flex flex-wrap items-center gap-2">
+              <Badge tone="danger">{findingLabel(f.kind)}</Badge>
+              <span className="text-[12px] text-fg-muted">chunk {f.chunk + 1}</span>
+            </span>
+            <span className="text-[12px] text-fg-subtle">{findingHint(f.kind)}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** Releasing a quarantined version: the findings acknowledged, by someone with rag.approve. */
+function Release({
+  tenantId,
+  collection,
+  doc,
+}: {
+  tenantId: string;
+  collection: RagCollection;
+  doc: RagDocument;
+}) {
+  const release = useReleaseRagDocument(tenantId, collection.name);
+  const [ack, setAck] = useState(false);
+  const denied = deniedReason(usePermissions(), 'rag.approve', tenantId);
+  const vetting = vettingOf(doc, collection);
+  const deadline = formatSeconds(settingsOf(collection).vet_deadline_secs);
+
+  if (release.isSuccess) {
+    return (
+      <p role="status" className="text-[12.5px] text-ok">
+        Released. Version {doc.version} is indexed again with its findings acknowledged, and
+        searched once it is ready.
+      </p>
+    );
+  }
+  return (
+    <section
+      aria-label="Release"
+      className="flex flex-col gap-3 rounded-md border border-border p-3 text-[12.5px]"
+    >
+      <p className="text-fg-muted">
+        Releasing indexes this version again with its findings acknowledged; it is searched once
+        ready. The release is recorded in the audit log with the findings. Passages from it still
+        carry the <code className="font-mono">retrieved</code> taint label, so a write they inspire
+        needs an allowlist entry or a human approval.
+      </p>
+      {vetting.kind === 'missed' && (
+        <p className="flex items-start gap-2 rounded-md bg-warn-soft px-3 py-2 text-fg">
+          <IconAlert size={14} className="mt-0.5 shrink-0 text-warn" />
+          This untrusted version was ingested more than {deadline} ago, the collection&apos;s
+          vetting deadline. The deadline counts from ingest, so a worker fails the version instead
+          of indexing it once released. Ingest the document again instead.
+        </p>
+      )}
+      {vetting.kind === 'open' && (
+        <p className="flex items-start gap-2 rounded-md bg-warn-soft px-3 py-2 text-fg">
+          <IconAlert size={14} className="mt-0.5 shrink-0 text-warn" />
+          The vetting deadline counts from ingest: release it within {vetting.remaining}, or the
+          worker fails it instead of indexing it.
+        </p>
+      )}
+      <Checkbox
+        label="I have read these findings and release this document"
+        checked={ack}
+        disabled={Boolean(denied)}
+        onChange={(e) => {
+          setAck(e.target.checked);
+          release.reset();
+        }}
+      />
+      <FormError error={release.error} />
+      <span>
+        <GatedButton
+          variant="primary"
+          deniedReason={denied}
+          loading={release.isPending}
+          disabled={!ack}
+          onClick={() => release.mutate({ docId: doc.doc_id, version: doc.version })}
+        >
+          Release document
+        </GatedButton>
+      </span>
+    </section>
+  );
+}
+
+function Version({
+  tenantId,
+  collection,
+  doc,
+  live,
+}: {
+  tenantId: string;
+  collection: RagCollection;
+  doc: RagDocument;
+  live: boolean;
+}) {
+  const quarantined = doc.status === 'quarantined';
+  const rows: Array<[string, ReactNode]> = [
+    ['Trust', <TrustBadge key="t" trust={doc.trust} />],
+    ['Vetting deadline', <VettingBadge key="v" vetting={vettingOf(doc, collection)} />],
+    ['Format', contentTypeLabel(doc.content_type)],
+    ['Size', formatBytes(doc.bytes)],
+    ['Chunks', formatInt(doc.chunks)],
+    ['Tokens (estimated)', formatInt(doc.tokens)],
+    ['Personal data', `${formatInt(doc.pii_entities)} pseudonymised before embedding`],
+    ['Source', doc.source || EMPTY],
+    ['Valid from', formatDateTime(doc.valid_from)],
+    ['Valid until', formatDateTime(doc.valid_to)],
+    ['Ingested', `${formatDateTime(doc.created_at)} by ${doc.created_by}`],
+    ['Indexed', formatDateTime(doc.indexed_at)],
+    ['Attempts', formatInt(doc.attempts)],
+  ];
+  if (doc.released_at) {
+    rows.push(['Released', `${formatDateTime(doc.released_at)} by ${doc.released_by ?? EMPTY}`]);
+  }
+
+  return (
+    <section
+      aria-label={`Version ${doc.version}`}
+      className="flex flex-col gap-3 rounded-md border border-border p-3"
+    >
+      <h3 className="flex flex-wrap items-center gap-2 text-[13px] font-semibold">
+        <Badge>v{doc.version}</Badge>
+        <DocumentStatusBadge status={doc.status} />
+        {live && (
+          <Badge tone="accent" title="The version rag_search serves.">
+            Searched
+          </Badge>
+        )}
+      </h3>
+      {doc.error && (
+        <p className="flex items-start gap-2 rounded-md bg-danger-soft px-3 py-2 text-[12.5px] text-fg">
+          <IconAlert size={14} className="mt-0.5 shrink-0 text-danger" />
+          {doc.error}
+        </p>
+      )}
+      {doc.findings.length > 0 ? (
+        <Findings
+          findings={doc.findings}
+          acknowledged={doc.findings_acknowledged}
+          quarantined={quarantined}
+          trusted={doc.trust === 'trusted'}
+        />
+      ) : (
+        doc.status === 'ready' && (
+          <p className="flex items-start gap-2 rounded-md bg-ok-soft px-3 py-2 text-[12.5px] text-fg">
+            <IconCheck size={14} className="mt-0.5 shrink-0 text-ok" />
+            The ingest checks found nothing.
+          </p>
+        )
+      )}
+      {quarantined && <Release tenantId={tenantId} collection={collection} doc={doc} />}
+      <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 text-[12.5px]">
+        {rows.map(([k, v]) => (
+          <div key={k} className="contents">
+            <dt className="text-fg-muted">{k}</dt>
+            <dd className="min-w-0 break-words">{v}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+/**
+ * Every version of a document, newest first: state, indexing figures, scan
+ * findings, and the release of a quarantined version. Never the content.
+ */
+export function DocumentReview({
+  tenantId,
+  collection,
+  docId,
+}: {
+  tenantId: string;
+  collection: RagCollection;
+  docId: string;
+}) {
+  const doc = useQuery(ragDocumentQuery(tenantId, collection.name, docId));
+  if (doc.isPending) return <LoadingState rows={3} />;
+  if (doc.isError) return <ErrorState error={doc.error} onRetry={() => void doc.refetch()} />;
+  const { versions, live_version: live } = doc.data;
+  return (
+    <div className="flex flex-col gap-4 text-[13px]">
+      <p className="text-[12.5px] text-fg-muted">
+        {live != null
+          ? `rag_search serves version ${live}.`
+          : 'No version is ready: rag_search does not see this document.'}{' '}
+        The content is sealed under the tenant&apos;s key and never shown.
+      </p>
+      {versions.map((v) => (
+        <Version
+          key={v.version}
+          tenantId={tenantId}
+          collection={collection}
+          doc={v}
+          live={v.version === live}
+        />
+      ))}
+    </div>
+  );
+}

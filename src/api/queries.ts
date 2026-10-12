@@ -5,6 +5,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { isEvalActive } from '@/lib/evals';
+import { isDocumentActive } from '@/lib/rag';
 import {
   isRunActive,
   sinceIso,
@@ -22,6 +23,9 @@ import type {
   ModelCreate,
   Node,
   ProviderKeyCreate,
+  RagCollectionCreate,
+  RagDocumentIngest,
+  RagDocumentStatus,
   RoleBindingCreate,
   ReviewDecision,
   SharedProviderCreate,
@@ -64,6 +68,18 @@ export const qk = {
   toolServers: (tenantId: string) => ['tool-servers', tenantId] as const,
   toolManifests: (tenantId: string, server: string) =>
     ['tool-servers', tenantId, server, 'tools'] as const,
+  /** Prefix of every retrieval query of a tenant: collections and their documents. */
+  rag: (tenantId: string) => ['rag', tenantId] as const,
+  ragCollections: (tenantId: string) => ['rag', tenantId, 'collections'] as const,
+  ragCollection: (tenantId: string, collection: string) =>
+    ['rag', tenantId, 'collection', collection] as const,
+  /** Prefix of a collection's document lists (every status filter). */
+  ragDocuments: (tenantId: string, collection: string) =>
+    ['rag', tenantId, 'collection', collection, 'documents'] as const,
+  ragDocumentList: (tenantId: string, collection: string, status: RagDocumentStatus | undefined) =>
+    ['rag', tenantId, 'collection', collection, 'documents', { status }] as const,
+  ragDocument: (tenantId: string, collection: string, docId: string) =>
+    ['rag', tenantId, 'collection', collection, 'document', docId] as const,
   usage: (tenantId: string | undefined, limit: number, filter: UsageFilter = {}) =>
     ['usage', tenantId ?? 'all', limit, filter] as const,
   audit: (limit: number) => ['audit', limit] as const,
@@ -262,6 +278,78 @@ export const toolManifestsQuery = (tenantId: string, server: string) =>
           params: { path: { tenantId, server } },
         }),
       ),
+  });
+
+/** Documents refresh this often while one of them waits for, or is being indexed by, a worker. */
+export const RAG_POLL_MS = 5_000;
+
+/** The tenant's document collections. */
+export const ragCollectionsQuery = (tenantId: string) =>
+  queryOptions({
+    queryKey: qk.ragCollections(tenantId),
+    queryFn: () =>
+      unwrap(
+        api.GET('/api/v1/tenants/{tenantId}/rag/collections', { params: { path: { tenantId } } }),
+      ),
+  });
+
+/** One collection, with the published node versions that search it (`used_by`). */
+export const ragCollectionQuery = (tenantId: string, collection: string) =>
+  queryOptions({
+    queryKey: qk.ragCollection(tenantId, collection),
+    queryFn: () =>
+      unwrap(
+        api.GET('/api/v1/tenants/{tenantId}/rag/collections/{collection}', {
+          params: { path: { tenantId, collection } },
+        }),
+      ),
+  });
+
+/**
+ * The newest version of each document of a collection, a page at a time
+ * (`next_cursor`), never the content. Refreshed while a document on screen
+ * waits for, or is being indexed by, a worker.
+ */
+export const ragDocumentsQuery = (
+  tenantId: string,
+  collection: string,
+  status?: RagDocumentStatus,
+) =>
+  infiniteQueryOptions({
+    queryKey: qk.ragDocumentList(tenantId, collection, status),
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) =>
+      unwrap(
+        api.GET('/api/v1/tenants/{tenantId}/rag/collections/{collection}/documents', {
+          params: {
+            path: { tenantId, collection },
+            query: {
+              limit: 50,
+              ...(status ? { status } : {}),
+              ...(pageParam ? { cursor: pageParam } : {}),
+            },
+          },
+        }),
+      ),
+    getNextPageParam: (last) => last.next_cursor ?? undefined,
+    refetchInterval: (q) =>
+      q.state.data?.pages.some((p) => p.documents.some((d) => isDocumentActive(d.status)))
+        ? RAG_POLL_MS
+        : false,
+  });
+
+/** Every version of a document, newest first: status, chunks, findings. Never the content. */
+export const ragDocumentQuery = (tenantId: string, collection: string, docId: string) =>
+  queryOptions({
+    queryKey: qk.ragDocument(tenantId, collection, docId),
+    queryFn: () =>
+      unwrap(
+        api.GET('/api/v1/tenants/{tenantId}/rag/collections/{collection}/documents/{docId}', {
+          params: { path: { tenantId, collection, docId } },
+        }),
+      ),
+    refetchInterval: (q) =>
+      q.state.data?.versions.some((v) => isDocumentActive(v.status)) ? RAG_POLL_MS : false,
   });
 
 export const usageQuery = (tenantId: string | undefined, limit = 100, filter: UsageFilter = {}) =>
@@ -564,6 +652,7 @@ export function useDeleteTenant() {
         qc.invalidateQueries({ queryKey: ['datasources'] }),
         qc.invalidateQueries({ queryKey: qk.nodesAll }),
         qc.invalidateQueries({ queryKey: ['tool-servers', tenantId] }),
+        qc.invalidateQueries({ queryKey: qk.rag(tenantId) }),
       ]);
     },
   });
@@ -882,6 +971,103 @@ export function useRevokeTool(tenantId: string, server: string) {
         }),
       ),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.toolManifests(tenantId, server) }),
+  });
+}
+
+/** Creates a document collection (audited as `rag.collection.create`). */
+export function useCreateRagCollection(tenantId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: RagCollectionCreate) =>
+      unwrap(
+        api.POST('/api/v1/tenants/{tenantId}/rag/collections', {
+          params: { path: { tenantId } },
+          body,
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.ragCollections(tenantId) }),
+  });
+}
+
+/** Deletes a collection and its documents. A 409 while a published node version names it. */
+export function useDeleteRagCollection(tenantId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (collection: string) =>
+      deleteOrGone(
+        api.DELETE('/api/v1/tenants/{tenantId}/rag/collections/{collection}', {
+          params: { path: { tenantId, collection } },
+        }),
+      ),
+    onSuccess: (_outcome, collection) => {
+      qc.removeQueries({ queryKey: qk.ragCollection(tenantId, collection) });
+      return qc.invalidateQueries({ queryKey: qk.ragCollections(tenantId) });
+    },
+  });
+}
+
+/**
+ * Ingests a document: a new pending version (202), or the newest version
+ * unchanged (200, `unchanged: true`) when the content and settings are the same.
+ */
+export function useIngestRagDocument(tenantId: string, collection: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: RagDocumentIngest) =>
+      unwrap(
+        api.POST('/api/v1/tenants/{tenantId}/rag/collections/{collection}/documents', {
+          params: { path: { tenantId, collection } },
+          body,
+        }),
+      ),
+    onSuccess: (doc) =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: qk.ragDocuments(tenantId, collection) }),
+        qc.invalidateQueries({ queryKey: qk.ragDocument(tenantId, collection, doc.doc_id) }),
+      ]),
+  });
+}
+
+/** Deletes every version of a document: it stops being searched at once. */
+export function useDeleteRagDocument(tenantId: string, collection: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (docId: string) =>
+      deleteOrGone(
+        api.DELETE('/api/v1/tenants/{tenantId}/rag/collections/{collection}/documents/{docId}', {
+          params: { path: { tenantId, collection, docId } },
+        }),
+      ),
+    onSuccess: (_outcome, docId) => {
+      qc.removeQueries({ queryKey: qk.ragDocument(tenantId, collection, docId) });
+      return qc.invalidateQueries({ queryKey: qk.ragDocuments(tenantId, collection) });
+    },
+  });
+}
+
+/**
+ * Releases a quarantined version (rag.approve): a decision about its findings,
+ * so `acknowledge_findings` is always sent. It is indexed again and served
+ * once ready.
+ */
+export function useReleaseRagDocument(tenantId: string, collection: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ docId, version }: { docId: string; version: number }) =>
+      unwrap(
+        api.POST(
+          '/api/v1/tenants/{tenantId}/rag/collections/{collection}/documents/{docId}/release',
+          {
+            params: { path: { tenantId, collection, docId } },
+            body: { version, acknowledge_findings: true },
+          },
+        ),
+      ),
+    onSuccess: (_doc, { docId }) =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: qk.ragDocuments(tenantId, collection) }),
+        qc.invalidateQueries({ queryKey: qk.ragDocument(tenantId, collection, docId) }),
+      ]),
   });
 }
 
