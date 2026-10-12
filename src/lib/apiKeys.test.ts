@@ -20,9 +20,10 @@ describe('API key access', () => {
   it('checks the allowlist and the scope format', () => {
     expect(accessError({ nodes: 'only', names: [], scopes: [] })).toMatch(/at least one node/);
     expect(accessError({ nodes: 'all', names: [], scopes: ['shop.orders:write', 'shop'] })).toBe(
-      'Scopes are <datasource>.<object>:read, such as shop.orders:read. Not valid: shop.orders:write, shop.',
+      'Scopes are <datasource>.<object>:read or rag.<collection>:read, such as shop.orders:read. Not valid: shop.orders:write, shop.',
     );
     expect(accessError({ nodes: 'all', names: [], scopes: ['shop.*:read'] })).toBeNull();
+    expect(accessError({ nodes: 'all', names: [], scopes: ['rag.handbook:read'] })).toBeNull();
   });
 
   it('reads a stored key back', () => {

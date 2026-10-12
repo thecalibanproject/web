@@ -21,7 +21,10 @@ export function accessOf(key: Pick<ApiKeyInfo, 'nodes' | 'datasource_scopes'>): 
   return { nodes, names: key.nodes ?? [], scopes: key.datasource_scopes ?? [] };
 }
 
-/** A datasource scope a key may carry: `<datasource>.<object>:read`. */
+/**
+ * A datasource scope a key may carry: `<datasource>.<object>:read`, or
+ * `rag.<collection>:read` for the document collections `rag_search` may search.
+ */
 const KEY_SCOPE = /^[^\s.:]+\.[^\s:]+:read$/;
 
 /** Splits a comma- or newline-separated list, dropping blanks and repeats. */
@@ -43,7 +46,7 @@ export function accessError(access: KeyAccess): string | null {
   }
   const bad = access.scopes.filter((s) => !KEY_SCOPE.test(s));
   if (bad.length > 0) {
-    return `Scopes are <datasource>.<object>:read, such as shop.orders:read. Not valid: ${bad.join(', ')}.`;
+    return `Scopes are <datasource>.<object>:read or rag.<collection>:read, such as shop.orders:read. Not valid: ${bad.join(', ')}.`;
   }
   return null;
 }

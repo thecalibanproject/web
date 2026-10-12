@@ -36,6 +36,10 @@ describe('permissionsOf', () => {
     expect(perms.canSomewhere('nodes.write')).toBe(true);
     expect(perms.canSomewhere('audit.read')).toBe(false);
     expect(perms.tenantsWith('api_keys.read')).toEqual(['acme']);
+    // Developers ingest documents; releasing a quarantined one is kept apart.
+    expect(perms.can('rag.write', 'acme')).toBe(true);
+    expect(perms.can('rag.approve', 'acme')).toBe(false);
+    expect(perms.can('rag.read', 'globex')).toBe(false);
     expect(perms.isOwner).toBe(false);
   });
 
@@ -46,6 +50,8 @@ describe('permissionsOf', () => {
     expect(auditor.tenantsWith('usage.read')).toBe('all');
     expect(auditor.can('rbac.read')).toBe(true);
     expect(auditor.can('rbac.write')).toBe(false);
+    expect(auditor.can('rag.read', 'any-tenant')).toBe(true);
+    expect(auditor.can('rag.write', 'any-tenant')).toBe(false);
   });
 
   it('knows owners from admins, and users without any role', () => {

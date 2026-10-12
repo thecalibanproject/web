@@ -82,7 +82,7 @@ export const PROBLEM_KIND: Record<ProblemKind, { label: string; hint: string }> 
   },
   scope: {
     label: 'Unknown datasource scope',
-    hint: 'Scopes are <datasource>.<object>:<read|write>. The datasource must be registered for this tenant, and the object must be * or an approved ontology entity bound to it.',
+    hint: 'Scopes are <datasource>.<object>:<read|write>. The datasource must be registered for this tenant, and the object must be * or an approved ontology entity bound to it. rag.<collection>:read must name a document collection of this tenant (Retrieval), and builtin://rag_search needs at least one.',
   },
   cap: {
     label: 'Over the node caps',

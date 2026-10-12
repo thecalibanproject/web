@@ -135,7 +135,7 @@ export function KeyAccessFields({
       </fieldset>
       <Field
         label="Datasource scopes"
-        hint="What the built-in datasource query tool may read in this key's runs, on top of each node's own scopes. Comma separated, such as shop.orders:read. Empty: every scope of the nodes it runs."
+        hint="What the built-in datasource query tool may read, and which document collections rag_search may search (rag.<collection>:read), in this key's runs, on top of each node's own scopes. Comma separated, such as shop.orders:read or rag.handbook:read. Empty: every scope of the nodes it runs."
       >
         {({ id, describedBy }) => (
           <Input

@@ -70,6 +70,16 @@ describe('nodeProblems', () => {
       'cap',
     ]);
     expect(kind('workflow nodes need a graph')).toEqual(['spec']);
+    expect(
+      kind(
+        'builtin://rag_search needs rag.<collection>:read scopes in datasources.scopes (what it may search)',
+      ),
+    ).toEqual(['scope']);
+    expect(
+      kind(
+        "datasource scope 'rag.handbook:read': the tenant has no document collection named 'handbook'",
+      ),
+    ).toEqual(['scope']);
     expect(nodeProblems('workflow nodes need a graph').title).toBeNull();
   });
 });
