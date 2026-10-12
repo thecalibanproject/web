@@ -43,6 +43,22 @@ describe('OntologyPage', () => {
     expect(review?.body).toEqual({ tenant_id: 't1', decision: 'approve' });
   });
 
+  it('reads the ontology only for a chosen tenant, which every read names', async () => {
+    const calls = mockApi({
+      'GET /api/v1/tenants': () => ({ body: tenants }),
+      'GET /api/v1/ontology': () => ({ body: ontology([service]) }),
+    });
+    const { router } = await renderApp('/ontology');
+    await waitFor(() => expect(calls.some((c) => c.path === '/api/v1/tenants')).toBe(true));
+    expect(calls.some((c) => c.path === '/api/v1/ontology')).toBe(false);
+
+    await router.navigate({ to: '/ontology', search: { tenant: 't1' } });
+    expect(await screen.findByRole('button', { name: 'Approve Service' })).toBeInTheDocument();
+    const reads = calls.filter((c) => c.path === '/api/v1/ontology');
+    expect(reads.length).toBeGreaterThan(0);
+    expect(reads.every((c) => c.query.get('tenant_id') === 't1')).toBe(true);
+  });
+
   it('shows the node versions a withdrawal breaks, and goes ahead only when acknowledged', async () => {
     const city: OntologyElement = {
       id: 'Service.city',
