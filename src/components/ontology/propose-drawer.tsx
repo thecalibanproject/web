@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useProposeOntology } from '@/api/queries';
-import { breakingChanges, parseProposals } from '@/lib/ontology';
+import { breakingChanges, parseProposals, readBreaking } from '@/lib/ontology';
 import { formatInt } from '@/lib/format';
 import { Button, Drawer, Field, FormError, Textarea } from '../ui';
-import { BreakingChanges } from './breaking-changes';
+import { AcknowledgedBreaking, BreakingChanges } from './breaking-changes';
 
 const EXAMPLE = `[
   {
@@ -77,18 +77,25 @@ export function ProposeDrawer({
       }
     >
       {result ? (
-        <p role="status" className="text-[13px] text-ok">
-          {result.proposed
-            ? `Wrote ${formatInt(result.proposed)} proposal${result.proposed === 1 ? '' : 's'} in version ${result.version}.`
-            : 'Nothing new: every element matches the ontology already.'}{' '}
-          {result.skipped ? `${formatInt(result.skipped)} unchanged skipped.` : ''}
-        </p>
+        <div className="flex flex-col gap-3 text-[13px]">
+          <p role="status" className="text-ok">
+            {result.proposed
+              ? `Wrote ${formatInt(result.proposed)} proposal${result.proposed === 1 ? '' : 's'} in version ${result.version}.`
+              : `Nothing written: every element matches version ${result.version} already.`}
+          </p>
+          <p className="text-fg-muted">
+            Skipped: {formatInt(result.skipped)}{' '}
+            {result.skipped === 1 ? 'element is' : 'elements are'} unchanged, so{' '}
+            {result.skipped === 1 ? 'it keeps its' : 'they keep their'} review decisions.
+          </p>
+          <AcknowledgedBreaking tenantId={tenantId} changes={readBreaking(result.breaking) ?? []} />
+        </div>
       ) : (
         <div className="flex flex-col gap-4 text-[13px]">
           <Field
             label="Elements (JSON)"
             hint={
-              'An array of elements, or an exported ontology ({"elements": [...]}). Each needs id, kind and name; every one is written as proposed. Proposing over an approved element withdraws it until it is approved again.'
+              'An array of elements, or an exported ontology ({"elements": [...]}). Each needs id, kind and name; status may be left out (every one is written as proposed). Elements whose spec, name and description match are skipped and keep their review decisions. A changed approved element is withdrawn until it is approved again.'
             }
             error={parseError ?? undefined}
           >

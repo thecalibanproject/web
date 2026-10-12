@@ -158,9 +158,7 @@ describe('parseProposals', () => {
     const fromArray = parseProposals(JSON.stringify([one]));
     expect(fromArray).toEqual({
       ok: true,
-      elements: [
-        { id: 'Clinic', kind: 'entity', name: 'Clinic', status: 'proposed', provenance: 'human' },
-      ],
+      elements: [{ id: 'Clinic', kind: 'entity', name: 'Clinic', provenance: 'human' }],
     });
     const fromExport = parseProposals(
       JSON.stringify({ tenant_id: 't1', version: 4, elements: [{ ...one, provenance: 'llm' }] }),

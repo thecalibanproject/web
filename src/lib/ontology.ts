@@ -4,6 +4,7 @@ import {
   type OntologyBreaking,
   type OntologyElement,
   type OntologyElementKind,
+  type OntologyElementProposal,
   type ReviewDecision,
 } from '@/api/types';
 
@@ -152,15 +153,16 @@ export function decisionsFor(status: OntologyElement['status']): ReviewDecision[
 
 /** Elements made outside Caliban, as `POST .../ontology/proposals` takes them. */
 export type ProposalsParse =
-  { ok: true; elements: OntologyElement[] } | { ok: false; error: string };
+  { ok: true; elements: OntologyElementProposal[] } | { ok: false; error: string };
 
 const MAX_PROPOSALS = 5000;
 
 /**
  * Reads pasted proposals: a JSON array of elements, or `{"elements": [...]}`
- * (an exported ontology). Each needs `id`, `kind` and `name`; `status` is
- * set to `proposed` (the server writes every one as proposed anyway) and a
- * missing `provenance` becomes `human`. The server checks the rest.
+ * (an exported ontology). Each needs `id`, `kind` and `name`. `status` and
+ * `changed_in` are dropped: the server writes every one as `proposed` and
+ * sets the version. A missing `provenance` becomes `human`. The server checks
+ * the rest.
  */
 export function parseProposals(text: string): ProposalsParse {
   let value: unknown;
@@ -180,7 +182,7 @@ export function parseProposals(text: string): ProposalsParse {
     return { ok: false, error: `At most ${MAX_PROPOSALS} elements at once.` };
   }
   const ids = new Set<string>();
-  const elements: OntologyElement[] = [];
+  const elements: OntologyElementProposal[] = [];
   for (const [i, raw] of list.entries()) {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
       return { ok: false, error: `Element ${i + 1} is not an object.` };
@@ -198,14 +200,14 @@ export function parseProposals(text: string): ProposalsParse {
       return { ok: false, error: `Element id "${String(e.id)}" is repeated.` };
     }
     ids.add(e.id as string);
-    // `changed_in` is the control plane's to set.
+    // Both are the control plane's to set.
     const rest = { ...e };
+    delete rest.status;
     delete rest.changed_in;
     elements.push({
       ...rest,
-      status: 'proposed',
       provenance: (e.provenance as OntologyElement['provenance'] | undefined) ?? 'human',
-    } as OntologyElement);
+    } as OntologyElementProposal);
   }
   return { ok: true, elements };
 }

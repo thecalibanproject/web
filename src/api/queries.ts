@@ -24,7 +24,7 @@ import type {
   ModelCreate,
   Node,
   Ontology,
-  OntologyElement,
+  OntologyElementProposal,
   ProviderKeyCreate,
   RagCollectionCreate,
   RagDocumentIngest,
@@ -894,7 +894,7 @@ export function useReviewElement(tenantId: string) {
 export function useProposeOntology(tenantId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (args: { elements: OntologyElement[]; acknowledgeBreaking?: boolean }) =>
+    mutationFn: (args: { elements: OntologyElementProposal[]; acknowledgeBreaking?: boolean }) =>
       unwrap(
         api.POST('/api/v1/tenants/{tenantId}/ontology/proposals', {
           params: { path: { tenantId } },

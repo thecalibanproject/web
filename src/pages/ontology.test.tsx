@@ -120,7 +120,7 @@ describe('OntologyPage', () => {
       'GET /api/v1/ontology': () => ({ body: ontology([]) }),
       'POST /api/v1/tenants/t1/ontology/proposals': () => ({
         status: 201,
-        body: { tenant_id: 't1', version: 4, proposed: 1, skipped: 1 },
+        body: { tenant_id: 't1', version: 4, proposed: 1, skipped: 1, breaking: [] },
       }),
     });
     const user = userEvent.setup();
@@ -142,14 +142,83 @@ describe('OntologyPage', () => {
     await user.click(within(drawer).getByRole('button', { name: 'Propose' }));
 
     expect(await within(drawer).findByRole('status')).toHaveTextContent(
-      'Wrote 1 proposal in version 4. 1 unchanged skipped.',
+      'Wrote 1 proposal in version 4.',
     );
+    expect(drawer).toHaveTextContent(
+      'Skipped: 1 element is unchanged, so it keeps its review decisions.',
+    );
+    expect(
+      within(drawer).queryByRole('region', { name: 'Acknowledged breaking changes' }),
+    ).not.toBeInTheDocument();
     expect(calls.find((c) => c.method === 'POST')?.body).toEqual({
       elements: [
-        { id: 'Clinic', kind: 'entity', name: 'Clinic', status: 'proposed', provenance: 'human' },
-        { id: 'Visit', kind: 'entity', name: 'Visit', status: 'proposed', provenance: 'llm' },
+        { id: 'Clinic', kind: 'entity', name: 'Clinic', provenance: 'human' },
+        { id: 'Visit', kind: 'entity', name: 'Visit', provenance: 'llm' },
       ],
     });
+  });
+
+  it('proposes over an approved element only when the breaking change is acknowledged', async () => {
+    const breaking = [
+      {
+        element: 'Service',
+        change: 'approved -> proposed',
+        nodes: ['triage@v3'],
+        versions: [{ node: 'triage', version: 3 }],
+      },
+    ];
+    const calls = mockApi({
+      'GET /api/v1/tenants': () => ({ body: tenants }),
+      'GET /api/v1/ontology': () => ({ body: ontology([{ ...service, status: 'approved' }]) }),
+      'POST /api/v1/tenants/t1/ontology/proposals': (c) =>
+        (c.body as { acknowledge_breaking?: boolean }).acknowledge_breaking
+          ? {
+              status: 201,
+              body: { tenant_id: 't1', version: 5, proposed: 1, skipped: 2, breaking },
+            }
+          : {
+              status: 409,
+              body: {
+                error: {
+                  message: 'proposing over approved elements withdraws them',
+                  type: 'conflict',
+                  code: 'ontology_breaking_change',
+                  breaking,
+                },
+              },
+            },
+    });
+    const user = userEvent.setup();
+    await renderApp('/ontology?tenant=t1');
+
+    await user.click(await screen.findByRole('button', { name: 'Propose elements' }));
+    const drawer = await screen.findByRole('dialog', { name: 'Propose elements' });
+    await user.click(within(drawer).getByRole('textbox', { name: 'Elements (JSON)' }));
+    await user.paste(
+      '[{"id": "Service", "kind": "entity", "name": "Service", "description": "Changed"}]',
+    );
+    await user.click(within(drawer).getByRole('button', { name: 'Propose' }));
+
+    const conflict = await within(drawer).findByRole('region', { name: 'Breaking change' });
+    expect(within(conflict).getByRole('link', { name: 'triage@v3' })).toHaveAttribute(
+      'href',
+      '/nodes/t1/triage?version=3',
+    );
+    await user.click(within(conflict).getByRole('checkbox'));
+    await user.click(within(conflict).getByRole('button', { name: 'Propose anyway' }));
+
+    expect(await within(drawer).findByRole('status')).toHaveTextContent(
+      'Wrote 1 proposal in version 5.',
+    );
+    expect(drawer).toHaveTextContent('Skipped: 2 elements are unchanged');
+    const acknowledged = within(drawer).getByRole('region', {
+      name: 'Acknowledged breaking changes',
+    });
+    expect(acknowledged).toHaveTextContent('Service (approved -> proposed) is used by triage@v3');
+    expect(calls.filter((c) => c.method === 'POST').map((c) => c.body)).toEqual([
+      { elements: [expect.objectContaining({ id: 'Service' })] },
+      { elements: [expect.objectContaining({ id: 'Service' })], acknowledge_breaking: true },
+    ]);
   });
 
   it('a viewer browses the ontology and cannot review or propose', async () => {
