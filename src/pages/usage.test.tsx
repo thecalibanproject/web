@@ -197,6 +197,53 @@ describe('UsagePage', () => {
     expect(shownRequests()).toEqual(['req-semantic-hit']);
   });
 
+  it('shows retrieval spend by purpose, and the purpose of each event', async () => {
+    mockUsage({
+      events: [
+        ...events,
+        {
+          ...base,
+          request_id: 'req-rag-index',
+          model: 'local/bge-m3',
+          cache: 'bypass',
+          cost_usd: 0.0001,
+          purpose: 'rag.ingest',
+        },
+      ],
+      totals,
+      by_purpose: [
+        {
+          purpose: 'rag.search',
+          totals: { requests: 4, prompt_tokens: 80, charged_usd: 0.0002, cost_usd: 0.0002 },
+        },
+        {
+          purpose: 'rag.ingest',
+          totals: { requests: 30, prompt_tokens: 12000, charged_usd: 0.003, cost_usd: 0.003 },
+        },
+      ],
+    });
+    await renderApp('/usage');
+    const card = await screen.findByRole('region', { name: 'Retrieval spend' });
+    const rows = within(card).getAllByRole('row');
+    expect(rows[1]).toHaveTextContent(/^Indexing documents rag\.ingest3012,000\$0\.0030\$0\.0030$/);
+    expect(rows[2]).toHaveTextContent('Retrieval queries rag.search');
+    expect(within(row('req-rag-index')).getByText('rag.ingest')).toHaveAttribute(
+      'title',
+      expect.stringMatching(/Embedding a collection's documents/),
+    );
+    expect(within(row('req-embedding')).queryByText(/rag\./)).not.toBeInTheDocument();
+  });
+
+  it('says when there were no retrieval calls', async () => {
+    mockUsage();
+    await renderApp('/usage');
+    expect(
+      await within(await screen.findByRole('region', { name: 'Retrieval spend' })).findByText(
+        'No retrieval calls',
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('totals cache hits with the semantic share and what they saved', async () => {
     mockUsage();
     await renderApp('/usage');

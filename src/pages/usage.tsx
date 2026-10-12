@@ -5,6 +5,7 @@ import { tenantsQuery, usageQuery } from '@/api/queries';
 import { CACHE_STATUSES, CACHE_TIERS, type CacheStatus, type CacheTier } from '@/api/types';
 import { AutoMarginCard } from '@/components/auto-margin-card';
 import { NodeCostCard } from '@/components/node-cost-card';
+import { PurposeCostCard } from '@/components/purpose-cost-card';
 import { RouteCountsCard } from '@/components/route-counts-card';
 import { TenantFilter } from '@/components/tenant-select';
 import { UsageTable } from '@/components/usage-table';
@@ -78,6 +79,7 @@ export function UsagePage() {
             selected={node}
             onSelect={(n) => setSearch({ node: n })}
           />
+          <PurposeCostCard byPurpose={usage.data.by_purpose} />
           <RouteCountsCard
             byRoute={usage.data.by_route}
             filtered={Boolean(node || run)}

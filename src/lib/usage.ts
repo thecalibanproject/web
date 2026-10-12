@@ -1,4 +1,4 @@
-import type { UsageByNode, UsageTotals } from '@/api/types';
+import type { UsageByNode, UsageByPurpose, UsagePurpose, UsageTotals } from '@/api/types';
 
 /** The totals the cost-per-node view adds up. */
 export interface NodeTotals {
@@ -61,4 +61,46 @@ export function nodeCosts(byNode: readonly UsageByNode[] | undefined): NodeCost[
       versions: [...c.versions].sort((a, b) => (a.version ?? 0) - (b.version ?? 0)),
     }))
     .sort((a, b) => b.totals.chargedUsd - a.totals.chargedUsd || a.node.localeCompare(b.node));
+}
+
+export const PURPOSE_LABEL: Record<UsagePurpose, string> = {
+  'rag.ingest': 'Indexing documents',
+  'rag.search': 'Retrieval queries',
+};
+
+export const PURPOSE_HINT: Record<UsagePurpose, string> = {
+  'rag.ingest': "Embedding a collection's documents: Caliban's background work for the tenant.",
+  'rag.search': "A node's retrieval: its query embedding and reranking.",
+};
+
+/** One row of the spend Caliban made on the tenant's behalf, by purpose. */
+export interface PurposeCost {
+  purpose: string;
+  label: string;
+  hint: string | undefined;
+  totals: NodeTotals;
+}
+
+/** `by_purpose` as rows, known purposes first in their order, then any other. */
+export function purposeCosts(byPurpose: readonly UsageByPurpose[] | undefined): PurposeCost[] {
+  const known = Object.keys(PURPOSE_LABEL);
+  return (byPurpose ?? [])
+    .map((row) => {
+      const purpose = row.purpose ?? '';
+      const k = purpose as UsagePurpose;
+      return {
+        purpose,
+        label: known.includes(purpose) ? PURPOSE_LABEL[k] : purpose,
+        hint: known.includes(purpose) ? PURPOSE_HINT[k] : undefined,
+        totals: totalsOf(row.totals),
+      };
+    })
+    .sort((a, b) => {
+      const ia = known.indexOf(a.purpose);
+      const ib = known.indexOf(b.purpose);
+      return (
+        (ia < 0 ? known.length : ia) - (ib < 0 ? known.length : ib) ||
+        a.purpose.localeCompare(b.purpose)
+      );
+    });
 }

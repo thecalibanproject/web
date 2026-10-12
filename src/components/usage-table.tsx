@@ -1,7 +1,8 @@
 import type { UsageEvent } from '@/api/types';
 import { EMPTY, formatDateTime, formatInt, formatMs, formatUsd } from '@/lib/format';
+import { PURPOSE_HINT } from '@/lib/usage';
 import { CacheBadge, CacheTierBadge } from './badges';
-import { Table, TBody, TD, TH, THead, TR } from './ui';
+import { Badge, Table, TBody, TD, TH, THead, TR } from './ui';
 
 /**
  * Requested model (e.g. `caliban/auto`) → routed model. A pinned request that
@@ -119,7 +120,12 @@ export function UsageTable({
                     )}
                   </span>
                 ) : (
-                  <span className="text-fg-subtle">{EMPTY}</span>
+                  !e.purpose && <span className="text-fg-subtle">{EMPTY}</span>
+                )}
+                {e.purpose && (
+                  <Badge tone="info" className="ml-1.5" title={PURPOSE_HINT[e.purpose]}>
+                    {e.purpose}
+                  </Badge>
                 )}
               </TD>
             )}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nodeCosts } from './usage';
+import { nodeCosts, purposeCosts } from './usage';
 
 describe('nodeCosts', () => {
   it('sums the versions of each node, most charged first', () => {
@@ -20,5 +20,22 @@ describe('nodeCosts', () => {
 
   it('is empty without node calls', () => {
     expect(nodeCosts(undefined)).toEqual([]);
+  });
+});
+
+describe('purposeCosts', () => {
+  it('labels the known purposes, ingest first, and keeps any other after them', () => {
+    const rows = purposeCosts([
+      { purpose: 'other', totals: { requests: 1 } },
+      { purpose: 'rag.search', totals: { requests: 2, charged_usd: 0.1 } },
+      { purpose: 'rag.ingest', totals: { requests: 3 } },
+    ]);
+    expect(rows.map((r) => [r.purpose, r.label])).toEqual([
+      ['rag.ingest', 'Indexing documents'],
+      ['rag.search', 'Retrieval queries'],
+      ['other', 'other'],
+    ]);
+    expect(rows[1]?.totals).toMatchObject({ requests: 2, chargedUsd: 0.1 });
+    expect(purposeCosts(undefined)).toEqual([]);
   });
 });
