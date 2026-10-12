@@ -16,6 +16,7 @@ import {
 import { api, ApiError, slashPreservingPath, unwrap } from './client';
 import type {
   ApiKeyCreate,
+  ConsoleRun,
   DatasourceCreate,
   EvalPolicy,
   EvalStart,
@@ -481,7 +482,7 @@ export const runsQuery = (tenantId: string, filter: RunFilter = {}) =>
 export const runQuery = (tenantId: string, runId: string) =>
   queryOptions({
     queryKey: qk.run(tenantId, runId),
-    queryFn: () =>
+    queryFn: (): Promise<ConsoleRun> =>
       unwrap(
         api.GET('/api/v1/tenants/{tenantId}/runs/{runId}', {
           params: { path: { tenantId, runId } },

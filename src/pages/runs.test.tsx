@@ -216,6 +216,59 @@ describe('RunDetailPage', () => {
     );
   });
 
+  it('shows the real model cost next to what is billed, and the personal data protected', async () => {
+    // A run caliban/auto started: billed at the flat auto price, routed to a cheaper model.
+    const auto: ConsoleRun = {
+      ...run,
+      origin: 'auto',
+      cost_usd: 0.01,
+      usage: { prompt_tokens: 700, completion_tokens: 200, total_tokens: 900, pii_entities: 3 },
+      steps: run.steps.map((s) =>
+        s.kind === 'llm'
+          ? { ...s, usd: 0.01, model_cost_usd: 0.0042, pii_entities: 3 }
+          : { ...s, model_cost_usd: 0 },
+      ),
+    };
+    await openDetail(null, auto);
+    const details = screen.getByText('Billed').closest('dl')!;
+    expect(within(details).getByText('Billed').nextSibling).toHaveTextContent('$0.01');
+    expect(within(details).getByText('Model cost').nextSibling).toHaveTextContent('$0.0042');
+    expect(within(details).getByText('Personal data').nextSibling).toHaveTextContent(
+      '3 entities protected in its model calls',
+    );
+    const steps = within(screen.getByRole('table', { name: 'Steps' })).getAllByRole('row');
+    expect(steps[2]).toHaveTextContent('$0.01model $0.0042');
+    expect(steps[1]).not.toHaveTextContent('model');
+    expect(screen.queryByText('Answer guard')).not.toBeInTheDocument();
+  });
+
+  it('shows what the answer guard found, by rule and place, never the text', async () => {
+    await openDetail(null, {
+      ...run,
+      model_cost_usd: 0.0042,
+      answer_check: {
+        labels: ['datasource', 'tool:catalogue/search'],
+        findings: [
+          { rule: 'untrusted_contact', label: 'datasource', at: '/recommendation' },
+          { rule: 'instruction_echo', label: 'tool:catalogue/search', at: '' },
+        ],
+        action: 'redacted',
+      },
+    });
+    const guard = screen
+      .getByText('Answer guard')
+      .closest('section, div.rounded-lg') as HTMLElement;
+    expect(guard).toHaveTextContent('redacted');
+    expect(guard).toHaveTextContent(/were removed from the answer/);
+    const rows = within(screen.getByRole('table', { name: 'Answer guard findings' })).getAllByRole(
+      'row',
+    );
+    expect(rows[1]).toHaveTextContent('Contact from untrusted text');
+    expect(rows[1]).toHaveTextContent('/recommendation');
+    expect(rows[2]).toHaveTextContent('Echo of an injected instruction');
+    expect(rows[2]).toHaveTextContent('tool:catalogue/search');
+  });
+
   it('hides run content from roles without runs.data', async () => {
     await openDetail([{ role: 'viewer', tenant_id: 't1' }], run);
     expect(screen.getByText(/Run content .* is hidden/)).toHaveTextContent('needs runs.data');

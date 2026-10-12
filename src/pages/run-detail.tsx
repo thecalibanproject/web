@@ -4,7 +4,7 @@ import { Fragment, useState, type ReactNode } from 'react';
 import { usePermissions } from '@/api/auth';
 import { ApiError } from '@/api/client';
 import { inboxQuery, runQuery, tenantsQuery, useCancelRun } from '@/api/queries';
-import type { ConsoleRun } from '@/api/types';
+import type { AnswerCheck, ConsoleRun } from '@/api/types';
 import { ApprovalDetails, HumanStepActions } from '@/components/runs/human-step';
 import { RunStatusBadge, TaintLabels } from '@/components/runs/run-badges';
 import {
@@ -32,9 +32,12 @@ import { EMPTY, formatDateTime, formatInt, formatMs, formatUsd } from '@/lib/for
 import { shortHash } from '@/lib/nodes';
 import { deniedReason } from '@/lib/permissions';
 import {
+  ANSWER_ACTION_TONE,
+  ANSWER_RULE_LABEL,
   budgetRows,
   elapsedMs,
   isRunActive,
+  modelCostUsd,
   prettyJson,
   timeline,
   type BudgetRow,
@@ -110,11 +113,26 @@ function Summary({ run }: { run: ConsoleRun }) {
     ['Started', formatDateTime(run.started_at)],
     ['Finished', formatDateTime(run.finished_at)],
     ['Duration', ms != null ? formatMs(ms) : run.finished_at ? EMPTY : 'not ended'],
-    ['Cost', formatUsd(run.cost_usd)],
+    ['Billed', formatUsd(run.cost_usd)],
+    [
+      'Model cost',
+      <span
+        key="m"
+        title="The real cost of the models its calls were routed to. It differs from what is billed only for runs billed as caliban/auto, at the flat price."
+      >
+        {formatUsd(modelCostUsd(run))}
+      </span>,
+    ],
     [
       'Tokens',
       usage
         ? `${formatInt(usage.total_tokens)} (${formatInt(usage.prompt_tokens)} prompt, ${formatInt(usage.completion_tokens)} completion)`
+        : EMPTY,
+    ],
+    [
+      'Personal data',
+      usage?.pii_entities != null
+        ? `${formatInt(usage.pii_entities)} entit${usage.pii_entities === 1 ? 'y' : 'ies'} protected in its model calls`
         : EMPTY,
     ],
   ];
@@ -249,6 +267,11 @@ function Steps({ run }: { run: ConsoleRun }) {
                   </TD>
                   <TD className="text-right whitespace-nowrap tabular-nums">
                     {s.usd ? formatUsd(s.usd) : EMPTY}
+                    {s.model_cost_usd != null && s.model_cost_usd !== s.usd && (
+                      <span className="block text-[11px] text-fg-subtle">
+                        model {formatUsd(s.model_cost_usd)}
+                      </span>
+                    )}
                   </TD>
                   <TD>
                     <TaintLabels labels={s.labels} />
@@ -286,6 +309,58 @@ function Steps({ run }: { run: ConsoleRun }) {
           </TBody>
         </Table>
       )}
+    </Card>
+  );
+}
+
+/**
+ * The answer guard's check of the final output (present when the output
+ * carried untrusted labels): what it found, by rule and place, never the text.
+ */
+function AnswerGuard({ check }: { check: AnswerCheck }) {
+  const findings = check.findings ?? [];
+  const action = check.action ?? 'passed';
+  return (
+    <Card className="mb-4">
+      <CardHeader
+        title={
+          <span className="flex items-center gap-2">
+            Answer guard <Badge tone={ANSWER_ACTION_TONE[action]}>{action}</Badge>
+          </span>
+        }
+        description={
+          action === 'redacted'
+            ? 'Links, contacts or references that only untrusted text supplied were removed from the answer.'
+            : action === 'refused'
+              ? 'The answer carried what only untrusted text supplied, and the node refuses such answers: the run failed.'
+              : 'The answer carried untrusted data and the guard found nothing to remove.'
+        }
+      />
+      <div className="flex flex-col gap-3 p-4 text-[12.5px]">
+        <Details rows={[['Output labels', <TaintLabels key="l" labels={check.labels ?? []} />]]} />
+        {findings.length > 0 && (
+          <Table label="Answer guard findings">
+            <THead>
+              <tr>
+                <TH>Rule</TH>
+                <TH>From</TH>
+                <TH>Where in the output</TH>
+              </tr>
+            </THead>
+            <TBody>
+              {findings.map((f, i) => (
+                <TR key={i}>
+                  <TD>{f.rule ? ANSWER_RULE_LABEL[f.rule] : EMPTY}</TD>
+                  <TD>
+                    <TaintLabels labels={f.label ? [f.label] : []} />
+                  </TD>
+                  <TD className="font-mono text-[12px]">{f.at || '/'}</TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        )}
+      </div>
     </Card>
   );
 }
@@ -505,6 +580,7 @@ export function RunDetailPage() {
         <>
           <Waiting tenantId={tenantId} run={run.data} />
           <Summary run={run.data} />
+          {run.data.answer_check && <AnswerGuard check={run.data.answer_check} />}
           <Steps run={run.data} />
           <Content run={run.data} />
         </>
