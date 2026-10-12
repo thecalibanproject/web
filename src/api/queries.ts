@@ -23,6 +23,7 @@ import type {
   GoldenCase,
   ModelCreate,
   Node,
+  Ontology,
   OntologyElement,
   ProviderKeyCreate,
   RagCollectionCreate,
@@ -247,8 +248,11 @@ export const introspectionQuery = (datasourceId: string) =>
 export const ontologyQuery = (tenantId: string) =>
   queryOptions({
     queryKey: qk.ontology(tenantId),
-    queryFn: () =>
-      unwrap(api.GET('/api/v1/ontology', { params: { query: { tenant_id: tenantId } } })),
+    // Stored elements always carry `status` (see `OntologyElement`).
+    queryFn: async (): Promise<Ontology> =>
+      (await unwrap(
+        api.GET('/api/v1/ontology', { params: { query: { tenant_id: tenantId } } }),
+      )) as Ontology,
   });
 
 /**

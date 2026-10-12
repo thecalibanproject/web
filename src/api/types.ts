@@ -35,8 +35,16 @@ export type DatasourceKind = S['DatasourceKind'];
 export type Datasource = S['Datasource'];
 export type DatasourceCreate = S['DatasourceCreate'];
 export type OntologyElementKind = S['OntologyElementKind'];
-export type OntologyElement = S['OntologyElement'];
-export type Ontology = S['Ontology'];
+/**
+ * A stored element. The contract makes `status` required on stored elements
+ * (an `allOf` over the proposal shape), which the generator loses.
+ */
+export type OntologyElement = S['OntologyElement'] & {
+  status: NonNullable<S['OntologyElementProposal']['status']>;
+};
+/** An element as `POST .../ontology/proposals` takes it: `status` is optional and ignored. */
+export type OntologyElementProposal = S['OntologyElementProposal'];
+export type Ontology = Omit<S['Ontology'], 'elements'> & { elements: OntologyElement[] };
 export type Node = S['Node'];
 export type NodeCreate = S['NodeCreate'];
 export type NodeState = Node['state'];
