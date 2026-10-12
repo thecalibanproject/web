@@ -11,6 +11,12 @@ export class ApiError extends Error {
   readonly code: string | null | undefined;
   /** Node version refusals (422 `validation_failed`): every reason, one by one. */
   readonly problems: ProblemDetail[];
+  /**
+   * Ontology refusals (409 `ontology_breaking_change`): the approved elements
+   * withdrawn and the published node versions that query them, as sent
+   * (`breakingChanges` checks the shape).
+   */
+  readonly breaking: unknown;
 
   constructor(
     status: number,
@@ -18,6 +24,7 @@ export class ApiError extends Error {
     type?: string,
     code?: string | null,
     problems: ProblemDetail[] = [],
+    breaking?: unknown,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -25,6 +32,7 @@ export class ApiError extends Error {
     this.type = type;
     this.code = code;
     this.problems = problems;
+    this.breaking = breaking;
   }
 }
 
@@ -114,6 +122,7 @@ export async function unwrap<T>(
         error.error.type,
         error.error.code,
         error.error.problems ?? [],
+        error.error.breaking,
       );
     }
     throw new ApiError(

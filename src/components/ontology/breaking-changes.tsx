@@ -1,19 +1,25 @@
 import { Link } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
-import { parseNodeVersion, type BreakingChange } from '@/lib/ontology';
+import { breakingVersions, type BreakingChange } from '@/lib/ontology';
 import { Checkbox } from '../ui';
 import { IconAlert } from '../ui/icons';
 
-function NodeVersionLink({ tenantId, nodeRef }: { tenantId: string; nodeRef: string }) {
-  const parsed = parseNodeVersion(nodeRef);
-  if (!parsed) return <span className="font-mono">{nodeRef}</span>;
+function NodeVersionLink({
+  tenantId,
+  target,
+}: {
+  tenantId: string;
+  target: ReturnType<typeof breakingVersions>[number];
+}) {
+  if (target.node === undefined) return <span className="font-mono">{target.ref}</span>;
   return (
     <Link
       to="/nodes/$tenantId/$nodeName"
-      params={{ tenantId, nodeName: parsed.name }}
+      params={{ tenantId, nodeName: target.node }}
+      search={{ version: target.version }}
       className="font-mono text-accent hover:underline"
     >
-      {nodeRef}
+      {target.ref}
     </Link>
   );
 }
@@ -58,11 +64,11 @@ export function BreakingChanges({
           {changes.map((c) => (
             <li key={c.element} className="rounded border border-danger/30 bg-surface p-2.5">
               <span className="font-mono">{c.element}</span>
-              {c.change && <span className="text-fg-muted"> ({c.change})</span>} is used by{' '}
-              {c.nodes.map((n, i) => (
-                <span key={n}>
+              <span className="text-fg-muted"> ({c.change})</span> is used by{' '}
+              {breakingVersions(c).map((t, i) => (
+                <span key={t.ref}>
                   {i > 0 && ', '}
-                  <NodeVersionLink tenantId={tenantId} nodeRef={n} />
+                  <NodeVersionLink tenantId={tenantId} target={t} />
                 </span>
               ))}
             </li>

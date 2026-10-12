@@ -1,6 +1,7 @@
 import { ApiError } from '@/api/client';
 import {
   ONTOLOGY_KINDS,
+  type OntologyBreaking,
   type OntologyElement,
   type OntologyElementKind,
   type ReviewDecision,
@@ -49,48 +50,80 @@ export const ALWAYS_REVIEW: ReadonlySet<OntologyElementKind> = new Set([
   'policy',
 ]);
 
-/** A published node version that a review decision or a proposal would break. */
-export interface BreakingChange {
-  /** The element id. */
-  element: string;
-  /** `approved -> deprecated`, when the control plane says. */
-  change?: string;
-  /** `name@vN` of the published versions whose fixed queries use the element. */
-  nodes: string[];
+/** The `error.code` of a breaking-change refusal (`409`). */
+export const BREAKING_CODE = 'ontology_breaking_change';
+
+/**
+ * An approved element a review decision or a proposal withdraws, and the
+ * published node versions whose fixed queries use it. `change` is
+ * `approved -> deprecated`; `versions` is empty only when the control plane
+ * sent `nodes` alone.
+ */
+export type BreakingChange = OntologyBreaking;
+
+function isStringArray(v: unknown): v is string[] {
+  return Array.isArray(v) && v.every((x) => typeof x === 'string');
+}
+
+function readVersions(v: unknown): BreakingChange['versions'] | null {
+  if (!Array.isArray(v)) return null;
+  const out: BreakingChange['versions'] = [];
+  for (const x of v) {
+    if (!x || typeof x !== 'object') return null;
+    const { node, version } = x as Record<string, unknown>;
+    if (typeof node !== 'string' || typeof version !== 'number') return null;
+    out.push({ node, version });
+  }
+  return out;
 }
 
 /**
- * The breaking changes a `409` names. The control plane lists them only in
- * the message, after `acknowledge_breaking: true`, as
- * `Service (approved -> deprecated): triage@v3, desk@v1; Other: ...`.
- * Returns null for any other error, and an empty list when the message is a
- * breaking-change refusal the console cannot read (show the message then).
+ * Reads a `breaking` list as the control plane sends it (in a `409` and in
+ * the response of a call that acknowledged it). Null when it is not one: an
+ * unexpected shape is not guessed at.
+ */
+export function readBreaking(value: unknown): BreakingChange[] | null {
+  if (!Array.isArray(value)) return null;
+  const out: BreakingChange[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') return null;
+    const b = raw as Record<string, unknown>;
+    if (typeof b.element !== 'string' || typeof b.change !== 'string') return null;
+    if (!isStringArray(b.nodes)) return null;
+    const versions = b.versions === undefined ? [] : readVersions(b.versions);
+    if (!versions) return null;
+    out.push({ element: b.element, change: b.change, nodes: b.nodes, versions });
+  }
+  return out;
+}
+
+/**
+ * The breaking changes a `409` names: `error.code` `ontology_breaking_change`
+ * with `error.breaking`. Null for any other error. An empty list when the
+ * error is a breaking-change refusal whose list the console cannot read
+ * (the caller shows the server's message then).
  */
 export function breakingChanges(error: unknown): BreakingChange[] | null {
   if (!(error instanceof ApiError) || error.status !== 409) return null;
-  const marker = 'acknowledge_breaking: true';
-  const at = error.message.indexOf(marker);
-  if (at < 0) return null;
-  // `...acknowledge_breaking: true: <list>` (reviews) or `... true to go ahead: <list>` (proposals).
-  const tail = error.message.slice(at + marker.length);
-  const start = tail.indexOf(': ');
-  if (start < 0) return [];
-  const rest = tail.slice(start + 2);
-  const out: BreakingChange[] = [];
-  for (const part of rest.split('; ')) {
-    const sep = part.lastIndexOf(': ');
-    if (sep <= 0) continue;
-    const head = part.slice(0, sep).trim();
-    const nodes = part
-      .slice(sep + 2)
-      .split(',')
-      .map((n) => n.trim())
-      .filter(Boolean);
-    const m = /^(.+?) \(([^()]+)\)$/.exec(head);
-    const [, element, change] = m ?? [];
-    out.push(element && change ? { element, change, nodes } : { element: head, nodes });
+  if (error.code !== BREAKING_CODE) return null;
+  return readBreaking(error.breaking) ?? [];
+}
+
+/**
+ * The node versions a breaking change names, structured: from `versions`,
+ * or read from `nodes` (`name@vN`) when the control plane sent only those.
+ * A ref that is not `name@vN` is kept as text.
+ */
+export function breakingVersions(
+  change: BreakingChange,
+): Array<{ ref: string; node?: string; version?: number }> {
+  if (change.versions.length > 0) {
+    return change.versions.map((v) => ({ ref: `${v.node}@v${v.version}`, ...v }));
   }
-  return out;
+  return change.nodes.map((ref) => {
+    const parsed = parseNodeVersion(ref);
+    return parsed ? { ref, node: parsed.name, version: parsed.version } : { ref };
+  });
 }
 
 /** `triage@v3` as a node name and version; null when it is not one. */

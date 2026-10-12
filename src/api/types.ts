@@ -93,6 +93,8 @@ export type EvalStart =
 export type PromotionGate =
   paths['/api/v1/tenants/{tenantId}/nodes/{nodeName}/versions/{version}/gate']['get']['responses'][200]['content']['application/json'];
 export type ProblemDetail = S['Problem'];
+/** An approved element a change withdraws, and the published node versions that query it. */
+export type OntologyBreaking = S['OntologyBreaking'];
 export type GateEvidence = S['GateEvidence'];
 export type GoldenSummary = S['GoldenSummary'];
 export type InjectionSummary = S['InjectionSummary'];

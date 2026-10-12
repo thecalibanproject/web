@@ -3,6 +3,7 @@ import type { OntologyElement } from '@/api/types';
 import { ApiError } from '@/api/client';
 import {
   breakingChanges,
+  breakingVersions,
   decisionsFor,
   groupByKind,
   parseNodeVersion,
@@ -49,41 +50,88 @@ describe('groupByKind', () => {
   });
 });
 
+const breakingError = (breaking: unknown, code: string | null = 'ontology_breaking_change') =>
+  new ApiError(
+    409,
+    'send acknowledge_breaking: true: Service: triage@v3',
+    'conflict',
+    code,
+    [],
+    breaking,
+  );
+
 describe('breakingChanges', () => {
-  it('reads the elements and node versions a review refusal names', () => {
-    const err = new ApiError(
-      409,
-      'these decisions break published node versions that query the elements; publish versions written on the new ontology, or send acknowledge_breaking: true: Service.city (approved -> deprecated): triage@v3, desk@v12; Service (approved -> rejected): triage@v3',
-      'conflict',
-    );
-    expect(breakingChanges(err)).toEqual([
+  it('reads the structured list of a breaking-change refusal', () => {
+    const list = [
       {
         element: 'Service.city',
         change: 'approved -> deprecated',
         nodes: ['triage@v3', 'desk@v12'],
+        versions: [
+          { node: 'triage', version: 3 },
+          { node: 'desk', version: 12 },
+        ],
       },
-      { element: 'Service', change: 'approved -> rejected', nodes: ['triage@v3'] },
+      {
+        element: 'Service',
+        change: 'approved -> proposed',
+        nodes: ['triage@v3'],
+        versions: [{ node: 'triage', version: 3 }],
+      },
+    ];
+    expect(breakingChanges(breakingError(list))).toEqual(list);
+  });
+
+  it('takes a list without versions, and reads them from the names', () => {
+    const [change] =
+      breakingChanges(
+        breakingError([
+          { element: 'Service', change: 'approved -> rejected', nodes: ['triage@v3'] },
+        ]),
+      ) ?? [];
+    expect(change?.versions).toEqual([]);
+    expect(change && breakingVersions(change)).toEqual([
+      { ref: 'triage@v3', node: 'triage', version: 3 },
     ]);
   });
 
-  it('reads a proposals refusal, which names no change', () => {
-    const err = new ApiError(
-      409,
-      'proposing over approved elements that published node versions query withdraws them; send acknowledge_breaking: true to go ahead: Service: triage@v3',
-      'conflict',
-    );
-    expect(breakingChanges(err)).toEqual([{ element: 'Service', nodes: ['triage@v3'] }]);
+  it('is empty when the list has an unexpected shape, so the message is shown', () => {
+    expect(breakingChanges(breakingError(undefined))).toEqual([]);
+    expect(breakingChanges(breakingError([{ element: 'Service' }]))).toEqual([]);
+    expect(
+      breakingChanges(
+        breakingError([
+          { element: 'S', change: 'x', nodes: ['a@v1'], versions: [{ node: 'a', version: '1' }] },
+        ]),
+      ),
+    ).toEqual([]);
   });
 
-  it('is null for other errors, and empty when the list cannot be read', () => {
+  it('is null for every other error, whatever its message says', () => {
+    expect(breakingChanges(breakingError([], null))).toBeNull();
     expect(
       breakingChanges(new ApiError(409, 'an introspection is running', 'conflict')),
     ).toBeNull();
-    expect(breakingChanges(new ApiError(400, 'acknowledge_breaking: true: x: y@v1'))).toBeNull();
-    expect(breakingChanges(new Error('acknowledge_breaking: true: x: y@v1'))).toBeNull();
     expect(
-      breakingChanges(new ApiError(409, 'send acknowledge_breaking: true', 'conflict')),
-    ).toEqual([]);
+      breakingChanges(new ApiError(400, 'x', 'invalid', 'ontology_breaking_change')),
+    ).toBeNull();
+    expect(breakingChanges(new Error('acknowledge_breaking: true: x: y@v1'))).toBeNull();
+  });
+});
+
+describe('breakingVersions', () => {
+  it('prefers the structured versions and keeps an unreadable name as text', () => {
+    expect(
+      breakingVersions({
+        element: 'S',
+        change: 'approved -> deprecated',
+        nodes: ['ignored@v9'],
+        versions: [{ node: 'triage', version: 3 }],
+      }),
+    ).toEqual([{ ref: 'triage@v3', node: 'triage', version: 3 }]);
+    expect(breakingVersions({ element: 'S', change: 'c', nodes: ['odd'], versions: [] })).toEqual([
+      { ref: 'odd' },
+    ]);
   });
 });
 

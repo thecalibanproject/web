@@ -65,7 +65,18 @@ describe('OntologyPage', () => {
                 message:
                   'these decisions break published node versions that query the elements; publish versions written on the new ontology, or send acknowledge_breaking: true: Service.city (approved -> deprecated): triage@v3, desk@v1',
                 type: 'conflict',
-                code: null,
+                code: 'ontology_breaking_change',
+                breaking: [
+                  {
+                    element: 'Service.city',
+                    change: 'approved -> deprecated',
+                    nodes: ['triage@v3', 'desk@v1'],
+                    versions: [
+                      { node: 'triage', version: 3 },
+                      { node: 'desk', version: 1 },
+                    ],
+                  },
+                ],
               },
             },
           };
@@ -85,7 +96,7 @@ describe('OntologyPage', () => {
     const conflict = await within(drawer).findByRole('region', { name: 'Breaking change' });
     expect(within(conflict).getByRole('link', { name: 'triage@v3' })).toHaveAttribute(
       'href',
-      '/nodes/t1/triage',
+      '/nodes/t1/triage?version=3',
     );
     expect(within(conflict).getByRole('link', { name: 'desk@v1' })).toBeInTheDocument();
     expect(conflict).toHaveTextContent('approved -> deprecated');
