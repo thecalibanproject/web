@@ -1,4 +1,5 @@
 import type { PiiPattern, PiiTerm } from '@/api/types';
+import { formatInt } from './format';
 
 /** Labels with built-in surrogates; any other label gets shape-preserving ones. */
 export const PII_BUILTIN_LABELS = [
@@ -12,10 +13,33 @@ export const PII_BUILTIN_LABELS = [
   'CARD',
 ] as const;
 
+/** Other spellings of built-in labels, with the same surrogates. */
+export const PII_LABEL_ALIASES = ['ID', 'NATIONALID', 'NAME', 'ORGANIZATION', 'ADDRESS'] as const;
+
 export const MAX_PII_PATTERNS = 50;
 export const MAX_PII_TERMS = 10_000;
 const MAX_PATTERN_CHARS = 500;
 const LABEL = /^[A-Za-z0-9_]{1,40}$/;
+
+/**
+ * Labels are case-insensitive: the control plane stores them as sent and uses
+ * them upper-cased (`phone` is `PHONE`). The console writes them upper-cased,
+ * so `phone` and `PHONE` cannot sit side by side as if they differed.
+ */
+export function normalizeLabel(label: string): string {
+  return label.trim().toUpperCase();
+}
+
+/** The patterns with their labels upper-cased. */
+export function normalizePatterns(patterns: readonly PiiPattern[]): PiiPattern[] {
+  return patterns.map((p) => ({ ...p, label: normalizeLabel(p.label) }));
+}
+
+/** The dictionary with its labels upper-cased and repeats dropped (see `parseDictionary`). */
+export function normalizeTerms(terms: readonly PiiTerm[]): PiiTerm[] {
+  const parsed = parseDictionary(formatDictionary(terms));
+  return parsed.ok ? parsed.terms : terms.map((t) => ({ ...t, label: normalizeLabel(t.label) }));
+}
 
 export function labelError(label: string): string | null {
   return LABEL.test(label) ? null : 'Use 1 to 40 letters, digits or underscores.';
@@ -44,8 +68,9 @@ export type DictionaryParse = { ok: true; terms: PiiTerm[] } | { ok: false; erro
 
 /**
  * Reads `LABEL: term` lines (a label has no colon, so the first one splits).
- * Blank lines are skipped and repeats (same term, ignoring case, and label)
- * dropped: matching is case-insensitive anyway.
+ * Labels are upper-cased (they are case-insensitive). Blank lines are skipped
+ * and repeats (same label, same term ignoring case) dropped: matching is
+ * case-insensitive anyway.
  */
 export function parseDictionary(text: string): DictionaryParse {
   const terms: PiiTerm[] = [];
@@ -55,7 +80,7 @@ export function parseDictionary(text: string): DictionaryParse {
     const line = raw.trim();
     if (!line) continue;
     const at = line.indexOf(':');
-    const label = at < 0 ? '' : line.slice(0, at).trim();
+    const label = at < 0 ? '' : normalizeLabel(line.slice(0, at));
     const term = at < 0 ? '' : line.slice(at + 1).trim();
     if (at < 0 || labelError(label)) {
       return {
@@ -75,6 +100,12 @@ export function parseDictionary(text: string): DictionaryParse {
   return terms.length > MAX_PII_TERMS
     ? { ok: false, error: `At most ${MAX_PII_TERMS.toLocaleString('en')} terms.` }
     : { ok: true, terms };
+}
+
+/** `12 patterns, 340 terms`: the size of a tenant's detectors. */
+export function detectorCounts(patterns: number, terms: number): string {
+  const n = (count: number, one: string) => `${formatInt(count)} ${one}${count === 1 ? '' : 's'}`;
+  return `${n(patterns, 'pattern')}, ${n(terms, 'term')}`;
 }
 
 /** Whether two lists hold the same entries in the same order. */

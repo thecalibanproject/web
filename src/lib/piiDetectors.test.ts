@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { formatDictionary, parseDictionary, patternError, sameList } from './piiDetectors';
+import {
+  detectorCounts,
+  formatDictionary,
+  normalizePatterns,
+  normalizeTerms,
+  parseDictionary,
+  patternError,
+  sameList,
+} from './piiDetectors';
 
 describe('parseDictionary', () => {
   it('reads LABEL: term lines, splitting on the first colon', () => {
@@ -35,6 +43,35 @@ describe('parseDictionary', () => {
       ok: false,
       error: 'Line 1: a term is 2 to 200 characters.',
     });
+  });
+});
+
+describe('labels', () => {
+  it('are upper-cased, so labels that differ only in case are one', () => {
+    expect(parseDictionary('org: Northwind\nORG: northwind\nOrg: Southwind')).toEqual({
+      ok: true,
+      terms: [
+        { term: 'Northwind', label: 'ORG' },
+        { term: 'Southwind', label: 'ORG' },
+      ],
+    });
+    expect(normalizePatterns([{ label: 'phone', pattern: '\\d+' }])).toEqual([
+      { label: 'PHONE', pattern: '\\d+' },
+    ]);
+    expect(
+      normalizeTerms([
+        { term: 'Building C', label: 'location' },
+        { term: 'building c', label: 'LOCATION' },
+      ]),
+    ).toEqual([{ term: 'Building C', label: 'LOCATION' }]);
+  });
+});
+
+describe('detectorCounts', () => {
+  it('says how many patterns and terms', () => {
+    expect(detectorCounts(12, 340)).toBe('12 patterns, 340 terms');
+    expect(detectorCounts(1, 1)).toBe('1 pattern, 1 term');
+    expect(detectorCounts(0, 2500)).toBe('0 patterns, 2,500 terms');
   });
 });
 

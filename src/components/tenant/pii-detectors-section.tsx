@@ -1,13 +1,18 @@
-import { useId, useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent, type ReactNode } from 'react';
 import { useUpdateTenant } from '@/api/queries';
 import type { PiiPattern, Tenant, TenantUpdate } from '@/api/types';
 import { formatInt } from '@/lib/format';
 import {
+  detectorCounts,
   formatDictionary,
   MAX_PII_PATTERNS,
+  normalizeLabel,
+  normalizePatterns,
+  normalizeTerms,
   parseDictionary,
   patternError,
   PII_BUILTIN_LABELS,
+  PII_LABEL_ALIASES,
   sameList,
 } from '@/lib/piiDetectors';
 import { Button, Field, FormError, Input, Textarea } from '../ui';
@@ -19,8 +24,37 @@ interface Draft {
   dictionary: string;
 }
 
+/** Labels are case-insensitive: the editor shows and writes them upper-cased. */
 function savedDraft(t: Tenant): Draft {
-  return { patterns: t.pii_patterns ?? [], dictionary: formatDictionary(t.pii_dictionary ?? []) };
+  return {
+    patterns: normalizePatterns(t.pii_patterns ?? []),
+    dictionary: formatDictionary(normalizeTerms(t.pii_dictionary ?? [])),
+  };
+}
+
+function Section({
+  headingId,
+  description,
+  children,
+}: {
+  headingId: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      aria-labelledby={headingId}
+      className="mt-6 rounded-lg border border-border bg-surface"
+    >
+      <div className="border-b border-border px-4 py-2.5">
+        <h2 id={headingId} className="text-[13px] font-semibold text-fg">
+          Personal data detectors
+        </h2>
+        <p className="text-[12px] text-fg-muted">{description}</p>
+      </div>
+      {children}
+    </section>
+  );
 }
 
 /**
@@ -29,6 +63,11 @@ function savedDraft(t: Tenant): Draft {
  * generic detectors miss (site names, internal codes, staff lists). Each list
  * is replaced as a whole with PATCH /tenants/{id}; the audit log records the
  * number of terms, never the terms.
+ *
+ * The lists come only to callers with `tenant.write` (the dictionary may hold
+ * staff or customer names); everyone else gets their sizes. Without both
+ * lists the section shows those sizes and offers no editor, since saving a
+ * list the console never saw would replace it.
  */
 export function PiiDetectorsSection({
   tenant,
@@ -37,8 +76,39 @@ export function PiiDetectorsSection({
   tenant: Tenant;
   readOnly?: boolean;
 }) {
-  const update = useUpdateTenant(tenant.id);
   const headingId = useId();
+  const listed = tenant.pii_patterns !== undefined && tenant.pii_dictionary !== undefined;
+  if (readOnly || !listed) {
+    const patterns = tenant.pii_patterns_count ?? tenant.pii_patterns?.length;
+    const terms = tenant.pii_dictionary_count ?? tenant.pii_dictionary?.length;
+    return (
+      <Section
+        headingId={headingId}
+        description={
+          readOnly
+            ? 'Read only: your role cannot see or change these detectors.'
+            : 'The patterns and terms did not come with the tenant, so they cannot be edited here.'
+        }
+      >
+        <div className="flex flex-col gap-1 p-4 text-[13px]">
+          <p className="text-fg">
+            {patterns != null && terms != null
+              ? detectorCounts(patterns, terms)
+              : 'Not reported by the control plane.'}
+          </p>
+          <p className="text-[12px] text-fg-subtle">
+            The tenant's own patterns and dictionary terms are shown only to roles with
+            tenant.write: the dictionary may hold staff or customer names.
+          </p>
+        </div>
+      </Section>
+    );
+  }
+  return <DetectorsEditor tenant={tenant} headingId={headingId} />;
+}
+
+function DetectorsEditor({ tenant, headingId }: { tenant: Tenant; headingId: string }) {
+  const update = useUpdateTenant(tenant.id);
   const listId = useId();
   const { current, saved: showSaved } = useSavedTenant(tenant);
   const saved = savedDraft(current);
@@ -46,11 +116,11 @@ export function PiiDetectorsSection({
   const [savedNotice, setSavedNotice] = useState(false);
   const values = draft ?? saved;
   const deleted = tenant.status === 'deleted';
-  const locked = deleted || readOnly || update.isPending;
+  const locked = deleted || update.isPending;
 
   const patternErrors = values.patterns.map(patternError);
   const dictionary = parseDictionary(values.dictionary);
-  const savedTerms = current.pii_dictionary ?? [];
+  const savedTerms = normalizeTerms(current.pii_dictionary ?? []);
   const body: TenantUpdate = {};
   if (!sameList(values.patterns, saved.patterns)) body.pii_patterns = values.patterns;
   if (dictionary.ok && !sameList(dictionary.terms, savedTerms)) {
@@ -85,22 +155,14 @@ export function PiiDetectorsSection({
   };
 
   return (
-    <section
-      aria-labelledby={headingId}
-      className="mt-6 rounded-lg border border-border bg-surface"
+    <Section
+      headingId={headingId}
+      description={
+        deleted
+          ? 'This tenant was deleted. Its detectors can no longer be changed.'
+          : "This tenant's own rules, applied with the built-in detectors before any model call. What they match is protected like any personal data, in the tenant's PII mode."
+      }
     >
-      <div className="border-b border-border px-4 py-2.5">
-        <h2 id={headingId} className="text-[13px] font-semibold text-fg">
-          Personal data detectors
-        </h2>
-        <p className="text-[12px] text-fg-muted">
-          {deleted
-            ? 'This tenant was deleted. Its detectors can no longer be changed.'
-            : readOnly
-              ? 'Read only: your role cannot change these detectors.'
-              : "This tenant's own rules, applied with the built-in detectors before any model call. What they match is protected like any personal data, in the tenant's PII mode."}
-        </p>
-      </div>
       <form
         onSubmit={onSubmit}
         aria-label="Personal data detectors"
@@ -110,8 +172,9 @@ export function PiiDetectorsSection({
           <legend className="mb-1 text-[13px] font-medium text-fg">Patterns</legend>
           <p className="text-[12px] text-fg-subtle">
             Regular expressions in the Rust regex syntax (no lookaround or backreferences), at most{' '}
-            {MAX_PII_PATTERNS}. A built-in label ({PII_BUILTIN_LABELS.join(', ')}) uses its
-            surrogates; any other label gets stand-ins of the same shape.
+            {MAX_PII_PATTERNS}. Labels ignore case and are written upper-cased. A built-in label (
+            {PII_BUILTIN_LABELS.join(', ')}, or {PII_LABEL_ALIASES.join(', ')}) uses its surrogates;
+            any other label gets stand-ins of the same shape, and is masked as [LABEL].
           </p>
           <datalist id={listId}>
             {PII_BUILTIN_LABELS.map((l) => (
@@ -129,7 +192,7 @@ export function PiiDetectorsSection({
                 value={p.label}
                 disabled={locked}
                 placeholder="MRN"
-                onChange={(e) => setPattern(i, { label: e.target.value.trim() })}
+                onChange={(e) => setPattern(i, { label: normalizeLabel(e.target.value) })}
                 className="font-mono"
               />
               <span className="flex flex-col gap-1">
@@ -147,35 +210,31 @@ export function PiiDetectorsSection({
                   <span className="text-[12px] text-danger">{patternErrors[i]}</span>
                 )}
               </span>
-              {!readOnly && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  icon={<IconTrash size={14} />}
-                  aria-label={`Remove pattern ${i + 1}`}
-                  disabled={locked}
-                  onClick={() => edit({ patterns: values.patterns.filter((_, j) => j !== i) })}
-                />
-              )}
-            </div>
-          ))}
-          {!readOnly && (
-            <span>
               <Button
                 size="sm"
-                icon={<IconPlus size={14} />}
-                disabled={locked || values.patterns.length >= MAX_PII_PATTERNS}
-                onClick={() => edit({ patterns: [...values.patterns, { label: '', pattern: '' }] })}
-              >
-                Add pattern
-              </Button>
-            </span>
-          )}
+                variant="ghost"
+                icon={<IconTrash size={14} />}
+                aria-label={`Remove pattern ${i + 1}`}
+                disabled={locked}
+                onClick={() => edit({ patterns: values.patterns.filter((_, j) => j !== i) })}
+              />
+            </div>
+          ))}
+          <span>
+            <Button
+              size="sm"
+              icon={<IconPlus size={14} />}
+              disabled={locked || values.patterns.length >= MAX_PII_PATTERNS}
+              onClick={() => edit({ patterns: [...values.patterns, { label: '', pattern: '' }] })}
+            >
+              Add pattern
+            </Button>
+          </span>
         </fieldset>
         <Field
           label="Dictionary"
           error={dictionary.ok ? undefined : dictionary.error}
-          hint={`One term per line, as LABEL: term. Matched as whole words, ignoring case. ${formatInt(
+          hint={`One term per line, as LABEL: term. Matched as whole words, ignoring case; labels ignore case too and are written upper-cased. ${formatInt(
             dictionary.ok ? dictionary.terms.length : savedTerms.length,
           )} terms.`}
         >
@@ -195,31 +254,29 @@ export function PiiDetectorsSection({
           )}
         </Field>
         <FormError error={update.error} />
-        {!readOnly && (
-          <div className="flex flex-wrap items-center justify-end gap-3">
-            <p role="status" className="mr-auto text-[12.5px] text-fg-muted">
-              {dirty ? 'Unsaved changes' : savedNotice ? 'Detectors saved.' : ''}
-            </p>
-            <Button
-              onClick={() => {
-                setDraft(null);
-                update.reset();
-              }}
-              disabled={!dirty || locked}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              loading={update.isPending}
-              disabled={!dirty || deleted || invalid}
-            >
-              Save
-            </Button>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <p role="status" className="mr-auto text-[12.5px] text-fg-muted">
+            {dirty ? 'Unsaved changes' : savedNotice ? 'Detectors saved.' : ''}
+          </p>
+          <Button
+            onClick={() => {
+              setDraft(null);
+              update.reset();
+            }}
+            disabled={!dirty || locked}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            loading={update.isPending}
+            disabled={!dirty || deleted || invalid}
+          >
+            Save
+          </Button>
+        </div>
       </form>
-    </section>
+    </Section>
   );
 }
