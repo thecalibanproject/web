@@ -57,6 +57,8 @@ export const qk = {
   providerHealth: (providerId: string) => ['providers', providerId, 'health'] as const,
   discovery: (providerId: string) => ['providers', providerId, 'discover'] as const,
   datasources: (tenantId?: string) => ['datasources', tenantId ?? 'all'] as const,
+  /** Under the datasources prefix, so a datasource change refreshes it too. */
+  introspection: (datasourceId: string) => ['datasources', 'introspection', datasourceId] as const,
   ontology: (tenantId: string) => ['ontology', tenantId] as const,
   /** Prefix of every node query: lists, versions and diffs. */
   nodesAll: ['nodes'] as const,
@@ -193,6 +195,9 @@ export const discoveryQuery = (providerId: string) =>
     retry: false,
   });
 
+/** How often a datasource being introspected, and its job, are re-read. */
+export const INTROSPECTION_POLL_MS = 3_000;
+
 export const datasourcesQuery = (tenantId?: string) =>
   queryOptions({
     queryKey: qk.datasources(tenantId),
@@ -202,6 +207,30 @@ export const datasourcesQuery = (tenantId?: string) =>
           params: { query: tenantId ? { tenant_id: tenantId } : {} },
         }),
       ),
+    refetchInterval: (q) =>
+      q.state.data?.some((d) => d.status === 'introspecting') ? INTROSPECTION_POLL_MS : false,
+  });
+
+/**
+ * The datasource's newest introspection job. Null when there is none here:
+ * jobs are kept by the control plane replica that ran them (404 elsewhere).
+ */
+export const introspectionQuery = (datasourceId: string) =>
+  queryOptions({
+    queryKey: qk.introspection(datasourceId),
+    queryFn: async () => {
+      try {
+        return await unwrap(
+          api.GET('/api/v1/datasources/{datasourceId}/introspection', {
+            params: { path: { datasourceId } },
+          }),
+        );
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) return null;
+        throw e;
+      }
+    },
+    refetchInterval: (q) => (q.state.data?.status === 'running' ? INTROSPECTION_POLL_MS : false),
   });
 
 export const ontologyQuery = (tenantId: string) =>
@@ -752,7 +781,10 @@ export function useIntrospectDatasource() {
           params: { path: { datasourceId } },
         }),
       ),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['datasources'] }),
+    onSuccess: (res, datasourceId) => {
+      if (res.job) qc.setQueryData(qk.introspection(datasourceId), res.job);
+      return qc.invalidateQueries({ queryKey: ['datasources'] });
+    },
   });
 }
 

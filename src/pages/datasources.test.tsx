@@ -13,6 +13,7 @@ const salesDw: Datasource = {
   status: 'connected',
 };
 const crm: Datasource = { ...salesDw, id: 'ds2', name: 'crm' };
+const legacy: Datasource = { ...salesDw, id: 'ds3', name: 'legacy', status: 'connected' };
 
 describe('DatasourcesPage', () => {
   it('deletes a datasource through a confirm dialog, scoped to its tenant', async () => {
@@ -42,6 +43,89 @@ describe('DatasourcesPage', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(calls.filter((c) => c.method === 'DELETE').map((c) => c.path)).toEqual([
       '/api/v1/tenants/t1/datasources/ds1',
+    ]);
+  });
+
+  it("shows each datasource's newest introspection job, and starts one", async () => {
+    const running = {
+      id: 'job3',
+      datasource_id: 'ds3',
+      tenant_id: 't1',
+      status: 'running' as const,
+      objects: 0,
+      proposed: 0,
+      skipped: 0,
+      version: null,
+      started_at: '2026-10-11T10:05:00Z',
+    };
+    let started = false;
+    const calls = mockApi({
+      'GET /api/v1/tenants': () => ({ body: tenants }),
+      'GET /api/v1/datasources': () => ({
+        body: [
+          { ...salesDw, status: 'ready' as Datasource['status'] },
+          { ...crm, status: 'failed' as Datasource['status'] },
+          legacy,
+        ],
+      }),
+      'GET /api/v1/datasources/ds1/introspection': () => ({
+        body: {
+          id: 'job1',
+          datasource_id: 'ds1',
+          tenant_id: 't1',
+          status: 'succeeded',
+          objects: 12,
+          proposed: 40,
+          skipped: 3,
+          version: 7,
+          started_at: '2026-10-11T10:00:00Z',
+          finished_at: '2026-10-11T10:00:09Z',
+        },
+      }),
+      'GET /api/v1/datasources/ds2/introspection': () => ({
+        body: {
+          id: 'job2',
+          datasource_id: 'ds2',
+          tenant_id: 't1',
+          status: 'failed',
+          objects: 0,
+          proposed: 0,
+          skipped: 0,
+          version: null,
+          error: 'the principal can write: use a read-only user',
+          started_at: '2026-10-11T10:00:00Z',
+        },
+      }),
+      'GET /api/v1/datasources/ds3/introspection': () => (started ? { body: running } : undefined),
+      'POST /api/v1/datasources/ds3/introspect': () => {
+        started = true;
+        return { status: 202, body: { job_id: 'job3', job: running } };
+      },
+    });
+    const user = userEvent.setup();
+    await renderApp('/datasources');
+
+    const rows = await screen.findAllByRole('row');
+    const row = (name: string) => rows.find((r) => within(r).queryByText(name))!;
+    await waitFor(() =>
+      expect(row('sales_dw')).toHaveTextContent(
+        '12 collections, 40 proposed, 3 skipped in version 7',
+      ),
+    );
+    expect(within(row('sales_dw')).getByRole('link', { name: 'version 7' })).toHaveAttribute(
+      'href',
+      '/ontology?tenant=t1',
+    );
+    expect(within(row('sales_dw')).getByText('ready')).toBeInTheDocument();
+    expect(row('crm')).toHaveTextContent('the principal can write: use a read-only user');
+    expect(within(row('crm')).getAllByText('failed')).toHaveLength(2);
+    // No job on this control plane (404): nothing to show.
+    expect(row('legacy')).toHaveTextContent('n/a');
+
+    await user.click(within(row('legacy')).getByRole('button', { name: 'Introspect legacy' }));
+    await waitFor(() => expect(within(row('legacy')).getByText('running')).toBeInTheDocument());
+    expect(calls.filter((c) => c.method === 'POST').map((c) => c.path)).toEqual([
+      '/api/v1/datasources/ds3/introspect',
     ]);
   });
 });

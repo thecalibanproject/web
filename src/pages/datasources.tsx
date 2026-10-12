@@ -4,15 +4,22 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { usePermissions } from '@/api/auth';
 import {
   datasourcesQuery,
+  introspectionQuery,
   tenantsQuery,
   useCreateDatasource,
   useDeleteDatasource,
   useIntrospectDatasource,
 } from '@/api/queries';
-import { DATASOURCE_KINDS, type Datasource, type DatasourceKind } from '@/api/types';
-import { DatasourceStatusBadge } from '@/components/badges';
+import {
+  DATASOURCE_KINDS,
+  type Datasource,
+  type DatasourceKind,
+  type IntrospectionJob,
+} from '@/api/types';
+import { DatasourceStatusBadge, type DatasourceStatus } from '@/components/badges';
 import { TenantFilter, TenantSelect } from '@/components/tenant-select';
 import {
+  Badge,
   Button,
   Card,
   ConfirmDialog,
@@ -32,6 +39,7 @@ import {
   THead,
   Textarea,
   TR,
+  type Tone,
 } from '@/components/ui';
 import { IconPlus, IconRefresh, IconTrash } from '@/components/ui/icons';
 import {
@@ -41,7 +49,8 @@ import {
   type ConnectionField,
 } from '@/lib/datasourceFields';
 import { DATASOURCE_LABEL } from '@/lib/labels';
-import { EMPTY } from '@/lib/format';
+import { errorMessage } from '@/lib/errors';
+import { EMPTY, formatDateTime, formatInt } from '@/lib/format';
 
 const route = getRouteApi('/_app/datasources');
 
@@ -214,26 +223,87 @@ function IntrospectButton({ ds }: { ds: Datasource }) {
   const introspect = useIntrospectDatasource();
   return (
     <span className="inline-flex items-center gap-2">
-      {introspect.isSuccess && (
-        <span className="text-[12px] text-ok" role="status">
-          Job {introspect.data.job_id ?? 'queued'}
-        </span>
-      )}
       {introspect.isError && (
-        <span className="text-[12px] text-danger" role="alert">
-          Failed
+        <span className="max-w-60 truncate text-[12px] text-danger" role="alert">
+          {errorMessage(introspect.error)}
         </span>
       )}
       <Button
         size="sm"
         icon={<IconRefresh size={14} />}
         loading={introspect.isPending}
-        disabled={ds.status === 'introspecting'}
+        disabled={(ds.status as DatasourceStatus) === 'introspecting'}
         onClick={() => introspect.mutate(ds.id)}
-        title="Introspect and profile the source, then propose ontology elements for review"
+        title="Sample the source and propose ontology elements for review"
+        aria-label={`Introspect ${ds.name}`}
       >
         Introspect
       </Button>
+    </span>
+  );
+}
+
+const JOB_TONE: Record<NonNullable<IntrospectionJob['status']>, Tone> = {
+  running: 'info',
+  succeeded: 'ok',
+  failed: 'danger',
+};
+
+/**
+ * The newest introspection job: what it found and proposed, the ontology
+ * version it wrote, or why it failed. Re-read while it runs.
+ */
+function IntrospectionCell({ ds }: { ds: Datasource }) {
+  const job = useQuery(introspectionQuery(ds.id));
+  if (job.isPending) return <span className="text-fg-subtle">{EMPTY}</span>;
+  if (job.isError) {
+    return (
+      <span className="text-[12px] text-danger" title={errorMessage(job.error)}>
+        Could not load
+      </span>
+    );
+  }
+  const j = job.data;
+  if (!j?.status) {
+    return (
+      <span
+        className="text-fg-subtle"
+        title="No introspection job on this control plane. Jobs are kept by the replica that ran them; the status column is stored for all."
+      >
+        {EMPTY}
+      </span>
+    );
+  }
+  return (
+    <span className="flex flex-col gap-0.5 text-[12px]">
+      <span className="inline-flex items-center gap-1.5">
+        <Badge tone={JOB_TONE[j.status]}>{j.status}</Badge>
+        <span className="text-fg-subtle">{formatDateTime(j.finished_at ?? j.started_at)}</span>
+      </span>
+      {j.status === 'failed' ? (
+        <span className="max-w-72 truncate text-danger" title={j.error}>
+          {j.error ?? 'Failed'}
+        </span>
+      ) : (
+        j.status === 'succeeded' && (
+          <span className="text-fg-muted">
+            {formatInt(j.objects)} collections, {formatInt(j.proposed)} proposed,{' '}
+            {formatInt(j.skipped)} skipped
+            {j.version != null && (
+              <>
+                {' in '}
+                <Link
+                  to="/ontology"
+                  search={{ tenant: ds.tenant_id }}
+                  className="text-accent hover:underline"
+                >
+                  version {j.version}
+                </Link>
+              </>
+            )}
+          </span>
+        )
+      )}
     </span>
   );
 }
@@ -307,6 +377,7 @@ export function DatasourcesPage() {
                 <TH>Kind</TH>
                 <TH>Tenant</TH>
                 <TH>Status</TH>
+                <TH>Introspection</TH>
                 <TH className="text-right">Epoch</TH>
                 <TH>
                   <span className="sr-only">Actions</span>
@@ -330,6 +401,9 @@ export function DatasourcesPage() {
                   </TD>
                   <TD>
                     <DatasourceStatusBadge status={ds.status} />
+                  </TD>
+                  <TD>
+                    <IntrospectionCell ds={ds} />
                   </TD>
                   <TD className="text-right text-fg-muted">{ds.epoch ?? EMPTY}</TD>
                   <TD className="text-right whitespace-nowrap">

@@ -32,16 +32,24 @@ export function TrustTierBadge({ tier }: { tier: TrustTier }) {
   );
 }
 
-const DS_TONE: Record<Datasource['status'], Tone> = {
+/**
+ * The contract lists pending, connected, error and introspecting; the control
+ * plane also stores `ready` and `failed` once an introspection ends.
+ */
+export type DatasourceStatus = Datasource['status'] | 'ready' | 'failed';
+
+const DS_TONE: Record<DatasourceStatus, Tone> = {
   pending: 'neutral',
   connected: 'ok',
+  ready: 'ok',
   error: 'danger',
+  failed: 'danger',
   introspecting: 'info',
 };
 
-export function DatasourceStatusBadge({ status }: { status: Datasource['status'] }) {
+export function DatasourceStatusBadge({ status }: { status: DatasourceStatus }) {
   return (
-    <Badge tone={DS_TONE[status]} dot>
+    <Badge tone={DS_TONE[status] ?? 'neutral'} dot>
       {status}
     </Badge>
   );
