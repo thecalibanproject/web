@@ -124,6 +124,10 @@ export type AuditEntry = S['AuditEntry'];
 export type AuditLog = S['AuditLog'];
 export type ReviewDecision = 'approve' | 'reject' | 'deprecate';
 export type IntrospectionJob = S['IntrospectionJob'];
+/** `GET .../intents`: the tenant's caliban/auto intents as routers use them. */
+export type TenantIntents =
+  paths['/api/v1/tenants/{tenantId}/intents']['get']['responses'][200]['content']['application/json'];
+export type TenantIntent = NonNullable<TenantIntents['intents']>[number];
 export type AuthConfig = S['AuthConfig'];
 export type Me = S['Me'];
 export type Role = S['Role'];

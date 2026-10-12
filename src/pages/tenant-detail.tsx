@@ -3,6 +3,7 @@ import { getRouteApi, Link } from '@tanstack/react-router';
 import { usePermissions } from '@/api/auth';
 import { tenantQuery } from '@/api/queries';
 import { ApiKeysPanel } from '@/components/tenant/api-keys-panel';
+import { IntentsPanel } from '@/components/tenant/intents-panel';
 import { DeleteTenantSection } from '@/components/tenant/delete-tenant-section';
 import { NodeLimitsSection } from '@/components/tenant/node-limits-section';
 import { ProviderKeysPanel } from '@/components/tenant/provider-keys-panel';
@@ -19,6 +20,7 @@ const route = getRouteApi('/_app/tenants/$tenantId');
 const TABS = [
   { value: 'api-keys', label: 'API keys', perm: 'api_keys.read' },
   { value: 'provider-keys', label: 'Provider keys', perm: 'provider_keys.read' },
+  { value: 'intents', label: 'Routing intents', perm: 'routes.read' },
 ] as const satisfies ReadonlyArray<{ value: TenantTab; label: string; perm: Permission }>;
 
 export function TenantDetailPage() {
@@ -85,8 +87,10 @@ export function TenantDetailPage() {
         >
           {tab === 'api-keys' ? (
             <ApiKeysPanel tenantId={tenantId} />
-          ) : (
+          ) : tab === 'provider-keys' ? (
             <ProviderKeysPanel tenantId={tenantId} />
+          ) : (
+            <IntentsPanel tenantId={tenantId} />
           )}
         </Tabs>
       )}

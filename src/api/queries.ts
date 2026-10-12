@@ -52,6 +52,7 @@ export const qk = {
   apiKeyList: (tenantId: string, includeRevoked: boolean) =>
     ['tenants', tenantId, 'api-keys', { includeRevoked }] as const,
   providerKeys: (tenantId: string) => ['tenants', tenantId, 'provider-keys'] as const,
+  intents: (tenantId: string) => ['tenants', tenantId, 'intents'] as const,
   models: ['models'] as const,
   providers: ['providers'] as const,
   providerHealth: (providerId: string) => ['providers', providerId, 'health'] as const,
@@ -159,6 +160,14 @@ export const providerKeysQuery = (tenantId: string) =>
       unwrap(
         api.GET('/api/v1/tenants/{tenantId}/provider-keys', { params: { path: { tenantId } } }),
       ),
+  });
+
+/** The tenant's caliban/auto intents, their exemplars, where each comes from and its node. */
+export const intentsQuery = (tenantId: string) =>
+  queryOptions({
+    queryKey: qk.intents(tenantId),
+    queryFn: () =>
+      unwrap(api.GET('/api/v1/tenants/{tenantId}/intents', { params: { path: { tenantId } } })),
   });
 
 export const modelsQuery = () =>
@@ -626,6 +635,38 @@ export function useUpdateTenant(tenantId: string) {
         qc.invalidateQueries({ queryKey: qk.tenantList(true) }),
       ]);
     },
+  });
+}
+
+/**
+ * Sets the tenant's exemplars of an intent, over the config file's (an empty
+ * list removes a file intent for the tenant). Audited as `tenant.intent.set`.
+ */
+export function useSetIntent(tenantId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ intent, exemplars }: { intent: string; exemplars: string[] }) =>
+      unwrap(
+        api.PUT('/api/v1/tenants/{tenantId}/intents/{intent}', {
+          params: { path: { tenantId, intent } },
+          body: { exemplars },
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.intents(tenantId) }),
+  });
+}
+
+/** Drops the tenant's own exemplars of an intent: the config file's apply again. */
+export function useDeleteIntent(tenantId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (intent: string) =>
+      deleteOrGone(
+        api.DELETE('/api/v1/tenants/{tenantId}/intents/{intent}', {
+          params: { path: { tenantId, intent } },
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.intents(tenantId) }),
   });
 }
 
