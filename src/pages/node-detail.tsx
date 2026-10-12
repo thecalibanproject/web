@@ -7,6 +7,7 @@ import type { Node } from '@/api/types';
 import { EvalsPanel } from '@/components/evals/evals-panel';
 import { LiveBadge, NodeStateBadge } from '@/components/nodes/node-badges';
 import { NodeEditor } from '@/components/nodes/node-editor';
+import { NodeScopes } from '@/components/nodes/node-scopes';
 import { VersionDialog, type VersionAction } from '@/components/nodes/version-dialogs';
 import { VersionDiff } from '@/components/nodes/version-diff';
 import {
@@ -35,6 +36,7 @@ import { isNotFound } from '@/lib/errors';
 import { EMPTY, formatDateTime } from '@/lib/format';
 import { shortHash } from '@/lib/nodes';
 import { deniedReason } from '@/lib/permissions';
+import { specHasScopes } from '@/lib/rag';
 import type { NodeTab } from '@/router';
 
 const route = getRouteApi('/_app/nodes/$tenantId/$nodeName');
@@ -52,7 +54,7 @@ function defaultPair(versions: Node[], live: number | null | undefined): [number
   return [from, latest];
 }
 
-function SpecDetails({ version: v }: { version: Node }) {
+function SpecDetails({ tenantId, version: v }: { tenantId: string; version: Node }) {
   const rows: Array<[string, ReactNode]> = [
     [
       'State',
@@ -74,14 +76,44 @@ function SpecDetails({ version: v }: { version: Node }) {
     ['Retired', formatDateTime(v.retired_at)],
   ];
   return (
-    <dl className="mb-4 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 text-[12.5px]">
-      {rows.map(([k, val]) => (
-        <div key={k} className="contents">
-          <dt className="text-fg-muted">{k}</dt>
-          <dd className="min-w-0">{val}</dd>
-        </div>
-      ))}
-    </dl>
+    <>
+      <dl className="mb-4 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 text-[12.5px]">
+        {rows.map(([k, val]) => (
+          <div key={k} className="contents">
+            <dt className="text-fg-muted">{k}</dt>
+            <dd className="min-w-0">{val}</dd>
+          </div>
+        ))}
+      </dl>
+      <section aria-label="Data access" className="mb-4 flex flex-col gap-1.5">
+        <h3 className="text-[12.5px] font-medium">Data access</h3>
+        <NodeScopes tenantId={tenantId} spec={v.spec} />
+      </section>
+    </>
+  );
+}
+
+/**
+ * What the live version (or, with none live, the latest) may read: the
+ * document collections it searches, linked to Retrieval, and its datasource
+ * scopes.
+ */
+function DataAccessCard({ tenantId, version: v }: { tenantId: string; version: Node }) {
+  if (!specHasScopes(v.spec)) return null;
+  return (
+    <Card role="region" aria-label="Data access" className="mt-6">
+      <CardHeader
+        title={`Data access of v${v.version}`}
+        description={
+          v.live
+            ? 'The live version. rag.<collection>:read scopes name the document collections builtin://rag_search may search.'
+            : 'The latest version (none is live). rag.<collection>:read scopes name the document collections builtin://rag_search may search.'
+        }
+      />
+      <div className="px-4 py-3">
+        <NodeScopes tenantId={tenantId} spec={v.spec} />
+      </div>
+    </Card>
   );
 }
 
@@ -103,6 +135,7 @@ export function NodeDetailPage() {
   const list = versions.data?.versions ?? [];
   const live = versions.data?.live;
   const latest = list[list.length - 1];
+  const current = list.find((v) => v.live) ?? latest;
   const viewing = list.find((v) => v.version === search.version) ?? null;
   const pair = defaultPair(list, live);
   const from = search.from ?? pair?.[0];
@@ -308,6 +341,7 @@ export function NodeDetailPage() {
                   </TBody>
                 </Table>
               </Card>
+              {current && <DataAccessCard tenantId={tenantId} version={current} />}
               <VersionDiff
                 tenantId={tenantId}
                 name={nodeName}
@@ -349,7 +383,7 @@ export function NodeDetailPage() {
       >
         {viewing && (
           <>
-            <SpecDetails version={viewing} />
+            <SpecDetails tenantId={tenantId} version={viewing} />
             <CodeBlock
               label="Node spec"
               language="json"

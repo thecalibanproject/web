@@ -278,6 +278,12 @@ export function specScopes(spec: unknown): { rag: RagScope[]; datasources: strin
   return { rag, datasources };
 }
 
+/** Whether a node spec declares any scope, datasource or document collection. */
+export function specHasScopes(spec: unknown): boolean {
+  const { rag, datasources } = specScopes(spec);
+  return rag.length > 0 || datasources.length > 0;
+}
+
 /** Whether a node spec calls `builtin://rag_search`. */
 export function usesRagSearch(spec: unknown): boolean {
   const tools =

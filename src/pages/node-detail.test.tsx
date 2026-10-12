@@ -349,4 +349,54 @@ describe('NodeDetailPage', () => {
     expect(await screen.findByText('Node not found')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to nodes' })).toBeInTheDocument();
   });
+
+  describe('data access', () => {
+    const ragSpec = {
+      ...spec,
+      datasources: { scopes: ['rag.handbook:read', 'rag.*:read', 'shop.orders:read'] },
+      tools: [{ ref: 'builtin://rag_search', effect: 'read' }],
+    };
+    const searching: Node = { ...v1, spec: ragSpec };
+
+    it('shows the collections the live version searches, linked to Retrieval', async () => {
+      await openAs(null, [searching, v2]);
+      const card = screen.getByRole('region', { name: 'Data access' });
+      expect(card).toHaveTextContent('Data access of v1');
+      const handbook = within(card).getByRole('link', {
+        name: 'rag.handbook:read: open collection handbook in Retrieval',
+      });
+      expect(handbook).toHaveAttribute('href', '/rag?tenant=t1&collection=handbook');
+      expect(
+        within(card).getByRole('link', {
+          name: 'rag.*:read: open every collection of the tenant in Retrieval',
+        }),
+      ).toHaveAttribute('href', '/rag?tenant=t1');
+      expect(card).toHaveTextContent('searches handbook');
+      expect(card).toHaveTextContent('shop.orders:read');
+      expect(within(card).queryByText('rag_search not used')).not.toBeInTheDocument();
+    });
+
+    it('shows the scopes of a version in its spec, and links only for roles that read retrieval', async () => {
+      const user = userEvent.setup();
+      await openAs(
+        [
+          { role: 'billing', tenant_id: 't1' },
+          { role: 'developer', tenant_id: 't9' },
+        ],
+        [{ ...searching, spec: { ...ragSpec, tools: [] } }],
+      );
+      await user.click(screen.getByRole('button', { name: 'View spec of v1' }));
+      const drawer = await screen.findByRole('dialog', { name: 'triage v1' });
+      const access = within(drawer).getByRole('region', { name: 'Data access' });
+      const list = within(access).getByRole('list', { name: 'Document collections' });
+      expect(list).toHaveTextContent('rag.handbook:read');
+      expect(within(list).queryByRole('link')).not.toBeInTheDocument();
+      expect(access).toHaveTextContent('rag_search not used');
+    });
+
+    it('has no data access card for a version without scopes', async () => {
+      await openAs(null);
+      expect(screen.queryByRole('region', { name: 'Data access' })).not.toBeInTheDocument();
+    });
+  });
 });
