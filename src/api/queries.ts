@@ -775,7 +775,12 @@ export function useReviewElement(tenantId: string) {
       unwrap(
         api.POST('/api/v1/ontology/elements/{elementId}/review', {
           params: { path: { elementId: args.elementId } },
-          body: { decision: args.decision, ...(args.note ? { note: args.note } : {}) },
+          // Element ids are per tenant: the control plane needs the tenant in the body.
+          body: {
+            tenant_id: tenantId,
+            decision: args.decision,
+            ...(args.note ? { note: args.note } : {}),
+          },
         }),
       ),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.ontology(tenantId) }),
