@@ -62,14 +62,9 @@ export type RunStep = S['RunStep'];
 export type RunUsage = S['RunUsage'];
 export type NodeRunSummary = S['NodeRunSummary'];
 export type NodeRunList = S['NodeRunList'];
-/**
- * The run as the console reads it. `model_cost_usd` and `answer_check` are in
- * the data plane's run (`NodeRun`) but not yet in the console's contract: read
- * them when the control plane sends them.
- */
-export type ConsoleRun = S['ConsoleRun'] &
-  Partial<Pick<S['NodeRun'], 'model_cost_usd' | 'answer_check'>>;
-export type AnswerCheck = NonNullable<S['NodeRun']['answer_check']>;
+export type ConsoleRun = S['ConsoleRun'];
+/** The answer guard on a run's final output: labels, rules, pointers, the action; never text. */
+export type AnswerCheck = S['AnswerCheck'];
 export type AnswerRule = NonNullable<NonNullable<AnswerCheck['findings']>[number]['rule']>;
 /** `GET .../inbox`: runs waiting for a human, oldest wait first. */
 export type Inbox =

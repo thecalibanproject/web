@@ -37,7 +37,6 @@ import {
   budgetRows,
   elapsedMs,
   isRunActive,
-  modelCostUsd,
   prettyJson,
   timeline,
   type BudgetRow,
@@ -120,7 +119,7 @@ function Summary({ run }: { run: ConsoleRun }) {
         key="m"
         title="The real cost of the models its calls were routed to. It differs from what is billed only for runs billed as caliban/auto, at the flat price."
       >
-        {formatUsd(modelCostUsd(run))}
+        {formatUsd(run.model_cost_usd)}
       </span>,
     ],
     [

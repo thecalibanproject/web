@@ -222,6 +222,8 @@ describe('RunDetailPage', () => {
       ...run,
       origin: 'auto',
       cost_usd: 0.01,
+      // The run's own figure, not a sum over its steps.
+      model_cost_usd: 0.0045,
       usage: { prompt_tokens: 700, completion_tokens: 200, total_tokens: 900, pii_entities: 3 },
       steps: run.steps.map((s) =>
         s.kind === 'llm'
@@ -232,7 +234,7 @@ describe('RunDetailPage', () => {
     await openDetail(null, auto);
     const details = screen.getByText('Billed').closest('dl')!;
     expect(within(details).getByText('Billed').nextSibling).toHaveTextContent('$0.01');
-    expect(within(details).getByText('Model cost').nextSibling).toHaveTextContent('$0.0042');
+    expect(within(details).getByText('Model cost').nextSibling).toHaveTextContent('$0.0045');
     expect(within(details).getByText('Personal data').nextSibling).toHaveTextContent(
       '3 entities protected in its model calls',
     );
@@ -267,6 +269,24 @@ describe('RunDetailPage', () => {
     expect(rows[1]).toHaveTextContent('/recommendation');
     expect(rows[2]).toHaveTextContent('Echo of an injected instruction');
     expect(rows[2]).toHaveTextContent('tool:catalogue/search');
+  });
+
+  it('shows the answer guard to roles without runs.data, as metadata only', async () => {
+    await openDetail([{ role: 'viewer', tenant_id: 't1' }], {
+      ...run,
+      content_visible: false,
+      answer_check: {
+        labels: ['datasource'],
+        findings: [{ rule: 'untrusted_link', label: 'datasource', at: '/answer' }],
+        action: 'refused',
+      },
+    });
+    const rows = within(screen.getByRole('table', { name: 'Answer guard findings' })).getAllByRole(
+      'row',
+    );
+    expect(rows[1]).toHaveTextContent('Link from untrusted text');
+    expect(rows[1]).toHaveTextContent('/answer');
+    expect(screen.getByText(/Run content .* is hidden/)).toBeInTheDocument();
   });
 
   it('hides run content from roles without runs.data', async () => {

@@ -150,17 +150,6 @@ export function prettyJson(v: unknown): string {
   return JSON.stringify(v, null, 2) ?? 'null';
 }
 
-/**
- * The real cost of the models the run's calls were routed to: the run's
- * `model_cost_usd`, else the sum over its steps. It differs from the billed
- * `cost_usd` only for runs billed as caliban/auto (the flat price).
- */
-export function modelCostUsd(run: ConsoleRun): number | undefined {
-  if (run.model_cost_usd != null) return run.model_cost_usd;
-  const costs = run.steps.map((s) => s.model_cost_usd).filter((c): c is number => c != null);
-  return costs.length ? costs.reduce((a, b) => a + b, 0) : undefined;
-}
-
 export const ANSWER_RULE_LABEL: Record<AnswerRule, string> = {
   untrusted_link: 'Link from untrusted text',
   untrusted_contact: 'Contact from untrusted text',
