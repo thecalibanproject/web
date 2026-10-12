@@ -9,6 +9,7 @@ import {
   contentTypeLabel,
   findingHint,
   findingLabel,
+  findingPlace,
   formatBytes,
   formatSeconds,
   settingsOf,
@@ -45,8 +46,8 @@ function Findings({
           : trusted && !acknowledged
             ? 'The source is trusted, so these findings were recorded without quarantining it. '
             : ''}
-        The document text stays sealed, so a finding names the chunk it is in, not the text: check
-        that part of the original before releasing it.
+        The document text stays sealed, so a finding names the chunk it is in and the headings above
+        it, not the text: check that part of the original before releasing it.
         {acknowledged && ' An approver acknowledged these findings.'}
       </p>
       <ul className="mt-2.5 flex flex-col gap-2">
@@ -57,7 +58,7 @@ function Findings({
           >
             <span className="flex flex-wrap items-center gap-2">
               <Badge tone="danger">{findingLabel(f.kind)}</Badge>
-              <span className="text-[12px] text-fg-muted">chunk {f.chunk + 1}</span>
+              <span className="text-[12px] text-fg-muted">{findingPlace(f)}</span>
             </span>
             <span className="text-[12px] text-fg-subtle">{findingHint(f.kind)}</span>
           </li>
@@ -80,7 +81,6 @@ function Release({
   const release = useReleaseRagDocument(tenantId, collection.name);
   const [ack, setAck] = useState(false);
   const denied = deniedReason(usePermissions(), 'rag.approve', tenantId);
-  const vetting = vettingOf(doc, collection);
   const deadline = formatSeconds(settingsOf(collection).vet_deadline_secs);
 
   if (release.isSuccess) {
@@ -102,19 +102,11 @@ function Release({
         carry the <code className="font-mono">retrieved</code> taint label, so a write they inspire
         needs an allowlist entry or a human approval.
       </p>
-      {vetting.kind === 'missed' && (
-        <p className="flex items-start gap-2 rounded-md bg-warn-soft px-3 py-2 text-fg">
-          <IconAlert size={14} className="mt-0.5 shrink-0 text-warn" />
-          This untrusted version was ingested more than {deadline} ago, the collection&apos;s
-          vetting deadline. The deadline counts from ingest, so a worker fails the version instead
-          of indexing it once released. Ingest the document again instead.
-        </p>
-      )}
-      {vetting.kind === 'open' && (
-        <p className="flex items-start gap-2 rounded-md bg-warn-soft px-3 py-2 text-fg">
-          <IconAlert size={14} className="mt-0.5 shrink-0 text-warn" />
-          The vetting deadline counts from ingest: release it within {vetting.remaining}, or the
-          worker fails it instead of indexing it.
+      {doc.trust === 'untrusted' && (
+        <p className="text-fg-muted">
+          Its checks then get a fresh vetting window of {deadline} from the release: if they have
+          not passed by then (a backlog of workers, say), the version fails instead of being
+          searched.
         </p>
       )}
       <Checkbox
@@ -156,7 +148,15 @@ function Version({
   const quarantined = doc.status === 'quarantined';
   const rows: Array<[string, ReactNode]> = [
     ['Trust', <TrustBadge key="t" trust={doc.trust} />],
-    ['Vetting deadline', <VettingBadge key="v" vetting={vettingOf(doc, collection)} />],
+    [
+      'Vetting deadline',
+      <span key="v" className="inline-flex flex-wrap items-center gap-2">
+        <VettingBadge vetting={vettingOf(doc, collection)} />
+        {doc.vet_deadline_at && doc.status !== 'quarantined' && (
+          <span className="text-fg-muted">{formatDateTime(doc.vet_deadline_at)}</span>
+        )}
+      </span>,
+    ],
     ['Format', contentTypeLabel(doc.content_type)],
     ['Size', formatBytes(doc.bytes)],
     ['Chunks', formatInt(doc.chunks)],

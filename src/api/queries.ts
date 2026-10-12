@@ -5,7 +5,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { isEvalActive } from '@/lib/evals';
-import { isDocumentActive } from '@/lib/rag';
+import { hasActiveDocuments, isDocumentActive } from '@/lib/rag';
 import {
   isRunActive,
   sinceIso,
@@ -76,6 +76,7 @@ export const qk = {
   /** Prefix of every retrieval query of a tenant: collections and their documents. */
   rag: (tenantId: string) => ['rag', tenantId] as const,
   ragCollections: (tenantId: string) => ['rag', tenantId, 'collections'] as const,
+  ragModels: (tenantId: string) => ['rag', tenantId, 'models'] as const,
   ragCollection: (tenantId: string, collection: string) =>
     ['rag', tenantId, 'collection', collection] as const,
   /** Prefix of a collection's document lists (every status filter). */
@@ -331,6 +332,17 @@ export const ragCollectionsQuery = (tenantId: string) =>
       unwrap(
         api.GET('/api/v1/tenants/{tenantId}/rag/collections', { params: { path: { tenantId } } }),
       ),
+    // The document counts move while documents are being indexed.
+    refetchInterval: (q) =>
+      q.state.data?.some((c) => hasActiveDocuments(c.document_counts)) ? RAG_POLL_MS : false,
+  });
+
+/** The embedding and rerank models the tenant can reach, for a new collection. */
+export const ragModelsQuery = (tenantId: string) =>
+  queryOptions({
+    queryKey: qk.ragModels(tenantId),
+    queryFn: () =>
+      unwrap(api.GET('/api/v1/tenants/{tenantId}/rag/models', { params: { path: { tenantId } } })),
   });
 
 /** One collection, with the published node versions that search it (`used_by`). */
@@ -1133,6 +1145,8 @@ export function useIngestRagDocument(tenantId: string, collection: string) {
       Promise.all([
         qc.invalidateQueries({ queryKey: qk.ragDocuments(tenantId, collection) }),
         qc.invalidateQueries({ queryKey: qk.ragDocument(tenantId, collection, doc.doc_id) }),
+        // The collection list counts documents per status.
+        qc.invalidateQueries({ queryKey: qk.ragCollections(tenantId) }),
       ]),
   });
 }
@@ -1149,7 +1163,10 @@ export function useDeleteRagDocument(tenantId: string, collection: string) {
       ),
     onSuccess: (_outcome, docId) => {
       qc.removeQueries({ queryKey: qk.ragDocument(tenantId, collection, docId) });
-      return qc.invalidateQueries({ queryKey: qk.ragDocuments(tenantId, collection) });
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: qk.ragDocuments(tenantId, collection) }),
+        qc.invalidateQueries({ queryKey: qk.ragCollections(tenantId) }),
+      ]);
     },
   });
 }
@@ -1176,6 +1193,7 @@ export function useReleaseRagDocument(tenantId: string, collection: string) {
       Promise.all([
         qc.invalidateQueries({ queryKey: qk.ragDocuments(tenantId, collection) }),
         qc.invalidateQueries({ queryKey: qk.ragDocument(tenantId, collection, docId) }),
+        qc.invalidateQueries({ queryKey: qk.ragCollections(tenantId) }),
       ]),
   });
 }

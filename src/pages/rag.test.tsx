@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import type { Model, RagCollection, RagDocument, Tenant } from '@/api/types';
+import type { RagCollection, RagDocument, Tenant } from '@/api/types';
 import { meWith, ssoRoutes, type Grant } from '@/test/auth';
 import { mockApi, renderApp } from '@/test/utils';
 
@@ -9,21 +9,10 @@ const tenants: Tenant[] = [
   { id: 't1', name: 'Acme', created_at: '2026-10-01T10:00:00Z' },
   { id: 't2', name: 'Globex', created_at: '2026-10-01T10:00:00Z' },
 ];
-const bge: Model = {
-  id: 'local/bge-m3',
-  provider_id: 'gpu1',
-  upstream_model: 'BAAI/bge-m3',
-  kind: 'embedding',
-  capabilities: {},
-  trust_tier: 't0_sovereign',
+const ragModels = {
+  embedding: [{ id: 'local/bge-m3', provider: 'gpu1', trust_tier: 't0_sovereign' as const }],
+  rerank: [{ id: 'local/bge-reranker', provider: 'gpu1', trust_tier: 't0_sovereign' as const }],
 };
-const reranker: Model = {
-  ...bge,
-  id: 'local/bge-reranker',
-  upstream_model: 'BAAI/bge-reranker-v2-m3',
-  kind: 'rerank',
-};
-const chat: Model = { ...bge, id: 'local/qwen3-8b', kind: 'chat' };
 const handbook: RagCollection = {
   id: 'ragc_1',
   tenant_id: 't1',
@@ -74,10 +63,11 @@ const flagged = doc({
   status: 'quarantined',
   pii_entities: 3,
   findings: [
-    { kind: 'instruction', chunk: 2 },
+    { kind: 'instruction', chunk: 2, heading_path: ['Vendors', 'Payment terms'] },
     { kind: 'near_duplicate', chunk: 4 },
   ],
   created_at: minutesAgo(5),
+  vet_deadline_at: minutesAgo(-10),
 });
 const failed = doc({
   doc_id: 'old-faq',
@@ -93,7 +83,7 @@ function mockRag(
 ) {
   return mockApi({
     'GET /api/v1/tenants': () => ({ body: tenants }),
-    'GET /api/v1/models': () => ({ body: [chat, bge, reranker] }),
+    'GET /api/v1/tenants/t1/rag/models': () => ({ body: ragModels }),
     [`GET ${C}`]: () => ({ body: collections }),
     [`GET ${C}/handbook`]: () => ({ body: { ...handbook, used_by: ['hr-bot@v3'] } }),
     [`GET ${C}/handbook/documents`]: (c) => {
@@ -119,9 +109,9 @@ const docRow = (id: string) =>
     .closest('tr')!;
 
 describe('RagPage', () => {
-  it("lists the tenant's collections with their models, trust and vetting deadline", async () => {
+  it("lists the tenant's collections with their documents, models, trust and vetting deadline", async () => {
     mockRag([], {}, [
-      handbook,
+      { ...handbook, document_counts: { ready: 12, quarantined: 1, pending: 0 } },
       {
         ...handbook,
         id: 'ragc_2',
@@ -141,6 +131,10 @@ describe('RagPage', () => {
     expect(row('contracts')).toHaveTextContent('Trusted');
     expect(row('contracts')).toHaveTextContent('1 h');
     expect(row('contracts')).toHaveTextContent('n/a');
+    expect(within(row('handbook')).getByText('12 ready')).toBeInTheDocument();
+    expect(within(row('handbook')).getByText('1 quarantined')).toBeInTheDocument();
+    expect(within(row('handbook')).queryByText(/pending/)).not.toBeInTheDocument();
+    expect(within(row('contracts')).getByText('None')).toBeInTheDocument();
   });
 
   it('creates a collection; only the settings that differ from the defaults are sent', async () => {
@@ -162,12 +156,12 @@ describe('RagPage', () => {
     expect(form).toHaveTextContent('rag.handbook:read');
     const embedding = within(form).getByLabelText(/^Embedding model/);
     await waitFor(() => expect(embedding).toBeEnabled());
-    // Only embedding models are offered for embedding, and rerank models for reranking.
+    // The embedding models the tenant can reach, from the control plane.
     expect(
       within(embedding)
         .getAllByRole('option')
         .map((o) => o.textContent),
-    ).toEqual(['Select an embedding model…', 'local/bge-m3 (T0 Sovereign)']);
+    ).toEqual(['Select an embedding model…', 'local/bge-m3 (T0 Sovereign, gpu1)']);
     await user.selectOptions(embedding, 'local/bge-m3');
     await user.selectOptions(within(form).getByLabelText(/^Rerank model/), 'local/bge-reranker');
     const deadline = within(form).getByLabelText(/^Vetting deadline/);
@@ -382,13 +376,14 @@ describe('RagPage', () => {
     expect(findings).toHaveTextContent('The ingest checks flagged 2 findings');
     expect(within(findings).getByText('Instructions to the model')).toBeInTheDocument();
     expect(within(findings).getByText('Near-copy of another document')).toBeInTheDocument();
-    expect(findings).toHaveTextContent('chunk 3');
+    expect(findings).toHaveTextContent('chunk 3, under Vendors > Payment terms');
+    expect(findings).toHaveTextContent('chunk 5');
     // Findings come before the release.
     const release = within(drawer).getByRole('region', { name: 'Release' });
     expect(
       findings.compareDocumentPosition(release) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    expect(release).toHaveTextContent(/release it within 1[01] min/);
+    expect(release).toHaveTextContent('a fresh vetting window of 15 min from the release');
 
     const button = within(release).getByRole('button', { name: 'Release document' });
     expect(button).toBeDisabled();
@@ -409,8 +404,8 @@ describe('RagPage', () => {
     });
   });
 
-  it('warns that releasing after the vetting deadline fails the document', async () => {
-    const late = { ...flagged, created_at: minutesAgo(60) };
+  it('releases a version past its ingest deadline: the window counts from the release', async () => {
+    const late = { ...flagged, created_at: minutesAgo(60), vet_deadline_at: minutesAgo(45) };
     mockRag([{ ...late, live_version: null }], {
       [`GET ${C}/handbook/documents/vendor-faq`]: () => ({
         body: { doc_id: 'vendor-faq', live_version: null, versions: [late] },
@@ -419,9 +414,26 @@ describe('RagPage', () => {
     await openRag(null, '/rag?tenant=t1&collection=handbook&doc=vendor-faq');
     const drawer = await screen.findByRole('dialog', { name: 'vendor-faq' });
     const release = await within(drawer).findByRole('region', { name: 'Release' });
-    expect(release).toHaveTextContent('ingested more than 15 min ago');
-    expect(release).toHaveTextContent('Ingest the document again instead.');
-    expect(within(docRow('vendor-faq')).getByText('Deadline passed')).toBeInTheDocument();
+    expect(release).toHaveTextContent('a fresh vetting window of 15 min from the release');
+    expect(release).not.toHaveTextContent(/Ingest the document again/);
+    expect(within(release).getByRole('checkbox')).toBeEnabled();
+    expect(within(docRow('vendor-faq')).getByText('15 min after release')).toBeInTheDocument();
+    expect(within(docRow('vendor-faq')).queryByText('Deadline passed')).not.toBeInTheDocument();
+  });
+
+  it('counts the deadline of a released version from its release', async () => {
+    const released = {
+      ...flagged,
+      status: 'indexing' as const,
+      findings_acknowledged: true,
+      created_at: minutesAgo(60),
+      released_at: minutesAgo(2),
+      vet_deadline_at: minutesAgo(-13),
+    };
+    mockRag([{ ...released, live_version: null }]);
+    await openRag(null, '/rag?tenant=t1&collection=handbook');
+    await screen.findByRole('table', { name: 'Documents of handbook' });
+    expect(within(docRow('vendor-faq')).getByText(/^1[23] min left$/)).toBeInTheDocument();
   });
 
   it('shows why a version failed and which version is searched', async () => {

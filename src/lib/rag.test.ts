@@ -13,6 +13,9 @@ import {
   specScopes,
   usesRagSearch,
   vettingOf,
+  documentCounts,
+  findingPlace,
+  hasActiveDocuments,
 } from './rag';
 
 describe('collection settings', () => {
@@ -84,12 +87,34 @@ describe('vettingOf', () => {
       created_at: '2026-10-12T09:55:00Z',
     } as const;
     expect(vettingOf(doc, collection, now)).toMatchObject({ kind: 'open', remaining: '10 min' });
-    expect(vettingOf({ ...doc, status: 'quarantined' }, collection, now)).toMatchObject({
-      kind: 'open',
-    });
     expect(
       vettingOf({ ...doc, created_at: '2026-10-12T09:40:00Z' }, collection, now),
     ).toMatchObject({ kind: 'missed', deadline: new Date('2026-10-12T09:55:00Z') });
+  });
+
+  it("takes the control plane's vet_deadline_at, which a release moves", () => {
+    const released = {
+      trust: 'untrusted',
+      status: 'indexing',
+      created_at: '2026-10-12T08:00:00Z',
+      vet_deadline_at: '2026-10-12T10:12:00Z',
+    } as const;
+    expect(vettingOf(released, collection, now)).toMatchObject({
+      kind: 'open',
+      remaining: '12 min',
+      deadline: new Date('2026-10-12T10:12:00Z'),
+    });
+  });
+
+  it('gives a quarantined version a fresh window on release, whenever it was ingested', () => {
+    const doc = {
+      trust: 'untrusted',
+      status: 'quarantined',
+      created_at: '2026-10-11T09:00:00Z',
+      vet_deadline_at: '2026-10-11T09:15:00Z',
+    } as const;
+    expect(vettingOf(doc, collection, now)).toEqual({ kind: 'on_release', window: '15 min' });
+    expect(vettingOf({ ...doc, trust: 'trusted' }, collection, now)).toEqual({ kind: 'none' });
   });
 
   it('does not apply to trusted or settled versions', () => {
@@ -139,5 +164,33 @@ describe('specScopes', () => {
     expect(usesRagSearch({ tools: [{ ref: 'builtin://rag_search', effect: 'read' }] })).toBe(true);
     expect(usesRagSearch({ tools: [{ ref: 'builtin://datasource_query' }] })).toBe(false);
     expect(usesRagSearch({})).toBe(false);
+  });
+});
+
+describe('documentCounts', () => {
+  it('keeps the statuses with documents, in status order', () => {
+    expect(documentCounts({ quarantined: 1, ready: 12, pending: 0, failed: 2 })).toEqual([
+      { status: 'ready', count: 12 },
+      { status: 'quarantined', count: 1 },
+      { status: 'failed', count: 2 },
+    ]);
+    expect(documentCounts(undefined)).toEqual([]);
+  });
+
+  it('says when documents are still being indexed', () => {
+    expect(hasActiveDocuments({ ready: 3, indexing: 1 })).toBe(true);
+    expect(hasActiveDocuments({ pending: 2 })).toBe(true);
+    expect(hasActiveDocuments({ ready: 3, pending: 0 })).toBe(false);
+    expect(hasActiveDocuments(undefined)).toBe(false);
+  });
+});
+
+describe('findingPlace', () => {
+  it('names the chunk and the headings above it', () => {
+    expect(findingPlace({ chunk: 2, heading_path: ['Travel', 'Hotels'] })).toBe(
+      'chunk 3, under Travel > Hotels',
+    );
+    expect(findingPlace({ chunk: 0 })).toBe('chunk 1');
+    expect(findingPlace({ chunk: 0, heading_path: [] })).toBe('chunk 1');
   });
 });

@@ -6,7 +6,7 @@ import { ragCollectionsQuery, tenantsQuery, useDeleteRagCollection } from '@/api
 import type { RagCollection } from '@/api/types';
 import { CollectionDocuments } from '@/components/rag/collection-documents';
 import { CreateCollectionForm } from '@/components/rag/create-collection-form';
-import { TrustBadge } from '@/components/rag/rag-badges';
+import { DocumentCountBadges, TrustBadge } from '@/components/rag/rag-badges';
 import { TenantSelect } from '@/components/tenant-select';
 import {
   Button,
@@ -192,6 +192,7 @@ function CollectionList({
               <tr>
                 <TH>Name</TH>
                 <TH>Description</TH>
+                <TH>Documents</TH>
                 <TH>Embedding model</TH>
                 <TH>Rerank model</TH>
                 <TH>Default trust</TH>
@@ -220,6 +221,9 @@ function CollectionList({
                     </TD>
                     <TD className="max-w-64 truncate text-fg-muted" title={c.description}>
                       {c.description || EMPTY}
+                    </TD>
+                    <TD>
+                      <DocumentCountBadges counts={c.document_counts} />
                     </TD>
                     <TD className="font-mono text-[12px]">{c.embedding_model}</TD>
                     <TD className="font-mono text-[12px] text-fg-muted">

@@ -1,9 +1,11 @@
-import type {
-  RagCollection,
-  RagCollectionSettings,
-  RagDocument,
-  RagDocumentStatus,
-  RagTrust,
+import {
+  RAG_DOCUMENT_STATUSES,
+  type RagCollection,
+  type RagCollectionSettings,
+  type RagDocument,
+  type RagDocumentStatus,
+  type RagFinding,
+  type RagTrust,
 } from '@/api/types';
 import type { Tone } from '@/components/ui';
 import { EMPTY } from './format';
@@ -222,32 +224,65 @@ function formatRemaining(ms: number): string {
   return `${Math.floor(hours / 24)} days`;
 }
 
+/** Document counts per status of a collection (newest version of each document). */
+export type DocumentCounts = Partial<Record<string, number>>;
+
+/** Whether some documents are still being indexed (pending or indexing). */
+export function hasActiveDocuments(counts: DocumentCounts | undefined): boolean {
+  return Boolean(counts && ((counts.pending ?? 0) > 0 || (counts.indexing ?? 0) > 0));
+}
+
+/**
+ * The counts to show, in status order, without zeros (deleted documents are
+ * not counted; superseded never is the newest version).
+ */
+export function documentCounts(
+  counts: DocumentCounts | undefined,
+): Array<{ status: RagDocumentStatus; count: number }> {
+  return RAG_DOCUMENT_STATUSES.flatMap((status) => {
+    const count = counts?.[status] ?? 0;
+    return count > 0 ? [{ status, count }] : [];
+  });
+}
+
 /**
  * Where a document version stands against its collection's vetting deadline.
- * Only untrusted versions have one, counted from ingest; it matters while the
- * version is not ready yet (pending, indexing) and for a quarantined version,
- * since releasing it sends it back to indexing, where the worker checks the
- * deadline again from the original ingest time.
+ * Only untrusted versions have one, and it matters while the version is not
+ * ready yet (pending, indexing): `vet_deadline_at` from the control plane, or
+ * for an older one the collection's window from ingest. A quarantined version
+ * waits on a decision: releasing it gives its checks a fresh window from the
+ * release.
  */
 export type Vetting =
   | { kind: 'none' }
   | { kind: 'open'; deadline: Date; remaining: string }
-  | { kind: 'missed'; deadline: Date };
+  | { kind: 'missed'; deadline: Date }
+  | { kind: 'on_release'; window: string };
 
 export function vettingOf(
-  doc: Pick<RagDocument, 'trust' | 'status' | 'created_at'>,
+  doc: Pick<RagDocument, 'trust' | 'status' | 'created_at' | 'vet_deadline_at'>,
   collection: Pick<RagCollection, 'settings'>,
   now: number = Date.now(),
 ): Vetting {
   if (doc.trust !== 'untrusted') return { kind: 'none' };
-  if (!(isDocumentActive(doc.status) || doc.status === 'quarantined')) return { kind: 'none' };
-  const created = Date.parse(doc.created_at);
-  if (Number.isNaN(created)) return { kind: 'none' };
-  const deadline = new Date(created + settingsOf(collection).vet_deadline_secs * 1000);
-  const left = deadline.getTime() - now;
+  const secs = settingsOf(collection).vet_deadline_secs;
+  if (doc.status === 'quarantined') return { kind: 'on_release', window: formatSeconds(secs) };
+  if (!isDocumentActive(doc.status)) return { kind: 'none' };
+  const at = doc.vet_deadline_at
+    ? Date.parse(doc.vet_deadline_at)
+    : Date.parse(doc.created_at) + secs * 1000;
+  if (Number.isNaN(at)) return { kind: 'none' };
+  const deadline = new Date(at);
+  const left = at - now;
   return left > 0
     ? { kind: 'open', deadline, remaining: formatRemaining(left) }
     : { kind: 'missed', deadline };
+}
+
+/** A finding's place: its chunk (1-based) and the headings above it. */
+export function findingPlace(f: Pick<RagFinding, 'chunk' | 'heading_path'>): string {
+  const path = (f.heading_path ?? []).filter(Boolean);
+  return path.length ? `chunk ${f.chunk + 1}, under ${path.join(' > ')}` : `chunk ${f.chunk + 1}`;
 }
 
 /** A `rag.<collection>:read` scope of a node spec. `collection` is `*` for every collection. */

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState, type FormEvent } from 'react';
-import { modelsQuery, useCreateRagCollection } from '@/api/queries';
+import { ragModelsQuery, useCreateRagCollection } from '@/api/queries';
 import { RAG_TRUSTS, type RagCollectionSettings, type RagTrust } from '@/api/types';
 import { TRUST_TIER_LABEL } from '@/lib/labels';
 import {
@@ -33,9 +33,11 @@ export function CreateCollectionForm({
   onCreated: (name: string) => void;
 }) {
   const create = useCreateRagCollection(tenantId);
-  const models = useQuery(modelsQuery());
-  const embedders = (models.data ?? []).filter((m) => m.kind === 'embedding');
-  const rerankers = (models.data ?? []).filter((m) => m.kind === 'rerank');
+  // Only the models this tenant can reach: served by one of its providers or a
+  // shared provider that serves it.
+  const models = useQuery(ragModelsQuery(tenantId));
+  const embedders = models.data?.embedding ?? [];
+  const rerankers = models.data?.rerank ?? [];
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [embedding, setEmbedding] = useState('');
@@ -113,11 +115,11 @@ export function CreateCollectionForm({
         hint={
           embedders.length === 0 && models.isSuccess ? (
             <>
-              The model catalogue has no embedding model.{' '}
+              No embedding model is served to this tenant.{' '}
               <Link to="/models" className="text-accent hover:underline">
                 Add one in Models
-              </Link>{' '}
-              first.
+              </Link>
+              , on one of its providers or a shared provider that serves it, first.
             </>
           ) : (
             "Fixed for the collection's life: vectors of two models cannot be compared. Text is pseudonymised before it is embedded, so an embedder outside your trust boundary sees surrogates."
@@ -138,7 +140,7 @@ export function CreateCollectionForm({
             </option>
             {embedders.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.id} ({TRUST_TIER_LABEL[m.trust_tier]})
+                {m.id} ({TRUST_TIER_LABEL[m.trust_tier]}, {m.provider})
               </option>
             ))}
           </Select>
@@ -146,7 +148,7 @@ export function CreateCollectionForm({
       </Field>
       <Field
         label="Rerank model"
-        hint="Optional. Reorders the best candidates of every search; recommended when the catalogue has one."
+        hint="Optional. Reorders the best candidates of every search; recommended when one is served to this tenant."
       >
         {({ id, describedBy }) => (
           <Select
@@ -159,7 +161,7 @@ export function CreateCollectionForm({
             <option value="">None</option>
             {rerankers.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.id} ({TRUST_TIER_LABEL[m.trust_tier]})
+                {m.id} ({TRUST_TIER_LABEL[m.trust_tier]}, {m.provider})
               </option>
             ))}
           </Select>
@@ -229,7 +231,7 @@ export function CreateCollectionForm({
             Number.isFinite(settings.vet_deadline_secs) && settings.vet_deadline_secs > 0
               ? `${formatSeconds(settings.vet_deadline_secs)}. `
               : ''
-          }An untrusted document whose checks have not passed this long after ingest fails and is never searched, rather than appearing later when a backlog clears. 60 seconds to 7 days.`}
+          }An untrusted document whose checks have not passed this long after ingest (or after its release from quarantine) fails and is never searched, rather than appearing later when a backlog clears. 60 seconds to 7 days.`}
         >
           {({ id, describedBy }) => (
             <Input
@@ -250,7 +252,7 @@ export function CreateCollectionForm({
           {invalid}
         </p>
       )}
-      <FormError error={create.error} />
+      <FormError error={create.error ?? models.error} />
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" onClick={onCancel}>
           Cancel
