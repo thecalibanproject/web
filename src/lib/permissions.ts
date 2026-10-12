@@ -95,6 +95,8 @@ const WHAT: Partial<Record<Permission, string>> = {
   'runs.answer': 'answer questions or approve writes of node runs',
   'tenant.write': 'change tenant settings',
   'api_keys.write': 'mint or revoke API keys',
+  'ontology.review': 'review or propose ontology elements',
+  'routes.write': 'change routing intents',
 };
 
 /**

@@ -5,6 +5,8 @@ import { usePermissions } from '@/api/auth';
 import { ontologyQuery, useReviewElement } from '@/api/queries';
 import type { OntologyElement, ReviewDecision } from '@/api/types';
 import { ConfidenceMeter, ElementStatusBadge, ProvenanceBadge } from '@/components/badges';
+import { BreakingChanges } from '@/components/ontology/breaking-changes';
+import { ProposeDrawer } from '@/components/ontology/propose-drawer';
 import { TenantFilter } from '@/components/tenant-select';
 import { TenantDeletedState } from '@/components/tenant/tenant-deleted-state';
 import {
@@ -17,6 +19,8 @@ import {
   EmptyState,
   ErrorState,
   Field,
+  FormError,
+  GatedButton,
   LoadingState,
   PageHeader,
   Table,
@@ -27,13 +31,28 @@ import {
   Textarea,
   TR,
 } from '@/components/ui';
-import { IconCheck, IconX } from '@/components/ui/icons';
+import { IconCheck, IconPlus, IconX } from '@/components/ui/icons';
 import { cn } from '@/lib/cn';
 import { errorMessage, isNotFound } from '@/lib/errors';
-import { ALWAYS_REVIEW, groupByKind, ONTOLOGY_KIND_LABEL, reviewQueue } from '@/lib/ontology';
+import { deniedReason } from '@/lib/permissions';
+import {
+  ALWAYS_REVIEW,
+  breakingChanges,
+  decisionsFor,
+  groupByKind,
+  ONTOLOGY_KIND_LABEL,
+  reviewQueue,
+} from '@/lib/ontology';
 
 const route = getRouteApi('/_app/ontology');
 
+const DECISION_LABEL: Record<ReviewDecision, string> = {
+  approve: 'Approve',
+  reject: 'Reject',
+  deprecate: 'Deprecate',
+};
+
+/** Approve or reject a proposal, or approve a stale element again. */
 function ReviewActions({
   tenantId,
   element,
@@ -57,7 +76,9 @@ function ReviewActions({
       { onSettled: () => setPending(null), onSuccess: () => onDone?.() },
     );
   };
-  if (!canReview) return null;
+  // Withdrawing (deprecate) has its own section, which handles breaking changes.
+  const decisions = decisionsFor(element.status).filter((d) => d !== 'deprecate');
+  if (!canReview || decisions.length === 0) return null;
   return (
     <span className="inline-flex flex-wrap items-center justify-end gap-1.5">
       {review.isError && (
@@ -65,30 +86,97 @@ function ReviewActions({
           {errorMessage(review.error)}
         </span>
       )}
-      <Button
-        size={size}
-        variant="success"
-        icon={<IconCheck size={14} />}
-        loading={pending === 'approve'}
-        disabled={review.isPending}
-        onClick={() => decide('approve')}
-        aria-label={`Approve ${element.name}`}
-      >
-        Approve
-      </Button>
-      <Button
-        size={size}
-        variant="danger"
-        icon={<IconX size={14} />}
-        loading={pending === 'reject'}
-        disabled={review.isPending}
-        onClick={() => decide('reject')}
-        aria-label={`Reject ${element.name}`}
-      >
-        Reject
-      </Button>
+      {decisions.map((d) => (
+        <Button
+          key={d}
+          size={size}
+          variant={d === 'approve' ? 'success' : 'danger'}
+          icon={d === 'approve' ? <IconCheck size={14} /> : <IconX size={14} />}
+          loading={pending === d}
+          disabled={review.isPending}
+          onClick={() => decide(d)}
+          aria-label={`${DECISION_LABEL[d]} ${element.name}`}
+        >
+          {DECISION_LABEL[d]}
+        </Button>
+      ))}
     </span>
   );
+}
+
+/**
+ * Withdrawing an approved (or stale) element: deprecating it. When published
+ * node versions' fixed queries use it, the control plane refuses with the
+ * versions it would break, and the reviewer goes ahead only by acknowledging.
+ */
+function Withdraw({
+  tenantId,
+  element,
+  note,
+}: {
+  tenantId: string;
+  element: OntologyElement;
+  note?: string;
+}) {
+  const review = useReviewElement(tenantId);
+  const denied = deniedReason(usePermissions(), 'ontology.review', tenantId);
+  const [ack, setAck] = useState(false);
+  const breaking = breakingChanges(review.error);
+  const deprecate = (acknowledgeBreaking: boolean) =>
+    review.mutate({ elementId: element.id, decision: 'deprecate', note, acknowledgeBreaking });
+
+  return (
+    <section
+      aria-label="Withdraw"
+      className="flex flex-col gap-3 rounded-md border border-border p-3 text-[12.5px]"
+    >
+      <p className="text-fg-muted">
+        Deprecating withdraws this element: new queries can no longer use it. Published node
+        versions whose fixed queries use it would fail on them, so the control plane names them and
+        asks you to confirm.
+      </p>
+      {breaking ? (
+        <BreakingChanges
+          tenantId={tenantId}
+          changes={breaking}
+          message={errorMessage(review.error)}
+          acknowledged={ack}
+          onAcknowledge={setAck}
+          disabled={review.isPending}
+        >
+          <Button
+            variant="danger"
+            disabled={!ack}
+            loading={review.isPending}
+            onClick={() => deprecate(true)}
+            aria-label={`Deprecate ${element.name} anyway`}
+          >
+            Deprecate anyway
+          </Button>
+        </BreakingChanges>
+      ) : (
+        <>
+          <FormError error={review.error} />
+          <span>
+            <GatedButton
+              variant="danger"
+              deniedReason={denied}
+              loading={review.isPending}
+              onClick={() => deprecate(false)}
+              aria-label={`Deprecate ${element.name}`}
+            >
+              Deprecate
+            </GatedButton>
+          </span>
+        </>
+      )}
+    </section>
+  );
+}
+
+/** `changed_in`: the ontology version its spec or status last changed in. */
+function changedIn(element: OntologyElement): string {
+  return element.changed_in != null ? `Version ${element.changed_in}` : 'Not recorded';
 }
 
 function ElementDrawer({
@@ -119,7 +207,7 @@ function ElementDrawer({
         )
       }
       footer={
-        element?.status === 'proposed' ? (
+        element && (element.status === 'proposed' || element.status === 'stale') ? (
           <ReviewActions
             tenantId={tenantId}
             element={element}
@@ -138,6 +226,10 @@ function ElementDrawer({
           <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-[13px]">
             <dt className="text-fg-muted">ID</dt>
             <dd className="font-mono text-[12px] break-all">{element.id}</dd>
+            <dt className="text-fg-muted">Changed in</dt>
+            <dd title="The ontology version its definition or status last changed in. Node queries written for an earlier version keep working while nothing they use changed after it.">
+              {changedIn(element)}
+            </dd>
             <dt className="text-fg-muted">Confidence</dt>
             <dd>
               <ConfidenceMeter value={element.confidence} />
@@ -167,7 +259,15 @@ function ElementDrawer({
               className="max-h-[50dvh]"
             />
           </section>
-          {element.status === 'proposed' && (
+          {(element.status === 'approved' || element.status === 'stale') && (
+            <Withdraw
+              key={element.id}
+              tenantId={tenantId}
+              element={element}
+              note={note.trim() || undefined}
+            />
+          )}
+          {decisionsFor(element.status).length > 0 && (
             <Field label="Review note" hint="Optional. Stored with the decision for audit.">
               {({ id, describedBy }) => (
                 <Textarea
@@ -264,6 +364,8 @@ export function OntologyPage() {
   const navigate = route.useNavigate();
   const ontology = useQuery({ ...ontologyQuery(tenant ?? ''), enabled: Boolean(tenant) });
   const [openId, setOpenId] = useState<string | null>(null);
+  const [proposing, setProposing] = useState(false);
+  const cannotReview = deniedReason(usePermissions(), 'ontology.review', tenant);
 
   const elements = useMemo(() => ontology.data?.elements ?? [], [ontology.data]);
   const queue = useMemo(() => reviewQueue(elements), [elements]);
@@ -278,9 +380,18 @@ export function OntologyPage() {
         description="The Caliban Semantic Model: a governed map of your data that grounds routing and answers."
         actions={
           ontology.data && (
-            <span className="text-[12px] text-fg-subtle">
-              Version {ontology.data.version} · {elements.length} elements
-            </span>
+            <>
+              <span className="text-[12px] text-fg-subtle">
+                Version {ontology.data.version} · {elements.length} elements
+              </span>
+              <GatedButton
+                icon={<IconPlus size={14} />}
+                deniedReason={cannotReview}
+                onClick={() => setProposing(true)}
+              >
+                Propose elements
+              </GatedButton>
+            </>
           )
         }
       />
@@ -350,6 +461,14 @@ export function OntologyPage() {
                             >
                               <span className="min-w-0 truncate">{el.name}</span>
                               <span className="flex shrink-0 items-center gap-1.5">
+                                {el.changed_in != null && (
+                                  <span
+                                    className="text-[11.5px] text-fg-subtle tabular-nums"
+                                    title={`Changed in version ${el.changed_in}`}
+                                  >
+                                    v{el.changed_in}
+                                  </span>
+                                )}
                                 <ProvenanceBadge provenance={el.provenance} />
                                 <ElementStatusBadge status={el.status} />
                               </span>
@@ -365,6 +484,7 @@ export function OntologyPage() {
           </section>
 
           <ElementDrawer tenantId={tenant} element={open} onClose={() => setOpenId(null)} />
+          <ProposeDrawer tenantId={tenant} open={proposing} onClose={() => setProposing(false)} />
         </>
       )}
     </>

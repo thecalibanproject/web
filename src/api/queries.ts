@@ -22,6 +22,7 @@ import type {
   GoldenCase,
   ModelCreate,
   Node,
+  OntologyElement,
   ProviderKeyCreate,
   RagCollectionCreate,
   RagDocumentIngest,
@@ -771,7 +772,13 @@ export function useDeleteDatasource() {
 export function useReviewElement(tenantId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (args: { elementId: string; decision: ReviewDecision; note?: string }) =>
+    mutationFn: (args: {
+      elementId: string;
+      decision: ReviewDecision;
+      note?: string;
+      /** Go ahead although published node versions query the element (a `409` otherwise). */
+      acknowledgeBreaking?: boolean;
+    }) =>
       unwrap(
         api.POST('/api/v1/ontology/elements/{elementId}/review', {
           params: { path: { elementId: args.elementId } },
@@ -780,6 +787,29 @@ export function useReviewElement(tenantId: string) {
             tenant_id: tenantId,
             decision: args.decision,
             ...(args.note ? { note: args.note } : {}),
+            ...(args.acknowledgeBreaking ? { acknowledge_breaking: true } : {}),
+          },
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.ontology(tenantId) }),
+  });
+}
+
+/**
+ * Writes elements made outside Caliban as proposals, in one ontology version
+ * (`ontology.review`). Proposing over an approved element withdraws it, so it
+ * can be refused with a breaking-change `409` like a review.
+ */
+export function useProposeOntology(tenantId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { elements: OntologyElement[]; acknowledgeBreaking?: boolean }) =>
+      unwrap(
+        api.POST('/api/v1/tenants/{tenantId}/ontology/proposals', {
+          params: { path: { tenantId } },
+          body: {
+            elements: args.elements,
+            ...(args.acknowledgeBreaking ? { acknowledge_breaking: true } : {}),
           },
         }),
       ),
