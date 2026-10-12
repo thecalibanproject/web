@@ -35,7 +35,7 @@ function buildAuth(method: ToolAuthMethod, f: AuthFields): ToolAuth {
 
 /** Explains the trusted flag: who sees personal data in tool arguments. */
 export const TRUSTED_HINT =
-  "Off (the default): the server receives tool arguments with personal data replaced, as the tenant's PII mode says (the same surrogates or masks the node's model calls see). On: Caliban puts the real values back before the call. Turn it on only for a server inside your trust boundary that may process personal data. Tool results are anonymized as they enter the run either way.";
+  "Off (the default): the server receives tool arguments with personal data replaced, as the tenant's PII mode says (the same surrogates or masks the node's model calls see). On: Caliban puts the real values back before the call. Turn it on only for a server inside your trust boundary that may process personal data. Tool results enter the run as they are in reversible mode (models get surrogates, the caller the real values) and masked, for good, in mask mode.";
 
 /**
  * Registers an MCP server (Streamable HTTP) for a tenant. The credential, for

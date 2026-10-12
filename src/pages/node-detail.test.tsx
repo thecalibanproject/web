@@ -427,6 +427,9 @@ describe('NodeDetailPage', () => {
       expect(card).toHaveTextContent('Answer and model calls of v1');
       expect(card).toHaveTextContent('what the node reads can steer what it tells the user');
       expect(card).toHaveTextContent('mask on every model call, sovereign models included');
+      expect(card).toHaveTextContent(
+        'Irreversible: tool results are masked as they enter the run, so the caller sees [PHONE] too. A node that must quote contacts from a catalogue should use reversible.',
+      );
       const rows = within(within(card).getByRole('table', { name: 'Model vertices' })).getAllByRole(
         'row',
       );
@@ -446,6 +449,9 @@ describe('NodeDetailPage', () => {
       expect(
         within(drawer).getByRole('region', { name: 'Answer and model calls' }),
       ).toHaveTextContent("the tenant's PII settings apply");
+      expect(card).toHaveTextContent(
+        'In reversible mode tool results enter the run as they are and the caller gets the real values',
+      );
     });
   });
 });

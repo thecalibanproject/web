@@ -12,6 +12,21 @@ const GUARD_HINT: Record<AnswerGuardMode, string> = {
   off: 'The answer is not checked: what the node reads can steer what it tells the user.',
 };
 
+/**
+ * What the PII mode does to tool results (docs/tools.md, Personal data): in
+ * reversible mode they enter the run as they are (models get surrogates, the
+ * caller the real values); mask is irreversible, so the caller sees masks too.
+ */
+const PII_FLOOR_HINT: Record<string, string> = {
+  reversible:
+    'Tool results enter the run as they are: models get surrogates, and the caller gets the real values.',
+  mask: 'Irreversible: tool results are masked as they enter the run, so the caller sees [PHONE] too. A node that must quote contacts from a catalogue should use reversible.',
+  off: "Adds nothing: the floor only strengthens the tenant's mode.",
+};
+
+const NO_FLOOR_HINT =
+  'In reversible mode tool results enter the run as they are and the caller gets the real values; mask is irreversible, so the caller sees [PHONE] too.';
+
 function reasoningText(own: Reasoning | undefined, node: Reasoning | undefined): string {
   if (own) return own;
   return node ? `${node} (node default)` : "model's default";
@@ -36,7 +51,7 @@ export function NodeBehavior({ spec }: { spec: unknown }) {
           <span className="text-[12px] text-fg-subtle">{GUARD_HINT[b.answerGuard]}</span>
         </dd>
         <dt className="text-fg-muted">PII floor</dt>
-        <dd>
+        <dd className="flex min-w-0 flex-col gap-0.5">
           {b.piiFloor ? (
             <span>
               <code className="font-mono">{b.piiFloor}</code>
@@ -48,6 +63,9 @@ export function NodeBehavior({ spec }: { spec: unknown }) {
           ) : (
             <span className="text-fg-subtle">None: the tenant&apos;s PII settings apply</span>
           )}
+          <span className="text-[12px] text-fg-subtle">
+            {b.piiFloor ? (PII_FLOOR_HINT[b.piiFloor] ?? '') : NO_FLOOR_HINT}
+          </span>
         </dd>
         <dt className="text-fg-muted">Reasoning</dt>
         <dd>{reasoningText(b.reasoning, undefined)}</dd>

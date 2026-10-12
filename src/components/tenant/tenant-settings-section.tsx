@@ -147,7 +147,7 @@ export function TenantSettingsSection({
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <Field
             label="PII default mode"
-            hint="Reversible pseudonymizes before the model and restores in the response."
+            hint="Reversible pseudonymizes before the model and restores in the response; tool results of node runs enter the run as they are. Mask is irreversible: the caller sees [PHONE] too."
           >
             {({ id, describedBy }) => (
               <Select
