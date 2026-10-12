@@ -16,7 +16,7 @@ import {
   type DatasourceKind,
   type IntrospectionJob,
 } from '@/api/types';
-import { DatasourceStatusBadge, type DatasourceStatus } from '@/components/badges';
+import { DatasourceStatusBadge } from '@/components/badges';
 import { TenantFilter, TenantSelect } from '@/components/tenant-select';
 import {
   Badge,
@@ -232,7 +232,7 @@ function IntrospectButton({ ds }: { ds: Datasource }) {
         size="sm"
         icon={<IconRefresh size={14} />}
         loading={introspect.isPending}
-        disabled={(ds.status as DatasourceStatus) === 'introspecting'}
+        disabled={ds.status === 'introspecting'}
         onClick={() => introspect.mutate(ds.id)}
         title="Sample the source and propose ontology elements for review"
         aria-label={`Introspect ${ds.name}`}
@@ -266,10 +266,7 @@ function IntrospectionCell({ ds }: { ds: Datasource }) {
   const j = job.data;
   if (!j?.status) {
     return (
-      <span
-        className="text-fg-subtle"
-        title="No introspection job on this control plane. Jobs are kept by the replica that ran them; the status column is stored for all."
-      >
+      <span className="text-fg-subtle" title="Never introspected.">
         {EMPTY}
       </span>
     );

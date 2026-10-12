@@ -62,11 +62,7 @@ describe('DatasourcesPage', () => {
     const calls = mockApi({
       'GET /api/v1/tenants': () => ({ body: tenants }),
       'GET /api/v1/datasources': () => ({
-        body: [
-          { ...salesDw, status: 'ready' as Datasource['status'] },
-          { ...crm, status: 'failed' as Datasource['status'] },
-          legacy,
-        ],
+        body: [{ ...salesDw, status: 'ready' }, { ...crm, status: 'failed' }, legacy],
       }),
       'GET /api/v1/datasources/ds1/introspection': () => ({
         body: {
@@ -119,7 +115,9 @@ describe('DatasourcesPage', () => {
     expect(within(row('sales_dw')).getByText('ready')).toBeInTheDocument();
     expect(row('crm')).toHaveTextContent('the principal can write: use a read-only user');
     expect(within(row('crm')).getAllByText('failed')).toHaveLength(2);
-    // No job on this control plane (404): nothing to show.
+    // A failed job (a stale one included) may be started again.
+    expect(within(row('crm')).getByRole('button', { name: 'Introspect crm' })).toBeEnabled();
+    // Never introspected (404): nothing to show.
     expect(row('legacy')).toHaveTextContent('n/a');
 
     await user.click(within(row('legacy')).getByRole('button', { name: 'Introspect legacy' }));

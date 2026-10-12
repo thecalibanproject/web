@@ -33,10 +33,10 @@ export function TrustTierBadge({ tier }: { tier: TrustTier }) {
 }
 
 /**
- * The contract lists pending, connected, error and introspecting; the control
- * plane also stores `ready` and `failed` once an introspection ends.
+ * `pending` when created, `introspecting` while a job runs, then `ready` or
+ * `failed`. `connected` and `error` are reserved (not set by this release).
  */
-export type DatasourceStatus = Datasource['status'] | 'ready' | 'failed';
+export type DatasourceStatus = Datasource['status'];
 
 const DS_TONE: Record<DatasourceStatus, Tone> = {
   pending: 'neutral',

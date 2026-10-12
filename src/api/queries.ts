@@ -224,8 +224,9 @@ export const datasourcesQuery = (tenantId?: string) =>
   });
 
 /**
- * The datasource's newest introspection job. Null when there is none here:
- * jobs are kept by the control plane replica that ran them (404 elsewhere).
+ * The datasource's newest introspection job, stored so every control-plane
+ * replica answers. Null (a 404) when it was never introspected. A job whose
+ * control plane stopped before it ended comes back `failed` once it is stale.
  */
 export const introspectionQuery = (datasourceId: string) =>
   queryOptions({
