@@ -240,6 +240,14 @@ describe('InboxPage (Approvals)', () => {
     ).toBeInTheDocument();
   });
 
+  it('starts the review on the first card when J is pressed with nothing focused', async () => {
+    const user = userEvent.setup();
+    await openInbox(null);
+    (document.activeElement as HTMLElement | null)?.blur();
+    await user.keyboard('j');
+    expect(card('run_a')).toHaveFocus();
+  });
+
   it('ignores the review keys while typing an answer', async () => {
     const user = userEvent.setup();
     await openInbox(null);

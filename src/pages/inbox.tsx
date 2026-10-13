@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
-import { useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { runQuery } from '@/api/queries';
 import { LearnMore } from '@/components/help/learn-more';
 import {
@@ -149,6 +149,22 @@ export function InboxPage() {
   const items = waiting.items.filter((w) => !only || w.tenant.id === only);
   const approvals = items.filter((w) => w.item.kind === 'approval').length;
   const severalWorkspaces = waiting.tenants.length > 1;
+
+  // J or K with nothing focused (just arrived, or after a click on the page)
+  // starts the review on the first card, as the "Keys" hint promises.
+  const count = items.length;
+  useEffect(() => {
+    const start = (e: globalThis.KeyboardEvent) => {
+      if (e.altKey || e.ctrlKey || e.metaKey || count === 0) return;
+      if (e.key.toLowerCase() !== 'j' && e.key.toLowerCase() !== 'k') return;
+      const active = document.activeElement;
+      if (active && active !== document.body) return;
+      e.preventDefault();
+      cards.current[0]?.focus();
+    };
+    document.addEventListener('keydown', start);
+    return () => document.removeEventListener('keydown', start);
+  }, [count]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLUListElement>) => {
     const target = e.target as HTMLElement;
