@@ -28,7 +28,8 @@ export function PageHelpButton() {
         className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-[13px] text-fg-muted hover:bg-surface-2 hover:text-fg"
       >
         <IconHelp size={16} />
-        <span className="hidden sm:inline">Help</span>
+        {/* sr-only, not hidden, on phones: the icon-only button keeps its name. */}
+        <span className="sr-only sm:not-sr-only">Help</span>
       </button>
       <Drawer
         open={open}
