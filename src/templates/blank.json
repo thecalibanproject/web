@@ -1,0 +1,26 @@
+{
+  "id": "blank",
+  "title": "Blank assistant",
+  "description": "Start from empty instructions and choose everything yourself.",
+  "source": "",
+  "fields": [],
+  "spec": {
+    "kind": "agent",
+    "description": "",
+    "prompt": {
+      "system": "You are a helpful assistant. Answer briefly and only from what you are given."
+    },
+    "model_policy": {
+      "model": "caliban/auto"
+    },
+    "guardrails": {
+      "pii": "reversible",
+      "answer": "redact"
+    },
+    "budgets": {
+      "steps": 8,
+      "tokens": 20000,
+      "wall_clock_s": 60
+    }
+  }
+}

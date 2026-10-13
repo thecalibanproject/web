@@ -361,8 +361,11 @@ describe('NodeDetailPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'New version' }));
     const form = await screen.findByRole('form', { name: 'Create version' });
-    // Starts from the latest version's spec.
-    expect(within(form).getByLabelText(/^Spec/)).toHaveValue(JSON.stringify(v2.spec, null, 2));
+    // Starts from the latest version's spec (the JSON view of the editor).
+    await user.click(within(form).getByRole('tab', { name: 'JSON' }));
+    expect(within(form).getByLabelText(/^Settings as JSON/)).toHaveValue(
+      JSON.stringify(v2.spec, null, 2),
+    );
     await user.click(within(form).getByRole('button', { name: 'Create draft' }));
     expect(await screen.findByText('Draft v3 created.')).toBeInTheDocument();
     expect(calls.find((c) => c.method === 'POST')?.body).toEqual({ spec: v2.spec });
