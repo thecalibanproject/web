@@ -4,6 +4,7 @@ import {
   CACHE_TIER_LABEL,
   MODEL_KIND_LABEL,
   REASONING_CONTROL_LABEL,
+  TRUST_TIER_CODE,
   TRUST_TIER_HINT,
   TRUST_TIER_LABEL,
 } from '@/lib/labels';
@@ -18,7 +19,10 @@ const TIER_TONE: Record<TrustTier, Tone> = {
 
 export function TrustTierBadge({ tier }: { tier: TrustTier }) {
   return (
-    <Badge tone={TIER_TONE[tier]} title={TRUST_TIER_HINT[tier]}>
+    <Badge
+      tone={TIER_TONE[tier]}
+      title={`${TRUST_TIER_HINT[tier]} Also called ${TRUST_TIER_CODE[tier]}.`}
+    >
       {TRUST_TIER_LABEL[tier]}
     </Badge>
   );

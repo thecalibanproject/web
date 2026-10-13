@@ -12,11 +12,19 @@ import type {
   TrustTier,
 } from '@/api/types';
 
+/** The glossary labels; the tier codes (T0 to T3) appear only as "also called". */
 export const TRUST_TIER_LABEL: Record<TrustTier, string> = {
-  t0_sovereign: 'On your servers (T0)',
-  t1_attested: 'Verified enclave (T1)',
-  t2_contracted: 'Provider under contract (T2)',
-  t3_public: 'Public provider (T3)',
+  t0_sovereign: 'On your servers',
+  t1_attested: 'Verified enclave',
+  t2_contracted: 'Provider under contract',
+  t3_public: 'Public provider',
+};
+
+export const TRUST_TIER_CODE: Record<TrustTier, string> = {
+  t0_sovereign: 'T0',
+  t1_attested: 'T1',
+  t2_contracted: 'T2',
+  t3_public: 'T3',
 };
 
 export const TRUST_TIER_HINT: Record<TrustTier, string> = {
