@@ -14,6 +14,7 @@ import {
   type RunStatusFilter,
 } from '@/lib/runs';
 import { api, ApiError, slashPreservingPath, unwrap } from './client';
+import type { paths } from './schema';
 import type {
   ApiKeyCreate,
   ConsoleRun,
@@ -111,6 +112,8 @@ export const qk = {
     ['evals', tenantId, name, 'list', version] as const,
   eval: (tenantId: string, evalId: string) => ['eval', tenantId, evalId] as const,
   evalKey: (tenantId: string) => ['tenants', tenantId, 'eval-key'] as const,
+  nodeSpend: (tenantId: string) => ['tenants', tenantId, 'node-spend'] as const,
+  routes: (tenantId: string) => ['tenants', tenantId, 'routes'] as const,
 };
 
 // ───────────── Queries ─────────────
@@ -509,6 +512,18 @@ export const runQuery = (tenantId: string, runId: string) =>
       q.state.data && isRunActive(q.state.data.status) ? RUN_POLL_MS : false,
   });
 
+/**
+ * What the workspace's assistants spent today and this month against its
+ * caps (`503` when the control plane runs without a node journal).
+ */
+export const nodeSpendQuery = (tenantId: string) =>
+  queryOptions({
+    queryKey: qk.nodeSpend(tenantId),
+    queryFn: () =>
+      unwrap(api.GET('/api/v1/tenants/{tenantId}/node-spend', { params: { path: { tenantId } } })),
+    refetchInterval: 60_000,
+  });
+
 /** Questions and approvals of tainted writes waiting for a human, oldest wait first. */
 export const inboxQuery = (tenantId: string) =>
   queryOptions({
@@ -883,6 +898,28 @@ export function useReviewElement(tenantId: string) {
         }),
       ),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.ontology(tenantId) }),
+  });
+}
+
+/**
+ * Reviews many elements as one ontology version (`ontology.review`): bulk
+ * approve or reject from the review queue. Refused with a breaking-change
+ * `409` like a single review.
+ */
+export function useReviewBatch(tenantId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: {
+      decisions: Array<{ id: string; decision: ReviewDecision }>;
+      note?: string;
+    }) =>
+      unwrap(
+        api.POST('/api/v1/tenants/{tenantId}/ontology/review', {
+          params: { path: { tenantId } },
+          body: { decisions: args.decisions, ...(args.note ? { note: args.note } : {}) },
+        }),
+      ),
+    onSettled: () => qc.invalidateQueries({ queryKey: qk.ontology(tenantId) }),
   });
 }
 
@@ -1388,5 +1425,58 @@ export function useRotateEvalKey(tenantId: string) {
         qc.invalidateQueries({ queryKey: qk.evalKey(tenantId) }),
         qc.invalidateQueries({ queryKey: qk.apiKeys(tenantId) }),
       ]),
+  });
+}
+
+/**
+ * Saves a finished run as a test case of its version (or of `version`): a
+ * right answer, or a wrong one with what it should have done. Needs
+ * `nodes.write`; the case comes back only with `runs.data`. Audited as
+ * `node.golden_set.capture`.
+ */
+export function useCaptureGoldenCase(tenantId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ runId, body }: { runId: string; body: GoldenCaseCaptureBody }) =>
+      unwrap(
+        api.POST('/api/v1/tenants/{tenantId}/runs/{runId}/golden-case', {
+          params: { path: { tenantId, runId } },
+          body,
+        }),
+      ),
+    onSuccess: (captured) =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: qk.nodeEvals(tenantId, captured.node) }),
+        qc.invalidateQueries({ queryKey: qk.run(tenantId, captured.run_id) }),
+      ]),
+  });
+}
+
+type GoldenCaseCaptureBody =
+  paths['/api/v1/tenants/{tenantId}/runs/{runId}/golden-case']['post']['requestBody']['content']['application/json'];
+
+/**
+ * The workspace's model routes: for each topic (`default` for everything
+ * else), the models that answer it, preferred first. Audited on change.
+ */
+export const routesQuery = (tenantId: string) =>
+  queryOptions({
+    queryKey: qk.routes(tenantId),
+    queryFn: () =>
+      unwrap(api.GET('/api/v1/tenants/{tenantId}/routes', { params: { path: { tenantId } } })),
+  });
+
+/** Replaces the workspace's model routes (422 when a route names a model it cannot reach). */
+export function useSetRoutes(tenantId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (routes: Array<{ intent: string; models: string[] }>) =>
+      unwrap(
+        api.PUT('/api/v1/tenants/{tenantId}/routes', {
+          params: { path: { tenantId } },
+          body: { routes },
+        }),
+      ),
+    onSuccess: (routes) => qc.setQueryData(qk.routes(tenantId), routes),
   });
 }

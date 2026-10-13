@@ -1,6 +1,14 @@
 import { useState, type FormEvent } from 'react';
 import { useCreateProvider } from '@/api/queries';
-import { PROVIDER_KINDS, TRUST_TIERS, type ProviderKind, type TrustTier } from '@/api/types';
+import {
+  PROVIDER_KINDS,
+  TRUST_TIERS,
+  type ProviderKind,
+  type SharedProvider,
+  type TrustTier,
+} from '@/api/types';
+import { Advanced } from '@/components/help/advanced';
+import { TermTip } from '@/components/help/toggletip';
 import { Button, Checkbox, Field, FormError, Input, Select } from '@/components/ui';
 import { PROVIDER_LABEL, TRUST_TIER_HINT, TRUST_TIER_LABEL } from '@/lib/labels';
 import {
@@ -22,8 +30,11 @@ const EMPTY: ServerDraft = {
   tenants: '',
 };
 
-/** Register a shared model server (an on-prem pool every allowed tenant can use). */
-export function ServerForm({ onDone }: { onDone: () => void }) {
+/**
+ * Add a shared model server (one the allowed workspaces can use). `onDone`
+ * gets the created server, or nothing when cancelled.
+ */
+export function ServerForm({ onDone }: { onDone: (created?: SharedProvider) => void }) {
   const create = useCreateProvider();
   const [d, setD] = useState<ServerDraft>(EMPTY);
   const [errors, setErrors] = useState<FieldErrors<ServerField>>({});
@@ -45,7 +56,7 @@ export function ServerForm({ onDone }: { onDone: () => void }) {
     create.mutate(serverBody(d), {
       // The key is write-only: drop it from memory whatever the outcome.
       onSettled: () => set({ apiKey: '' }),
-      onSuccess: onDone,
+      onSuccess: (created) => onDone(created),
     });
   };
 
@@ -60,7 +71,7 @@ export function ServerForm({ onDone }: { onDone: () => void }) {
         label="Server ID"
         required
         error={errors.id}
-        hint="Referenced by catalogue models as their provider."
+        hint="A short name; the models it serves refer to it."
       >
         {({ id, describedBy, invalid }) => (
           <Input
@@ -95,7 +106,7 @@ export function ServerForm({ onDone }: { onDone: () => void }) {
         label="Base URL"
         required
         error={errors.baseUrl}
-        hint="The server’s OpenAI-compatible /v1 endpoint, reachable from the data plane."
+        hint="The server's OpenAI-compatible address, ending in /v1, reachable from the gateway."
       >
         {({ id, describedBy, invalid }) => (
           <Input
@@ -112,7 +123,15 @@ export function ServerForm({ onDone }: { onDone: () => void }) {
           />
         )}
       </Field>
-      <Field label="Trust tier" required hint={TRUST_TIER_HINT[d.trustTier]}>
+      <Field
+        label="Where it runs"
+        required
+        hint={
+          <>
+            {TRUST_TIER_HINT[d.trustTier]} <TermTip term="trustLevel" />
+          </>
+        }
+      >
         {({ id, describedBy }) => (
           <Select
             id={id}
@@ -128,12 +147,6 @@ export function ServerForm({ onDone }: { onDone: () => void }) {
           </Select>
         )}
       </Field>
-      <Checkbox
-        label="Cache salt"
-        hint="Isolate prefix cache per tenant (vLLM)"
-        checked={d.cacheSalt}
-        onChange={(e) => set({ cacheSalt: e.target.checked })}
-      />
       <Field
         label="API key"
         hint="Optional, for servers started with --api-key. Write-only: sealed at rest, never shown again."
@@ -151,26 +164,34 @@ export function ServerForm({ onDone }: { onDone: () => void }) {
           />
         )}
       </Field>
-      <Field
-        label="Tenant allow-list"
-        hint="Optional. Comma-separated tenant ids. Leave empty to share with every tenant."
-      >
-        {({ id, describedBy }) => (
-          <Input
-            id={id}
-            aria-describedby={describedBy}
-            value={d.tenants}
-            onChange={(e) => set({ tenants: e.target.value })}
-            placeholder="acme, globex"
-            className="font-mono"
-            autoComplete="off"
-            spellCheck={false}
-          />
-        )}
-      </Field>
+      <Advanced summary="Shared with every workspace, no cache isolation">
+        <Checkbox
+          label="Cache salt"
+          hint="Isolates the vLLM prefix cache per workspace."
+          checked={d.cacheSalt}
+          onChange={(e) => set({ cacheSalt: e.target.checked })}
+        />
+        <Field
+          label="Only these workspaces"
+          hint="Optional. Workspace ids, comma separated. Empty: every workspace may use it."
+        >
+          {({ id, describedBy }) => (
+            <Input
+              id={id}
+              aria-describedby={describedBy}
+              value={d.tenants}
+              onChange={(e) => set({ tenants: e.target.value })}
+              placeholder="acme, globex"
+              className="font-mono"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          )}
+        </Field>
+      </Advanced>
       <FormError error={create.error} />
       <div className="flex justify-end gap-2">
-        <Button onClick={onDone}>Cancel</Button>
+        <Button onClick={() => onDone()}>Cancel</Button>
         <Button type="submit" variant="primary" loading={create.isPending}>
           Add server
         </Button>

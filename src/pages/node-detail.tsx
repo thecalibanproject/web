@@ -5,6 +5,7 @@ import { usePermissions } from '@/api/auth';
 import { nodeVersionsQuery, tenantsQuery } from '@/api/queries';
 import type { Node } from '@/api/types';
 import { EvalsPanel } from '@/components/evals/evals-panel';
+import { GoLivePanel } from '@/components/evals/go-live';
 import { LiveBadge, NodeStateBadge } from '@/components/nodes/node-badges';
 import { NodeEditor } from '@/components/nodes/node-editor';
 import { NodeBehavior } from '@/components/nodes/node-behavior';
@@ -44,7 +45,7 @@ const route = getRouteApi('/_app/nodes/$tenantId/$nodeName');
 
 const TABS: ReadonlyArray<{ value: NodeTab; label: string }> = [
   { value: 'versions', label: 'Versions' },
-  { value: 'evals', label: 'Evals' },
+  { value: 'evals', label: 'Tests' },
 ];
 
 /** Default comparison: the live version (or the one before the latest) against the latest. */
@@ -65,10 +66,10 @@ function SpecDetails({ tenantId, version: v }: { tenantId: string; version: Node
       </span>,
     ],
     [
-      'Content hash',
+      'Fingerprint',
       <span key="h" className="inline-flex min-w-0 items-center gap-1">
         <code className="font-mono text-[12px] break-all">{v.hash}</code>
-        <CopyButton value={v.hash} label="Copy hash" compact />
+        <CopyButton value={v.hash} label="Copy fingerprint" compact />
       </span>,
     ],
     ['Created by', v.created_by ?? EMPTY],
@@ -90,8 +91,8 @@ function SpecDetails({ tenantId, version: v }: { tenantId: string; version: Node
         <h3 className="text-[12.5px] font-medium">Data access</h3>
         <NodeScopes tenantId={tenantId} spec={v.spec} />
       </section>
-      <section aria-label="Answer and model calls" className="mb-4 flex flex-col gap-1.5">
-        <h3 className="text-[12.5px] font-medium">Answer and model calls</h3>
+      <section aria-label="Answers and models" className="mb-4 flex flex-col gap-1.5">
+        <h3 className="text-[12.5px] font-medium">Answers and models</h3>
         <NodeBehavior spec={v.spec} />
       </section>
     </>
@@ -108,11 +109,11 @@ function DataAccessCard({ tenantId, version: v }: { tenantId: string; version: N
   return (
     <Card role="region" aria-label="Data access" className="mt-6">
       <CardHeader
-        title={`Data access of v${v.version}`}
+        title={`What v${v.version} may read`}
         description={
           v.live
-            ? 'The live version. rag.<collection>:read scopes name the document collections builtin://rag_search may search.'
-            : 'The latest version (none is live). rag.<collection>:read scopes name the document collections builtin://rag_search may search.'
+            ? 'The live version: the document libraries it may search and the data it may look up.'
+            : 'The latest version (none is live): the document libraries it may search and the data it may look up.'
         }
       />
       <div className="px-4 py-3">
@@ -125,9 +126,9 @@ function DataAccessCard({ tenantId, version: v }: { tenantId: string; version: N
 /** The answer guard and the model calls of the live version (or the latest). */
 function BehaviorCard({ version: v }: { version: Node }) {
   return (
-    <Card role="region" aria-label="Answer and model calls" className="mt-6">
+    <Card role="region" aria-label="Answers and models" className="mt-6">
       <CardHeader
-        title={`Answer and model calls of v${v.version}`}
+        title={`Answers and models of v${v.version}`}
         description={v.live ? 'The live version.' : 'The latest version (none is live).'}
       />
       <div className="px-4 py-3">
@@ -186,7 +187,7 @@ export function NodeDetailPage() {
     <>
       <nav aria-label="Breadcrumb" className="mb-2 text-[12.5px] text-fg-muted">
         <Link to="/nodes" search={{ tenant: tenantId }} className="hover:text-fg hover:underline">
-          Nodes
+          Assistants
         </Link>
         <span aria-hidden="true"> / </span>
         <span>{tenantName}</span>
@@ -213,8 +214,8 @@ export function NodeDetailPage() {
                   )}
                 </span>
               ) : (
-                <Badge title="Runs that name no version are refused until a version is live.">
-                  No live version
+                <Badge title="Requests that name no version are refused until a version is live.">
+                  Nothing live yet
                 </Badge>
               )}
             </span>
@@ -228,7 +229,7 @@ export function NodeDetailPage() {
                 search={{ tenant: tenantId, node: nodeName }}
                 className="text-[13px] text-accent hover:underline"
               >
-                Runs
+                Conversations
               </Link>
               <GatedButton
                 variant="primary"
@@ -248,15 +249,15 @@ export function NodeDetailPage() {
       ) : versions.isError && isNotFound(versions.error) ? (
         <Card>
           <EmptyState
-            title="Node not found"
-            description={`${tenantName} has no node named ${nodeName}, or all its versions were deleted.`}
+            title="Assistant not found"
+            description={`${tenantName} has no assistant named ${nodeName}, or all its versions were deleted.`}
             action={
               <Link
                 to="/nodes"
                 search={{ tenant: tenantId }}
                 className="text-[13px] text-accent hover:underline"
               >
-                Back to nodes
+                Back to assistants
               </Link>
             }
           />
@@ -266,121 +267,137 @@ export function NodeDetailPage() {
           <ErrorState error={versions.error} onRetry={() => void versions.refetch()} />
         </Card>
       ) : (
-        <Tabs<NodeTab>
-          label="Node"
-          tabs={TABS}
-          value={search.tab ?? 'versions'}
-          onChange={(tab) => setSearch({ tab: tab === 'versions' ? undefined : tab })}
-        >
-          {search.tab === 'evals' ? (
-            <EvalsPanel
-              tenantId={tenantId}
-              name={nodeName}
-              versions={list}
-              version={search.ev}
-              evalId={search.eval}
-              onVersion={(ev) => setSearch({ ev })}
-              onEval={(id) => setSearch({ eval: id })}
-            />
-          ) : (
-            <>
-              <Card>
-                <CardHeader
-                  title="Versions"
-                  description="Versions are immutable. Drafts are published, published versions are made live or retired."
-                  actions={
-                    <p role="status" className="text-[12.5px] text-ok">
-                      {created != null ? `Draft v${created} created.` : ''}
-                    </p>
-                  }
-                />
-                <Table label="Versions">
-                  <THead>
-                    <tr>
-                      <TH>Version</TH>
-                      <TH>State</TH>
-                      <TH>Hash</TH>
-                      <TH>Created by</TH>
-                      <TH>Created</TH>
-                      <TH>Published</TH>
-                      <TH>
-                        <span className="sr-only">Actions</span>
-                      </TH>
-                    </tr>
-                  </THead>
-                  <TBody>
-                    {[...list].reverse().map((v) => (
-                      <TR key={v.id}>
-                        <TD>
-                          <Badge>v{v.version}</Badge>
-                        </TD>
-                        <TD>
-                          <span className="inline-flex items-center gap-1.5">
-                            <NodeStateBadge state={v.state} />
-                            {v.live && <LiveBadge />}
-                          </span>
-                        </TD>
-                        <TD className="whitespace-nowrap">
-                          <code className="font-mono text-[12px] text-fg-muted" title={v.hash}>
-                            {shortHash(v.hash)}
-                          </code>
-                          <CopyButton value={v.hash} label={`Copy hash of v${v.version}`} compact />
-                        </TD>
-                        <TD className="max-w-56 truncate text-fg-muted" title={v.created_by ?? ''}>
-                          {v.created_by ?? EMPTY}
-                        </TD>
-                        <TD className="whitespace-nowrap text-fg-muted">
-                          {formatDateTime(v.created_at)}
-                        </TD>
-                        <TD className="whitespace-nowrap text-fg-muted">
-                          {formatDateTime(v.published_at)}
-                        </TD>
-                        <TD className="text-right whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1.5">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              aria-label={`View spec of v${v.version}`}
-                              onClick={() => setSearch({ version: v.version })}
-                            >
-                              View spec
-                            </Button>
-                            {v.state === 'draft' &&
-                              action(v, 'publish', 'Publish', cannotPublish, 'primary')}
-                            {v.state === 'published' &&
-                              !v.live &&
-                              action(v, 'promote', 'Make live', cannotPublish)}
-                            {v.state === 'published' &&
-                              action(v, 'retire', 'Retire', cannotPublish, 'danger')}
-                            {v.state !== 'published' &&
-                              action(v, 'delete', 'Delete', cannotWrite, 'danger')}
-                          </span>
-                        </TD>
-                      </TR>
-                    ))}
-                  </TBody>
-                </Table>
-              </Card>
-              {current && <DataAccessCard tenantId={tenantId} version={current} />}
-              {current && <BehaviorCard version={current} />}
-              <VersionDiff
+        <>
+          <GoLivePanel
+            tenantId={tenantId}
+            name={nodeName}
+            versions={list}
+            onOpenTests={(ev) => setSearch({ tab: 'evals', ev })}
+          />
+          <Tabs<NodeTab>
+            label="Assistant"
+            tabs={TABS}
+            value={search.tab ?? 'versions'}
+            onChange={(tab) => setSearch({ tab: tab === 'versions' ? undefined : tab })}
+          >
+            {search.tab === 'evals' ? (
+              <EvalsPanel
                 tenantId={tenantId}
                 name={nodeName}
                 versions={list}
-                from={from}
-                to={to}
-                onChange={(f, t) => setSearch({ from: f, to: t })}
+                version={search.ev}
+                evalId={search.eval}
+                onVersion={(ev) => setSearch({ ev })}
+                onEval={(id) => setSearch({ eval: id })}
               />
-            </>
-          )}
-        </Tabs>
+            ) : (
+              <>
+                <Card>
+                  <CardHeader
+                    title="Versions"
+                    description="A version never changes. Publish a draft to test it, then make it live or retire it."
+                    actions={
+                      <p role="status" className="text-[12.5px] text-ok">
+                        {created != null ? `Draft v${created} created.` : ''}
+                      </p>
+                    }
+                  />
+                  <Table label="Versions">
+                    <THead>
+                      <tr>
+                        <TH>Version</TH>
+                        <TH>State</TH>
+                        {/* The fingerprint is also in "View settings": shown here only when there is room, so the actions never scroll out of view. */}
+                        <TH className="hidden 2xl:table-cell">Fingerprint</TH>
+                        <TH>Created by</TH>
+                        <TH>Created</TH>
+                        <TH>Published</TH>
+                        <TH>
+                          <span className="sr-only">Actions</span>
+                        </TH>
+                      </tr>
+                    </THead>
+                    <TBody>
+                      {[...list].reverse().map((v) => (
+                        <TR key={v.id}>
+                          <TD>
+                            <Badge>v{v.version}</Badge>
+                          </TD>
+                          <TD>
+                            <span className="inline-flex items-center gap-1.5">
+                              <NodeStateBadge state={v.state} />
+                              {v.live && <LiveBadge />}
+                            </span>
+                          </TD>
+                          <TD className="hidden whitespace-nowrap 2xl:table-cell">
+                            <code className="font-mono text-[12px] text-fg-muted" title={v.hash}>
+                              {shortHash(v.hash)}
+                            </code>
+                            <CopyButton
+                              value={v.hash}
+                              label={`Copy fingerprint of v${v.version}`}
+                              compact
+                            />
+                          </TD>
+                          <TD
+                            className="max-w-56 truncate text-fg-muted"
+                            title={v.created_by ?? ''}
+                          >
+                            {v.created_by ?? EMPTY}
+                          </TD>
+                          <TD className="whitespace-nowrap text-fg-muted">
+                            {formatDateTime(v.created_at)}
+                          </TD>
+                          <TD className="whitespace-nowrap text-fg-muted">
+                            {formatDateTime(v.published_at)}
+                          </TD>
+                          <TD className="text-right whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1.5">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                aria-label={`View settings of v${v.version}`}
+                                onClick={() => setSearch({ version: v.version })}
+                              >
+                                View settings
+                              </Button>
+                              {v.state === 'draft' &&
+                                action(v, 'publish', 'Publish', cannotPublish, 'primary')}
+                              {v.state === 'published' &&
+                                !v.live &&
+                                action(v, 'promote', 'Make live', cannotPublish)}
+                              {v.state === 'published' &&
+                                action(v, 'retire', 'Retire', cannotPublish, 'danger')}
+                              {v.state !== 'published' &&
+                                action(v, 'delete', 'Delete', cannotWrite, 'danger')}
+                            </span>
+                          </TD>
+                        </TR>
+                      ))}
+                    </TBody>
+                  </Table>
+                </Card>
+                {current && <DataAccessCard tenantId={tenantId} version={current} />}
+                {current && <BehaviorCard version={current} />}
+                <VersionDiff
+                  tenantId={tenantId}
+                  name={nodeName}
+                  versions={list}
+                  from={from}
+                  to={to}
+                  onChange={(f, t) => setSearch({ from: f, to: t })}
+                />
+              </>
+            )}
+          </Tabs>
+        </>
       )}
 
       <Drawer
         open={viewing !== null}
         onClose={() => setSearch({ version: undefined })}
         title={viewing ? `${viewing.name} v${viewing.version}` : ''}
-        description="Read only. Change a node by creating a new version."
+        description="Read only. Change an assistant by creating a new version."
         footer={
           viewing && (
             <>
@@ -396,7 +413,7 @@ export function NodeDetailPage() {
                   setSearch({ version: undefined });
                 }}
               >
-                New version from this spec
+                New version from these settings
               </GatedButton>
             </>
           )
@@ -406,7 +423,7 @@ export function NodeDetailPage() {
           <>
             <SpecDetails tenantId={tenantId} version={viewing} />
             <CodeBlock
-              label="Node spec"
+              label="Assistant settings (JSON)"
               language="json"
               code={JSON.stringify(viewing.spec, null, 2)}
             />
@@ -417,7 +434,7 @@ export function NodeDetailPage() {
         open={editing !== null}
         onClose={() => setEditing(null)}
         title={`New version of ${nodeName}`}
-        description="Starts from the spec you picked. The control plane checks it again when you create the draft and when you publish it."
+        description="Starts from the settings you picked. Caliban checks them again when you create the draft and when you publish it."
       >
         {editing && (
           <NodeEditor

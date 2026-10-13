@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
+import type { DocLink } from '@/lib/docs';
 import { errorMessage, isForbidden } from '@/lib/errors';
+import { LearnMore } from '../help/learn-more';
 import { cn } from '@/lib/cn';
 import { Button } from './button';
 import { IconAlert, IconLock, IconRefresh } from './icons';
@@ -30,22 +32,33 @@ export function InlineLoading({ label = 'Loading…' }: { label?: string }) {
   );
 }
 
+/**
+ * An empty list that teaches (research note 10, section 3): what this is in
+ * one sentence, one primary action, and one "Learn more" link.
+ */
 export function EmptyState({
   title,
   description,
   action,
+  learnMore,
   className,
 }: {
   title: ReactNode;
   description?: ReactNode;
   action?: ReactNode;
+  learnMore?: DocLink;
   className?: string;
 }) {
   return (
     <div className={cn('flex flex-col items-center gap-1.5 px-6 py-10 text-center', className)}>
       <p className="text-[13.5px] font-medium text-fg">{title}</p>
       {description && <p className="max-w-md text-[12.5px] text-fg-muted">{description}</p>}
-      {action && <div className="mt-2">{action}</div>}
+      {(action || learnMore) && (
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-3 text-[13px]">
+          {action}
+          {learnMore && <LearnMore doc={learnMore} />}
+        </div>
+      )}
     </div>
   );
 }

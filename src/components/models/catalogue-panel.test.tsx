@@ -39,14 +39,14 @@ describe('CataloguePanel', () => {
   it('shows kind, family and capability badges', async () => {
     mockApi({ 'GET /api/v1/models': () => ({ body: [qwen, embed] }) });
     renderWithClient(<CataloguePanel />);
-    const table = await screen.findByRole('table', { name: 'Model registry' });
+    const table = await screen.findByRole('table', { name: 'Models' });
     const row = within(table).getByText('local/qwen3-8b').closest('tr')!;
     expect(within(row).getByText('Chat')).toBeInTheDocument();
     expect(within(row).getByText('qwen3')).toBeInTheDocument();
-    expect(within(row).getByText('tools')).toBeInTheDocument();
-    expect(within(row).getByText('reasoning · hybrid')).toBeInTheDocument();
-    expect(within(row).queryByText('vision')).not.toBeInTheDocument();
-    expect(within(row).getByText('T0 Sovereign')).toBeInTheDocument();
+    expect(within(row).getByText('Tools')).toBeInTheDocument();
+    expect(within(row).getByText('Thinking (optional)')).toBeInTheDocument();
+    expect(within(row).queryByText('Images')).not.toBeInTheDocument();
+    expect(within(row).getByText('On your servers')).toBeInTheDocument();
     const embedRow = within(table).getByText('local/bge-m3').closest('tr')!;
     expect(within(embedRow).getByText('Embedding')).toBeInTheDocument();
   });

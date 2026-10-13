@@ -46,7 +46,7 @@ export function DeleteTenantSection({
   return (
     <section
       aria-labelledby={headingId}
-      className="mt-6 rounded-lg border border-danger/40 bg-surface"
+      className="mt-4 rounded-lg border first:mt-0 border-danger/40 bg-surface"
     >
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
         <div className="min-w-0">
@@ -54,19 +54,19 @@ export function DeleteTenantSection({
             Danger zone
           </h2>
           <p className="text-[12px] text-fg-muted">
-            Deleting this tenant revokes its API keys, destroys its provider credentials, removes
-            its routes and deletes its datasources and nodes. Audit history is kept.
+            Deleting this workspace revokes its app keys, destroys its provider accounts, removes
+            its routing and deletes its data connections and assistants. The audit log is kept.
           </p>
         </div>
         <Button variant="danger" icon={<IconTrash size={14} />} onClick={() => setOpen(true)}>
-          Delete tenant
+          Delete workspace
         </Button>
       </div>
 
       <ConfirmDialog
         open={open}
-        title="Delete tenant?"
-        confirmLabel="Delete tenant"
+        title="Delete this workspace?"
+        confirmLabel="Delete workspace"
         confirmDisabled={!matches}
         loading={del.isPending}
         error={del.error}
@@ -78,16 +78,16 @@ export function DeleteTenantSection({
           Caliban:
         </p>
         <ul className="flex list-disc flex-col gap-1 pl-5">
-          <li>revokes all of its Caliban API keys, so apps using them stop working;</li>
-          <li>destroys its BYOK provider credentials;</li>
-          <li>removes its routes;</li>
-          <li>deletes its datasources and nodes.</li>
+          <li>revokes all of its app keys, so applications using them stop working;</li>
+          <li>destroys its own provider accounts;</li>
+          <li>removes its routing;</li>
+          <li>deletes its data connections and assistants.</li>
         </ul>
         <p>
-          Audit history is kept. The tenant id <code className="font-mono">{tenant.id}</code>{' '}
+          The audit log is kept. The workspace id <code className="font-mono">{tenant.id}</code>{' '}
           can&apos;t be reused.
         </p>
-        <form onSubmit={onSubmit} aria-label="Confirm tenant deletion">
+        <form onSubmit={onSubmit} aria-label="Confirm workspace deletion">
           <Field
             label={
               <>

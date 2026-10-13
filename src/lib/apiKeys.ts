@@ -42,11 +42,11 @@ export function splitList(text: string): string[] {
 /** Why the access cannot be saved, or null. */
 export function accessError(access: KeyAccess): string | null {
   if (access.nodes === 'only' && access.names.length === 0) {
-    return 'Pick at least one node, or choose every published node or no nodes.';
+    return 'Pick at least one assistant, or choose model calls only.';
   }
   const bad = access.scopes.filter((s) => !KEY_SCOPE.test(s));
   if (bad.length > 0) {
-    return `Scopes are <datasource>.<object>:read or rag.<collection>:read, such as shop.orders:read. Not valid: ${bad.join(', ')}.`;
+    return `Write other data as <connection>.<collection>:read or rag.<library>:read, such as shop.orders:read. Not valid: ${bad.join(', ')}.`;
   }
   return null;
 }
@@ -68,15 +68,34 @@ export function accessBody(
   return body;
 }
 
-/** One line for a key's access, for summaries. */
+/**
+ * The access a new key starts with (UX-28): only the workspace's assistants
+ * the user ticks, which starts empty, so the narrowest choice is the default.
+ * With no assistant to pick, or no right to grant them, the key makes model
+ * calls only.
+ */
+export function initialKeyAccess(assistants: readonly string[], canGrantNodes: boolean): KeyAccess {
+  return {
+    nodes: canGrantNodes && assistants.length > 0 ? 'only' : 'none',
+    names: [],
+    scopes: [],
+  };
+}
+
+/** One sentence for what a key can reach, before it is created. */
 export function describeAccess(access: KeyAccess, canGrantNodes: boolean): string {
   const nodes = !canGrantNodes
-    ? 'no nodes'
+    ? 'make model calls only'
     : access.nodes === 'all'
-      ? 'every published node'
+      ? 'run every published assistant, including ones added later'
       : access.nodes === 'none'
-        ? 'no nodes'
-        : access.names.join(', ') || 'no node picked yet';
-  const scopes = access.scopes.length === 0 ? "the nodes' own scopes" : access.scopes.join(', ');
-  return `Runs ${nodes}; datasource scopes: ${scopes}`;
+        ? 'make model calls only, and run no assistant'
+        : access.names.length > 0
+          ? `run ${access.names.join(', ')}`
+          : 'run the assistants you pick (none yet)';
+  const scopes =
+    access.scopes.length === 0
+      ? "with each assistant's own data access"
+      : `reading ${access.scopes.join(', ')}`;
+  return `This key can ${nodes}, ${scopes}.`;
 }

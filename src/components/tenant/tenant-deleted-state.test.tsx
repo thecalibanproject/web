@@ -21,19 +21,19 @@ describe('TenantDeletedState', () => {
     });
     renderWithClient(<TenantDeletedState tenantId="t1" />);
 
-    expect(await screen.findByText('This tenant was deleted')).toBeInTheDocument();
+    expect(await screen.findByText('This workspace was deleted')).toBeInTheDocument();
     expect(screen.getByText('Acme')).toBeInTheDocument();
     expect(
       screen.getByText(new RegExp(formatDateTime('2026-10-09T09:00:00Z'))),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Audit history is kept/)).toBeInTheDocument();
+    expect(screen.getByText(/The audit log is kept/)).toBeInTheDocument();
     expect(calls[0]?.query.get('include_deleted')).toBe('true');
   });
 
   it('says "not found" for an id that never existed', async () => {
     mockApi({ 'GET /api/v1/tenants': () => ({ body: [] }) });
     renderWithClient(<TenantDeletedState tenantId="typo" />);
-    expect(await screen.findByText('Tenant not found')).toBeInTheDocument();
-    expect(screen.queryByText('This tenant was deleted')).not.toBeInTheDocument();
+    expect(await screen.findByText('Workspace not found')).toBeInTheDocument();
+    expect(screen.queryByText('This workspace was deleted')).not.toBeInTheDocument();
   });
 });

@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useId, useState, type FormEvent } from 'react';
 import { providersQuery, useCreateModel } from '@/api/queries';
 import { MODEL_KINDS, TRUST_TIERS, type ModelKind, type TrustTier } from '@/api/types';
+import { Advanced } from '@/components/help/advanced';
+import { TermTip } from '@/components/help/toggletip';
 import { Button, Field, FormError, Input, Select } from '@/components/ui';
 import { MODEL_KIND_LABEL, TRUST_TIER_HINT, TRUST_TIER_LABEL } from '@/lib/labels';
 import {
@@ -15,7 +17,11 @@ import {
 } from '@/lib/modelForm';
 import { CapabilitiesFields } from './capabilities-fields';
 
-/** Register a catalogue model by hand (all `ModelCreate` fields). */
+/**
+ * Add a model by hand. The basics come first; family, licence, context
+ * window, prices and capabilities (usually filled by discovery) are under
+ * Advanced.
+ */
 export function ModelForm({ onDone }: { onDone: () => void }) {
   const create = useCreateModel();
   const servers = useQuery(providersQuery());
@@ -40,6 +46,8 @@ export function ModelForm({ onDone }: { onDone: () => void }) {
     set(server && !tierTouched ? { provider, trustTier: server.trust_tier } : { provider });
   };
 
+  const advancedErrors = Boolean(errors.contextWindow || errors.priceIn || errors.priceOut);
+
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
     const errs = validateModel(d);
@@ -54,7 +62,7 @@ export function ModelForm({ onDone }: { onDone: () => void }) {
         label="Model ID"
         required
         error={errors.id}
-        hint="What clients send as model, e.g. local/qwen3-8b."
+        hint="The name apps send as model, for example local/qwen3-8b."
       >
         {({ id, describedBy, invalid }) => (
           <Input
@@ -72,10 +80,10 @@ export function ModelForm({ onDone }: { onDone: () => void }) {
       </Field>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field
-          label="Provider"
+          label="Server"
           required
           error={errors.provider}
-          hint="A model server id or a tenant BYOK provider id."
+          hint="One of your model servers, or a workspace's own provider account."
         >
           {({ id, describedBy, invalid }) => (
             <>
@@ -99,10 +107,10 @@ export function ModelForm({ onDone }: { onDone: () => void }) {
           )}
         </Field>
         <Field
-          label="Upstream model"
+          label="Name on the server"
           required
           error={errors.upstreamModel}
-          hint="Name the server expects."
+          hint="The model name the server expects."
         >
           {({ id, describedBy, invalid }) => (
             <Input
@@ -133,18 +141,15 @@ export function ModelForm({ onDone }: { onDone: () => void }) {
             </Select>
           )}
         </Field>
-        <Field label="Family" hint="e.g. qwen3, llama3, bge">
-          {({ id, describedBy }) => (
-            <Input
-              id={id}
-              aria-describedby={describedBy}
-              value={d.family}
-              onChange={(e) => set({ family: e.target.value })}
-              className="font-mono"
-            />
-          )}
-        </Field>
-        <Field label="Trust tier" required hint={TRUST_TIER_HINT[d.trustTier]}>
+        <Field
+          label="Where it runs"
+          required
+          hint={
+            <>
+              {TRUST_TIER_HINT[d.trustTier]} <TermTip term="trustLevel" />
+            </>
+          }
+        >
           {({ id, describedBy }) => (
             <Select
               id={id}
@@ -163,61 +168,88 @@ export function ModelForm({ onDone }: { onDone: () => void }) {
             </Select>
           )}
         </Field>
-        <Field label="Licence" hint="SPDX id from the model card, e.g. Apache-2.0.">
-          {({ id, describedBy }) => (
-            <Input
-              id={id}
-              aria-describedby={describedBy}
-              value={d.licence}
-              onChange={(e) => set({ licence: e.target.value })}
-            />
-          )}
-        </Field>
-        <Field label="Context window" error={errors.contextWindow} hint="Tokens.">
-          {({ id, describedBy, invalid }) => (
-            <Input
-              id={id}
-              inputMode="numeric"
-              aria-describedby={describedBy}
-              aria-invalid={invalid}
-              value={d.contextWindow}
-              onChange={(e) => set({ contextWindow: e.target.value })}
-              placeholder="32768"
-            />
-          )}
-        </Field>
-        <Field label="Price in (USD / Mtok)" error={errors.priceIn} hint="Blank for self-hosted.">
-          {({ id, describedBy, invalid }) => (
-            <Input
-              id={id}
-              inputMode="decimal"
-              aria-describedby={describedBy}
-              aria-invalid={invalid}
-              value={d.priceIn}
-              onChange={(e) => set({ priceIn: e.target.value })}
-            />
-          )}
-        </Field>
-        <Field label="Price out (USD / Mtok)" error={errors.priceOut}>
-          {({ id, describedBy, invalid }) => (
-            <Input
-              id={id}
-              inputMode="decimal"
-              aria-describedby={describedBy}
-              aria-invalid={invalid}
-              value={d.priceOut}
-              onChange={(e) => set({ priceOut: e.target.value })}
-            />
-          )}
-        </Field>
       </div>
-      <CapabilitiesFields
-        value={d.capabilities}
-        onChange={(capabilities) => set({ capabilities })}
-      />
+      <Advanced
+        key={String(advancedErrors)}
+        defaultOpen={advancedErrors}
+        summary="Filled by discovery; prices blank for your own servers"
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Family" hint="For example qwen3, llama3, bge.">
+            {({ id, describedBy }) => (
+              <Input
+                id={id}
+                aria-describedby={describedBy}
+                value={d.family}
+                onChange={(e) => set({ family: e.target.value })}
+                className="font-mono"
+              />
+            )}
+          </Field>
+          <Field label="Licence" hint="From the model card, for example Apache-2.0.">
+            {({ id, describedBy }) => (
+              <Input
+                id={id}
+                aria-describedby={describedBy}
+                value={d.licence}
+                onChange={(e) => set({ licence: e.target.value })}
+              />
+            )}
+          </Field>
+          <Field
+            label="Context window"
+            error={errors.contextWindow}
+            hint="In tokens (about 0.75 words each)."
+          >
+            {({ id, describedBy, invalid }) => (
+              <Input
+                id={id}
+                inputMode="numeric"
+                aria-describedby={describedBy}
+                aria-invalid={invalid}
+                value={d.contextWindow}
+                onChange={(e) => set({ contextWindow: e.target.value })}
+                placeholder="32768"
+              />
+            )}
+          </Field>
+          <Field
+            label="Price in (USD per million tokens)"
+            error={errors.priceIn}
+            hint="Blank for models on your own servers."
+          >
+            {({ id, describedBy, invalid }) => (
+              <Input
+                id={id}
+                inputMode="decimal"
+                aria-describedby={describedBy}
+                aria-invalid={invalid}
+                value={d.priceIn}
+                onChange={(e) => set({ priceIn: e.target.value })}
+              />
+            )}
+          </Field>
+          <Field label="Price out (USD per million tokens)" error={errors.priceOut}>
+            {({ id, describedBy, invalid }) => (
+              <Input
+                id={id}
+                inputMode="decimal"
+                aria-describedby={describedBy}
+                aria-invalid={invalid}
+                value={d.priceOut}
+                onChange={(e) => set({ priceOut: e.target.value })}
+              />
+            )}
+          </Field>
+        </div>
+        <CapabilitiesFields
+          value={d.capabilities}
+          onChange={(capabilities) => set({ capabilities })}
+        />
+      </Advanced>
       <FormError error={create.error} />
       <div className="flex justify-end gap-2">
-        <Button onClick={onDone}>Cancel</Button>
+        <Button onClick={() => onDone()}>Cancel</Button>
         <Button type="submit" variant="primary" loading={create.isPending}>
           Add model
         </Button>

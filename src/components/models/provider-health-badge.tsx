@@ -24,7 +24,7 @@ export function ProviderHealthBadge({ providerId }: { providerId: string }) {
   if (health.isPending) {
     return (
       <Badge tone="neutral" dot title="Probing the server’s /models endpoint…">
-        checking
+        Checking…
       </Badge>
     );
   }
@@ -44,13 +44,13 @@ export function ProviderHealthBadge({ providerId }: { providerId: string }) {
     ].filter(Boolean);
     return (
       <Badge tone="ok" dot title="The server answered its /models endpoint.">
-        healthy{detail.length ? ` · ${detail.join(' · ')}` : ''}
+        Healthy{detail.length ? ` · ${detail.join(' · ')}` : ''}
       </Badge>
     );
   }
   return (
     <Badge tone="danger" dot title={h.error ? `Unreachable: ${h.error}` : 'Unreachable'}>
-      unreachable
+      Unreachable
       {h.error && <span className="sr-only">: {h.error}</span>}
     </Badge>
   );

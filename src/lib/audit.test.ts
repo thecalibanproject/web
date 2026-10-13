@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AuditEntry } from '@/api/types';
-import { chainLinks, shortHash, summarizeAudit } from './audit';
+import { actionLabel, actorLabel, chainLinks, shortHash, summarizeAudit } from './audit';
 
 const s = (action: string, detail: Record<string, unknown>) => summarizeAudit({ action, detail });
 
@@ -24,7 +24,9 @@ describe('summarizeAudit', () => {
         pii_surrogate_scope: { from: 'tenant', to: 'tenant' },
         semantic_cache: { from: 'off', to: 'on' },
       }),
-    ).toBe('PII default reversible → mask, semantic cache off → on');
+    ).toBe(
+      'personal data Hide from the model, restore in the answer → Hide everywhere, reuse similar answers off → on',
+    );
     expect(s('tenant.update', { semantic_cache: { from: 'on', to: 'on' } })).toBe(
       'No setting changed',
     );
@@ -55,7 +57,7 @@ describe('summarizeAudit', () => {
         trust_tier: 't3_public',
         last4: 'wxyz',
       }),
-    ).toBe('OpenAI, T3 Public, key ending wxyz');
+    ).toBe('OpenAI, Public provider, key ending wxyz');
   });
 
   it('summarizes the other actions the control plane records', () => {
@@ -66,7 +68,9 @@ describe('summarizeAudit', () => {
         pii_surrogate_scope: 'tenant',
         semantic_cache: 'off',
       }),
-    ).toBe('Created "Acme": PII default reversible, surrogate scope tenant, semantic cache off');
+    ).toBe(
+      'Created "Acme": personal data Hide from the model, restore in the answer, placeholder consistency Same placeholder across the workspace, reuse similar answers off',
+    );
     expect(
       s('routes.set', {
         routes: [
@@ -113,5 +117,21 @@ describe('shortHash', () => {
   it('keeps the first 12 hex characters', () => {
     expect(shortHash('0123456789abcdef0123')).toBe('0123456789ab…');
     expect(shortHash(null)).toBe('');
+  });
+});
+
+describe('actionLabel and actorLabel', () => {
+  it('names actions in plain words and keeps unknown ids', () => {
+    expect(actionLabel('node.eval.finish')).toBe('Tests finished');
+    expect(actionLabel('tenant.intent.set')).toBe('Topic changed');
+    expect(actionLabel('node.write.approve')).toBe('Approved an action');
+    expect(actionLabel('node.golden_set.capture')).toBe('Saved a conversation as a test');
+    expect(actionLabel('something.new')).toBe('something.new');
+  });
+
+  it('says the shared admin token acted, not a person', () => {
+    expect(actorLabel('break_glass')).toBe('Shared admin token (emergency access)');
+    expect(actorLabel('eval:eval_01:case')).toBe('A test run');
+    expect(actorLabel('ada@example.internal')).toBe('ada@example.internal');
   });
 });

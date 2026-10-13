@@ -3,6 +3,7 @@ import { useDeferredValue, useMemo, useState } from 'react';
 import { usePermissions } from '@/api/auth';
 import { modelsQuery, useDeleteModel } from '@/api/queries';
 import { MODEL_KINDS, TRUST_TIERS, type Model, type ModelKind, type TrustTier } from '@/api/types';
+import { doc } from '@/lib/docs';
 import { CapabilityBadges, ModelKindBadge, TrustTierBadge } from '@/components/badges';
 import {
   Button,
@@ -81,12 +82,12 @@ export function CataloguePanel() {
           ))}
         </Select>
         <Select
-          aria-label="Trust tier"
+          aria-label="Where it runs"
           value={tier}
           onChange={(e) => setTier(e.target.value as TrustTier | '')}
           className="w-44"
         >
-          <option value="">All trust tiers</option>
+          <option value="">Anywhere</option>
           {TRUST_TIERS.map((t) => (
             <option key={t} value={t}>
               {TRUST_TIER_LABEL[t]}
@@ -117,13 +118,25 @@ export function CataloguePanel() {
         <ErrorState error={models.error} onRetry={() => void models.refetch()} />
       ) : models.data.length === 0 ? (
         <EmptyState
-          title="No models registered"
-          description="Add a model by hand, or register a model server and discover the models it serves."
+          title="No models yet"
+          description="Add a model server and let Caliban find its models, or add a model by hand."
+          action={
+            canWrite && (
+              <Button
+                variant="primary"
+                icon={<IconPlus size={14} />}
+                onClick={() => setAdding(true)}
+              >
+                Add model
+              </Button>
+            )
+          }
+          learnMore={doc('guides/models', 'add-a-model')}
         />
       ) : rows.length === 0 ? (
         <EmptyState title="No matches" description="No model matches the current filters." />
       ) : (
-        <Table label="Model registry">
+        <Table label="Models">
           <THead>
             <tr>
               <TH>Model</TH>
@@ -131,10 +144,10 @@ export function CataloguePanel() {
               <TH>Family</TH>
               <TH>Capabilities</TH>
               <TH>Provider</TH>
-              <TH>Trust tier</TH>
+              <TH>Where it runs</TH>
               <TH>Licence</TH>
               <TH className="text-right">Context</TH>
-              <TH className="text-right">In / Out per Mtok</TH>
+              <TH className="text-right">In / out per million tokens</TH>
               <TH>
                 <span className="sr-only">Actions</span>
               </TH>
@@ -203,7 +216,7 @@ export function CataloguePanel() {
         open={adding}
         onClose={() => setAdding(false)}
         title="Add model"
-        description="Register a model in the catalogue. Check the licence on the model card before routing traffic to it."
+        description="Add a model Caliban may send requests to. Check the licence on the model card before routing traffic to it."
       >
         {adding && <ModelForm onDone={() => setAdding(false)} />}
       </Drawer>

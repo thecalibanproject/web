@@ -1,12 +1,12 @@
 import type { EvalStatus, EvalTrial } from '@/api/types';
-import { EVAL_STATUS_TONE } from '@/lib/evals';
+import { EVAL_STATUS_LABEL, EVAL_STATUS_TONE } from '@/lib/evals';
 import { EMPTY } from '@/lib/format';
 import { Badge, type Tone } from '../ui';
 
 export function EvalStatusBadge({ status }: { status: EvalStatus }) {
   return (
     <Badge tone={EVAL_STATUS_TONE[status]} dot>
-      {status}
+      {EVAL_STATUS_LABEL[status]}
     </Badge>
   );
 }

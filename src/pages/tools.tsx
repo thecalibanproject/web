@@ -1,15 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi } from '@tanstack/react-router';
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { usePermissions } from '@/api/auth';
-import {
-  tenantsQuery,
-  toolServersQuery,
-  useDeleteToolServer,
-  useDiscoverTools,
-} from '@/api/queries';
+import { toolServersQuery, useDeleteToolServer, useDiscoverTools } from '@/api/queries';
 import type { ToolServer } from '@/api/types';
-import { TenantSelect } from '@/components/tenant-select';
+import { TermTip } from '@/components/help/toggletip';
 import { RegisterServerForm, TRUSTED_HINT } from '@/components/tools/register-server-form';
 import { ServerTools } from '@/components/tools/server-tools';
 import {
@@ -34,44 +29,34 @@ import {
 import { IconPlus, IconRefresh, IconTrash } from '@/components/ui/icons';
 import { isNotFound } from '@/lib/errors';
 import { EMPTY, formatDateTime } from '@/lib/format';
+import { doc } from '@/lib/docs';
 import { deniedReason } from '@/lib/permissions';
 import { TOOL_AUTH_LABEL } from '@/lib/tools';
+import { useScopedTenant, useWorkspace } from '@/lib/workspace';
 
 const route = getRouteApi('/_app/tools');
 
 export function ToolsPage() {
   const search = route.useSearch();
   const navigate = route.useNavigate();
-  const perms = usePermissions();
-  const tenants = useQuery(tenantsQuery());
-  const readable = perms.tenantsWith('tools.read');
-  const firstReadable = tenants.data?.find(
-    (t) => readable === 'all' || readable.includes(t.id),
-  )?.id;
-  const tenantId = search.tenant ?? firstReadable;
+  // The header's workspace, or a ?tenant= deep link.
+  const tenantId = useScopedTenant(search.tenant);
+  const ws = useWorkspace();
 
   const setSearch = (patch: Partial<typeof search>) =>
     void navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
 
-  const toolbar = (
-    <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
-      <label className="flex items-center gap-2 text-[12.5px] text-fg-muted">
-        Tenant
-        <TenantSelect
-          value={tenantId}
-          permission="tools.read"
-          className="w-52"
-          onChange={(t) => setSearch({ tenant: t, server: undefined })}
-        />
-      </label>
-    </div>
-  );
-
   return (
     <>
       <PageHeader
-        title="Tools"
-        description="The MCP servers a tenant's nodes may call, and the tool manifests approved for them. A tool becomes callable only once someone who may approve tools has reviewed its manifest."
+        title="Connected systems"
+        description={
+          <>
+            Outside systems the assistants of this workspace may call. Each of their actions can be
+            used only after a person has reviewed and approved it.{' '}
+            <TermTip term="connectedSystem" />
+          </>
+        }
         actions={
           tenantId && (
             <RegisterButton tenantId={tenantId} onRegistered={(s) => setSearch({ server: s })} />
@@ -80,22 +65,20 @@ export function ToolsPage() {
       />
       {tenantId ? (
         <ServerList
-          toolbar={toolbar}
           tenantId={tenantId}
           selected={search.server}
           onSelect={(s) => setSearch({ server: s })}
         />
       ) : (
         <Card>
-          {toolbar}
-          {tenants.isPending ? (
+          {ws.isPending ? (
             <LoadingState rows={2} />
-          ) : tenants.isError ? (
-            <ErrorState error={tenants.error} onRetry={() => void tenants.refetch()} />
+          ) : ws.isError ? (
+            <ErrorState error={ws.error} onRetry={ws.refetch} />
           ) : (
             <EmptyState
-              title="No tenant to show"
-              description="Tool servers are registered per tenant. Your roles do not cover a tenant with tools yet."
+              title="No workspace to show"
+              description="Connected systems belong to a workspace, and your roles do not cover one yet."
             />
           )}
         </Card>
@@ -106,9 +89,11 @@ export function ToolsPage() {
 
 function RegisterButton({
   tenantId,
+  label = 'Add a system',
   onRegistered,
 }: {
   tenantId: string;
+  label?: string;
   onRegistered: (server: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -121,13 +106,13 @@ function RegisterButton({
         deniedReason={denied}
         onClick={() => setOpen(true)}
       >
-        Register server
+        {label}
       </GatedButton>
       <Drawer
         open={open}
         onClose={() => setOpen(false)}
-        title="Register tool server"
-        description="Registering a server is what allows nodes to reach it: the registry is the egress allowlist for tools."
+        title="Add a connected system"
+        description="Assistants can only reach systems added here."
       >
         {open && (
           <RegisterServerForm
@@ -145,12 +130,10 @@ function RegisterButton({
 }
 
 function ServerList({
-  toolbar,
   tenantId,
   selected,
   onSelect,
 }: {
-  toolbar: ReactNode;
   tenantId: string;
   selected: string | undefined;
   onSelect: (server: string | undefined) => void;
@@ -171,8 +154,8 @@ function ServerList({
       <div className="mx-4 mt-3">
         {discover.isSuccess ? (
           <p role="status" className="text-[12.5px] text-ok">
-            The server lists {discover.data.tools?.length ?? 0} tool
-            {discover.data.tools?.length === 1 ? '' : 's'}. New and changed manifests need approval.
+            The system offers {discover.data.tools?.length ?? 0} action
+            {discover.data.tools?.length === 1 ? '' : 's'}. New and changed ones need approval.
           </p>
         ) : (
           <FormError error={discover.error} />
@@ -188,26 +171,33 @@ function ServerList({
   return (
     <>
       <Card>
-        {toolbar}
         {servers.isPending ? (
           <LoadingState rows={3} />
         ) : servers.isError ? (
           isNotFound(servers.error) ? (
-            <EmptyState title="Tenant not found" description="It may have been deleted." />
+            <EmptyState title="Workspace not found" description="It may have been deleted." />
           ) : (
             <ErrorState error={servers.error} onRetry={() => void servers.refetch()} />
           )
         ) : servers.data.length === 0 ? (
           <EmptyState
-            title="No tool servers"
-            description="Register an MCP server (Streamable HTTP), discover its tools, then review and approve them so nodes can pin them."
+            title="No connected systems yet"
+            description="Add a system's tool server, check which actions it offers, then approve the ones assistants may use."
+            action={
+              <RegisterButton
+                tenantId={tenantId}
+                label="Add your first system"
+                onRegistered={(s) => onSelect(s)}
+              />
+            }
+            learnMore={doc('guides/connected-systems', 'add-a-tool-server')}
           />
         ) : (
-          <Table label="Tool servers">
+          <Table label="Connected systems">
             <THead>
               <tr>
                 <TH>Name</TH>
-                <TH>URL</TH>
+                <TH>Address</TH>
                 <TH>Authentication</TH>
                 <TH>Personal data</TH>
                 <TH>Credential</TH>
@@ -243,19 +233,19 @@ function ServerList({
                     <TD>
                       {s.trusted ? (
                         <Badge tone="warn" title={TRUSTED_HINT}>
-                          Trusted: real values
+                          Gets real values
                         </Badge>
                       ) : (
-                        <Badge title={TRUSTED_HINT}>Surrogates</Badge>
+                        <Badge title={TRUSTED_HINT}>Gets placeholders</Badge>
                       )}
                     </TD>
                     <TD>
                       {s.has_credential ? (
                         <Badge
                           tone="ok"
-                          title="Sealed under the tenant's data key; never returned."
+                          title="Encrypted with the workspace's data key; never shown again."
                         >
-                          Sealed
+                          Stored, encrypted
                         </Badge>
                       ) : (
                         <span className="text-fg-subtle">{EMPTY}</span>
@@ -274,20 +264,20 @@ function ServerList({
                         <Button
                           size="sm"
                           variant="ghost"
-                          aria-label={`Show the tools of ${name}`}
+                          aria-label={`Show the actions of ${name}`}
                           onClick={() => onSelect(name)}
                         >
-                          Tools
+                          Actions
                         </Button>
                         <GatedButton
                           size="sm"
                           icon={<IconRefresh size={14} />}
                           deniedReason={cannotWrite}
                           loading={discover.isPending && discover.variables === name}
-                          aria-label={`Discover the tools of ${name}`}
+                          aria-label={`Check ${name} for tools`}
                           onClick={() => runDiscover(name)}
                         >
-                          Discover
+                          Check for tools
                         </GatedButton>
                         <GatedButton
                           size="sm"
@@ -322,7 +312,7 @@ function ServerList({
 
       <ConfirmDialog
         open={deleting !== null}
-        title="Delete tool server?"
+        title="Delete connected system?"
         confirmLabel="Delete server"
         loading={del.isPending}
         error={del.error}
@@ -340,10 +330,10 @@ function ServerList({
       >
         <p>
           Delete <code className="font-mono font-medium">{deleting?.name}</code>? Its credential is
-          wiped and its tools leave the data plane.
+          wiped and assistants can no longer call it.
         </p>
         <p className="text-fg-muted">
-          A server that a published node version uses cannot be deleted: retire those versions
+          A system that a published assistant version uses cannot be deleted: retire those versions
           first.
         </p>
       </ConfirmDialog>

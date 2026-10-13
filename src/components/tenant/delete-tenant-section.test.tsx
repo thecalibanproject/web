@@ -15,8 +15,8 @@ const acme: Tenant = {
 async function openDialog() {
   const user = userEvent.setup();
   const section = screen.getByRole('region', { name: 'Danger zone' });
-  await user.click(within(section).getByRole('button', { name: 'Delete tenant' }));
-  const dialog = await screen.findByRole('dialog', { name: 'Delete tenant?' });
+  await user.click(within(section).getByRole('button', { name: 'Delete workspace' }));
+  const dialog = await screen.findByRole('dialog', { name: 'Delete this workspace?' });
   return { user, dialog };
 }
 
@@ -27,14 +27,14 @@ describe('DeleteTenantSection', () => {
     renderWithClient(<DeleteTenantSection tenant={acme} onDeleted={onDeleted} />);
     const { user, dialog } = await openDialog();
 
-    expect(dialog).toHaveTextContent(/revokes all of its Caliban API keys/);
-    expect(dialog).toHaveTextContent(/destroys its BYOK provider credentials/);
-    expect(dialog).toHaveTextContent(/removes its routes/);
-    expect(dialog).toHaveTextContent(/deletes its datasources and nodes/);
-    expect(dialog).toHaveTextContent(/Audit history is kept/);
+    expect(dialog).toHaveTextContent(/revokes all of its app keys/);
+    expect(dialog).toHaveTextContent(/destroys its own provider accounts/);
+    expect(dialog).toHaveTextContent(/removes its routing/);
+    expect(dialog).toHaveTextContent(/deletes its data connections and assistants/);
+    expect(dialog).toHaveTextContent(/The audit log is kept/);
     expect(dialog).toHaveTextContent(/can't be reused/);
 
-    const confirm = within(dialog).getByRole('button', { name: 'Delete tenant' });
+    const confirm = within(dialog).getByRole('button', { name: 'Delete workspace' });
     const input = within(dialog).getByLabelText('Type acme-finance to confirm');
     expect(confirm).toBeDisabled();
 
@@ -75,7 +75,7 @@ describe('DeleteTenantSection', () => {
     renderWithClient(<DeleteTenantSection tenant={acme} onDeleted={onDeleted} />);
     const { user, dialog } = await openDialog();
     await user.type(within(dialog).getByLabelText(/to confirm/), 'acme-finance');
-    await user.click(within(dialog).getByRole('button', { name: 'Delete tenant' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Delete workspace' }));
     await waitFor(() => expect(onDeleted).toHaveBeenCalledTimes(1));
   });
 
@@ -90,7 +90,7 @@ describe('DeleteTenantSection', () => {
     renderWithClient(<DeleteTenantSection tenant={acme} onDeleted={onDeleted} />);
     const { user, dialog } = await openDialog();
     await user.type(within(dialog).getByLabelText(/to confirm/), 'acme-finance');
-    await user.click(within(dialog).getByRole('button', { name: 'Delete tenant' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Delete workspace' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('database unavailable');
     expect(onDeleted).not.toHaveBeenCalled();

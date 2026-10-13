@@ -11,18 +11,18 @@ import { Card, CardHeader, EmptyState, Table, TBody, TD, TH, THead, TR } from '.
 export function PurposeCostCard({ byPurpose }: { byPurpose: UsageByPurpose[] | undefined }) {
   const rows = purposeCosts(byPurpose);
   return (
-    <Card role="region" aria-label="Retrieval spend">
+    <Card role="region" aria-label="Knowledge spend">
       <CardHeader
-        title="Retrieval spend"
-        description="Embedding and rerank calls Caliban makes for document collections, apart from the tenant's own embedding calls."
+        title="Knowledge spend"
+        description="The calls Caliban makes to index and search your document libraries, apart from the workspace's own calls."
       />
       {rows.length === 0 ? (
         <EmptyState
-          title="No retrieval calls"
-          description="Indexing documents and node retrieval queries will appear here."
+          title="No document library calls yet"
+          description="Indexing documents and searches by assistants appear here."
         />
       ) : (
-        <Table label="Retrieval spend">
+        <Table label="Knowledge spend">
           <THead>
             <tr>
               <TH>Purpose</TH>

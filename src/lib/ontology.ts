@@ -33,16 +33,93 @@ export function groupByKind(
   }));
 }
 
+/** Plain names of the kinds of entries (jargon.json); the internal kind stays in the details. */
 export const ONTOLOGY_KIND_LABEL: Record<OntologyElementKind, string> = {
-  entity: 'Entities',
-  attribute: 'Attributes',
-  relation: 'Relations',
-  metric: 'Metrics',
-  dimension: 'Dimensions',
-  glossary_term: 'Glossary terms',
-  policy: 'Policies',
-  verified_query: 'Verified queries',
+  entity: 'Things',
+  attribute: 'Details',
+  relation: 'Links',
+  metric: 'Measures',
+  dimension: 'Groupings',
+  glossary_term: 'Also called',
+  policy: 'Rules',
+  verified_query: 'Saved questions',
 };
+
+/** One entry of a kind, for badges. */
+export const ONTOLOGY_KIND_SINGULAR: Record<OntologyElementKind, string> = {
+  entity: 'Thing',
+  attribute: 'Detail',
+  relation: 'Link',
+  metric: 'Measure',
+  dimension: 'Grouping',
+  glossary_term: 'Also called',
+  policy: 'Rule',
+  verified_query: 'Saved question',
+};
+
+export const ELEMENT_STATUS_LABEL: Record<OntologyElement['status'], string> = {
+  proposed: 'Suggested',
+  approved: 'In use',
+  rejected: 'Rejected',
+  stale: 'Source changed',
+  deprecated: 'Withdrawn',
+};
+
+/** Who suggested an entry, in plain words (the internal provenance stays in a tooltip). */
+export const PROVENANCE_LABEL: Record<OntologyElement['provenance'], string> = {
+  introspect: 'From a scan',
+  profile: 'From statistics',
+  query_log: 'From past queries',
+  llm: 'Suggested by AI',
+  human: 'By a person',
+};
+
+/** Thresholds offered for "approve every suggestion above". */
+export const CONFIDENCE_THRESHOLDS = [0.95, 0.9, 0.8, 0.7] as const;
+
+/** Suggestions at or above `threshold` confidence (unknown confidence never qualifies). */
+export function aboveConfidence(
+  queue: readonly OntologyElement[],
+  threshold: number,
+): OntologyElement[] {
+  return queue.filter((e) => e.confidence != null && e.confidence >= threshold);
+}
+
+/** Entries in use, rejected, and the rest, for the header counts (UX-35). */
+export function countByStatus(elements: readonly OntologyElement[]): {
+  inUse: number;
+  rejected: number;
+  suggested: number;
+} {
+  let inUse = 0;
+  let rejected = 0;
+  let suggested = 0;
+  for (const e of elements) {
+    if (e.status === 'approved') inUse += 1;
+    else if (e.status === 'rejected') rejected += 1;
+    else if (e.status === 'proposed') suggested += 1;
+  }
+  return { inUse, rejected, suggested };
+}
+
+/**
+ * Up to two example values an entry carries in its spec (`samples`,
+ * `sample_values` or `examples`), as text; empty when it carries none.
+ */
+export function sampleValues(element: Pick<OntologyElement, 'spec'>): string[] {
+  const spec = element.spec as Record<string, unknown> | null | undefined;
+  if (!spec || typeof spec !== 'object') return [];
+  for (const key of ['samples', 'sample_values', 'examples']) {
+    const v = spec[key];
+    if (Array.isArray(v)) {
+      return v
+        .filter((x) => x !== null && x !== undefined && x !== '')
+        .slice(0, 2)
+        .map((x) => (typeof x === 'string' ? x : JSON.stringify(x)));
+    }
+  }
+  return [];
+}
 
 /** Kinds the architecture says must always be human-approved. */
 export const ALWAYS_REVIEW: ReadonlySet<OntologyElementKind> = new Set([

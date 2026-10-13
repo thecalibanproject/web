@@ -1,5 +1,11 @@
 import type { AuditEntry, DatasourceKind, ProviderKind, TrustTier } from '@/api/types';
-import { DATASOURCE_LABEL, PROVIDER_SHORT, TRUST_TIER_LABEL } from './labels';
+import {
+  DATASOURCE_LABEL,
+  PII_MODE_LABEL,
+  PROVIDER_SHORT,
+  SURROGATE_SCOPE_LABEL,
+  TRUST_TIER_LABEL,
+} from './labels';
 
 /** Window sizes offered for GET /api/v1/audit?limit= (the API caps it at 1000). */
 export const AUDIT_LIMITS = [100, 250, 500, 1000] as const;
@@ -56,9 +62,9 @@ const datasourceLabel = (kind: string | undefined) =>
   kind ? (DATASOURCE_LABEL[kind as DatasourceKind] ?? kind) : undefined;
 
 const TENANT_FIELDS: Array<[string, string]> = [
-  ['pii_default', 'PII default'],
-  ['pii_surrogate_scope', 'surrogate scope'],
-  ['semantic_cache', 'semantic cache'],
+  ['pii_default', 'personal data'],
+  ['pii_surrogate_scope', 'placeholder consistency'],
+  ['semantic_cache', 'reuse similar answers'],
 ];
 
 const fmt = (v: unknown): string => {
@@ -67,6 +73,15 @@ const fmt = (v: unknown): string => {
   if (typeof v === 'number' || typeof v === 'boolean') return `${v}`;
   return JSON.stringify(v);
 };
+
+/** A tenant setting's value in the words the settings page uses. */
+function settingValue(k: string, v: unknown): string {
+  const labels: Record<string, Record<string, string>> = {
+    pii_default: PII_MODE_LABEL,
+    pii_surrogate_scope: SURROGATE_SCOPE_LABEL,
+  };
+  return typeof v === 'string' ? (labels[k]?.[v] ?? v) : fmt(v);
+}
 
 /** Fallback for actions this console does not know yet: `key: value` pairs. */
 function genericSummary(d: Detail): string {
@@ -89,15 +104,18 @@ export function summarizeAudit(entry: Pick<AuditEntry, 'action' | 'detail'>): st
     case 'tenant.create': {
       const settings = TENANT_FIELDS.flatMap(([k, label]) => {
         const v = str(d, k);
-        return v ? [`${label} ${v}`] : [];
+        return v ? [`${label} ${settingValue(k, v)}`] : [];
       });
       const name = quoted(str(d, 'name'));
       return [name ? `Created ${name}` : 'Created', settings.join(', ')].filter(Boolean).join(': ');
     }
     case 'tenant.update': {
+      // Only the fields the change carried (a partial update is not a reset, UX-72).
       const changed = TENANT_FIELDS.flatMap(([k, label]) => {
         const c = change(d, k);
-        return c && c.from !== c.to ? [`${label} ${fmt(c.from)} → ${fmt(c.to)}`] : [];
+        return c && c.from !== c.to && c.to !== undefined
+          ? [`${label} ${settingValue(k, c.from)} → ${settingValue(k, c.to)}`]
+          : [];
       });
       return changed.length ? changed.join(', ') : 'No setting changed';
     }
@@ -196,4 +214,82 @@ export function chainLinks(entries: readonly AuditEntry[]): Map<number, ChainLin
     else links.set(e.seq, e.seq > oldest ? 'broken' : 'unchecked');
   }
   return links;
+}
+
+/** What each audit action means, in plain words (UX-72). The id stays as a tooltip. */
+export const AUDIT_ACTION_LABEL: Record<string, string> = {
+  'api_key.create': 'App key created',
+  'api_key.revoke': 'App key revoked',
+  'api_key.update': 'App key changed',
+  'auth.break_glass': 'Signed in with the shared admin token',
+  'auth.login': 'Signed in',
+  'auth.login_failed': 'Sign-in failed',
+  'auth.logout': 'Signed out',
+  'datasource.create': 'Data connection added',
+  'datasource.delete': 'Data connection deleted',
+  'datasource.introspection': 'Data connection scanned',
+  'datasource.status': 'Data connection status changed',
+  'keys.migrate': 'Encryption keys migrated',
+  'keys.rotate': 'Encryption keys rotated',
+  'model.create': 'Model added',
+  'model.delete': 'Model deleted',
+  'node.create': 'Assistant version created',
+  'node.delete': 'Assistant version deleted',
+  'node.eval.start': 'Tests started',
+  'node.eval.finish': 'Tests finished',
+  'node.eval.cancel': 'Tests cancelled',
+  'node.eval_policy.update': 'Go-live bar changed',
+  'node.golden_set.update': 'Test cases changed',
+  'node.golden_set.delete': 'Test cases deleted',
+  'node.golden_set.capture': 'Saved a conversation as a test',
+  'node.publish': 'Version published',
+  'node.promote': 'Version made live',
+  'node.retire': 'Version retired',
+  'node.run.answer': 'Answered a question',
+  'node.run.cancel': 'Conversation stopped',
+  'node.write.approve': 'Approved an action',
+  'node.write.deny': 'Rejected an action',
+  'ontology.propose': 'Data dictionary entries suggested',
+  'ontology.review': 'Data dictionary reviewed',
+  'provider.create': 'Model server added',
+  'provider.delete': 'Model server deleted',
+  'provider_key.create': 'Provider account added',
+  'provider_key.delete': 'Provider account deleted',
+  'rag.collection.create': 'Document library created',
+  'rag.collection.delete': 'Document library deleted',
+  'rag.document.ingest': 'Document added',
+  'rag.document.delete': 'Document deleted',
+  'rag.document.release': 'Held document allowed',
+  'role_binding.create': 'Role granted',
+  'role_binding.delete': 'Role revoked',
+  'routes.set': 'Model routing changed',
+  'store.seed': 'Initial setup loaded',
+  'tenant.create': 'Workspace created',
+  'tenant.update': 'Workspace settings changed',
+  'tenant.delete': 'Workspace deleted',
+  'tenant.intent.set': 'Topic changed',
+  'tenant.intent.delete': 'Topic removed',
+  'tool.approve': 'Action approved for assistants',
+  'tool.revoke': 'Action approval revoked',
+  'tool.discover': 'Checked a system for tools',
+  'tool_server.create': 'Connected system added',
+  'tool_server.update': 'Connected system changed',
+  'tool_server.delete': 'Connected system deleted',
+  'user.create': 'Person added',
+  'user.sessions_revoke': 'Sessions ended',
+};
+
+/** The plain name of an action, or the id itself for one this console does not know yet. */
+export function actionLabel(action: string): string {
+  return AUDIT_ACTION_LABEL[action] ?? action;
+}
+
+/**
+ * Who acted, for people. `break_glass` is the shared admin token: name it so
+ * an auditor knows no one person is identified (UX-07). Eval actors are tests.
+ */
+export function actorLabel(actor: string): string {
+  if (actor === 'break_glass') return 'Shared admin token (emergency access)';
+  if (actor.startsWith('eval:')) return 'A test run';
+  return actor;
 }

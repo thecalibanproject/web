@@ -45,10 +45,10 @@ export const CONNECTION_FIELDS: Record<DatasourceKind, ConnectionField[]> = {
     { key: 'database', label: 'Database', type: 'text', required: true, placeholder: 'sales' },
     {
       key: 'read_preference',
-      label: 'Read preference',
+      label: 'Read from',
       type: 'select',
       defaultValue: 'secondaryPreferred',
-      hint: 'Prefer secondaries so introspection and AI queries stay off the primary.',
+      hint: 'Reading from a replica (secondary) keeps scans and assistant questions off the main database server. Recommended.',
       options: READ_PREFERENCES.map((v) => ({ value: v, label: v })),
     },
   ],

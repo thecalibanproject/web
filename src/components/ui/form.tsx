@@ -1,10 +1,4 @@
-import {
-  useId,
-  type InputHTMLAttributes,
-  type ReactNode,
-  type SelectHTMLAttributes,
-  type TextareaHTMLAttributes,
-} from 'react';
+import { useId, type ComponentProps, type ReactNode, type SelectHTMLAttributes } from 'react';
 import { cn } from '@/lib/cn';
 
 const control =
@@ -13,11 +7,11 @@ const control =
   'focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-ring ' +
   'disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-danger';
 
-export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
+export function Input({ className, ...rest }: ComponentProps<'input'>) {
   return <input className={cn(control, 'h-8', className)} {...rest} />;
 }
 
-export function Textarea({ className, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function Textarea({ className, ...rest }: ComponentProps<'textarea'>) {
   return <textarea className={cn(control, 'min-h-20 py-2 leading-snug', className)} {...rest} />;
 }
 
@@ -76,7 +70,7 @@ export function Checkbox({
   hint,
   className,
   ...rest
-}: Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & { label: ReactNode; hint?: ReactNode }) {
+}: Omit<ComponentProps<'input'>, 'type'> & { label: ReactNode; hint?: ReactNode }) {
   const id = useId();
   const hintId = hint ? `${id}-hint` : undefined;
   return (

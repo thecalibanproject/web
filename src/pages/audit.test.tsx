@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import type { AuditEntry, AuditLog, Tenant } from '@/api/types';
+import { expectNoAxeViolations } from '@/test/a11y';
 import { mockApi, renderApp } from '@/test/utils';
 
 const tenants: Tenant[] = [
@@ -91,6 +92,32 @@ const shownSeqs = () =>
     .map((r) => r.querySelector('td')?.textContent);
 
 describe('AuditPage', () => {
+  it('names the shared admin token and plain actions in each row', async () => {
+    mockAudit({
+      ...verified,
+      entries: verified.entries.map((e) =>
+        e.seq === 4 ? { ...e, actor: 'break_glass', action: 'node.write.approve' } : e,
+      ),
+    });
+    await renderApp('/audit');
+    await screen.findByRole('table', { name: 'Audit log' });
+    const row = within(table())
+      .getAllByRole('row')
+      .find((r) => r.querySelector('td')?.textContent === '4')!;
+    expect(within(row).getByText('Shared admin token (emergency access)')).toBeInTheDocument();
+    expect(within(row).getByText('Approved an action')).toHaveAttribute(
+      'title',
+      'node.write.approve',
+    );
+  });
+
+  it('has no axe violations', async () => {
+    mockAudit();
+    await renderApp('/audit');
+    await screen.findByRole('table', { name: 'Audit log' });
+    await expectNoAxeViolations();
+  });
+
   it('lists entries newest first with actor, action, tenant, target and a readable summary', async () => {
     const calls = mockAudit();
     await renderApp('/audit');
@@ -106,10 +133,10 @@ describe('AuditPage', () => {
       'Time',
       'Actor',
       'Action',
-      'Tenant',
+      'Workspace',
       'Target',
       'Details',
-      'Hash',
+      'Fingerprint',
     ]);
 
     const rowOf = (seq: number) =>
@@ -118,13 +145,17 @@ describe('AuditPage', () => {
         .find((r) => r.querySelector('td')?.textContent === String(seq))!;
 
     const revoke = rowOf(4);
-    expect(within(revoke).getByText('api_key.revoke')).toBeInTheDocument();
+    expect(within(revoke).getByText('App key revoked')).toBeInTheDocument();
     expect(within(revoke).getByText('Acme')).toBeInTheDocument();
     expect(within(revoke).getByText('k1')).toBeInTheDocument();
     expect(within(revoke).getByText('Revoked "ci" (cal_abcd…)')).toBeInTheDocument();
 
     // Only the setting that changed, and deleted tenants keep their name.
-    expect(within(rowOf(3)).getByText('PII default reversible → mask')).toBeInTheDocument();
+    expect(
+      within(rowOf(3)).getByText(
+        'personal data Hide from the model, restore in the answer → Hide everywhere',
+      ),
+    ).toBeInTheDocument();
     const del = rowOf(5);
     expect(within(del).getByText('Globex (deleted)')).toBeInTheDocument();
     expect(within(del).getByText('1 API key revoked, 1 route removed')).toBeInTheDocument();
@@ -141,10 +172,10 @@ describe('AuditPage', () => {
     mockAudit();
     await renderApp('/audit');
     const status = await screen.findByRole('region', { name: 'Chain integrity' });
-    expect(within(status).getByText('Chain verified')).toBeInTheDocument();
+    expect(within(status).getByText('Untampered')).toBeInTheDocument();
     expect(status).toHaveTextContent('recomputed the hashes of entries #1 to #5');
     expect(status).toHaveTextContent('This window starts at the first entry of the log.');
-    expect(within(status).getByText('Head #5')).toBeInTheDocument();
+    expect(within(status).getByText('Latest entry #5')).toBeInTheDocument();
     expect(within(status).getByTitle(hash(5))).toHaveTextContent('0005abababab…');
     expect(within(status).getByRole('button', { name: 'Copy head hash' })).toBeInTheDocument();
 
@@ -170,7 +201,7 @@ describe('AuditPage', () => {
     });
     await renderApp('/audit');
     const status = await screen.findByRole('region', { name: 'Chain integrity' });
-    expect(within(status).getByText('Chain not verified')).toBeInTheDocument();
+    expect(within(status).getByText('Possibly tampered with')).toBeInTheDocument();
     expect(status).toHaveTextContent('could not verify entries #2 to #5');
     expect(status).toHaveTextContent('Treat these entries as tampered with');
     expect(status).toHaveTextContent('Entries before #2 are outside this window');
@@ -186,12 +217,12 @@ describe('AuditPage', () => {
     const { router } = await renderApp('/audit');
     await screen.findByRole('table', { name: 'Audit log' });
 
-    const tenant = screen.getByRole('combobox', { name: 'Tenant' });
+    const tenant = screen.getByRole('combobox', { name: 'Entries of' });
     expect(
       within(tenant)
         .getAllByRole('option')
         .map((o) => o.textContent),
-    ).toEqual(['All tenants', 'Acme', 'Globex (deleted)']);
+    ).toEqual(['All workspaces', 'Acme', 'Globex (deleted)']);
     await user.selectOptions(tenant, 'acme');
     await waitFor(() => expect(shownSeqs()).toEqual(['4', '3', '2']));
     expect(router.state.location.search).toMatchObject({ tenant: 'acme' });
@@ -204,11 +235,11 @@ describe('AuditPage', () => {
         .map((o) => o.textContent),
     ).toEqual([
       'All actions',
-      'api_key.revoke',
-      'store.seed',
-      'tenant.create',
-      'tenant.delete',
-      'tenant.update',
+      'App key revoked',
+      'Initial setup loaded',
+      'Workspace created',
+      'Workspace deleted',
+      'Workspace settings changed',
     ]);
     await user.selectOptions(action, 'tenant.update');
     await waitFor(() => expect(shownSeqs()).toEqual(['3']));

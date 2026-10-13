@@ -25,14 +25,14 @@ describe('ProviderKeyForm (BYOK)', () => {
     renderWithClient(<ProviderKeyForm tenantId="t1" onDone={onDone} />);
 
     expect(screen.getByLabelText(/^Provider\*?$/)).toHaveValue('openai_compatible');
-    expect(screen.getByLabelText(/^Trust tier/)).toHaveValue('t0_sovereign');
+    expect(screen.getByLabelText(/^Where the model runs/)).toHaveValue('t0_sovereign');
     const secret = screen.getByLabelText(/^API key/);
     expect(secret).toHaveAttribute('type', 'password');
     expect(secret).not.toBeRequired();
 
     await user.type(screen.getByLabelText(/^Label/), 'dc1-vllm');
     await user.type(screen.getByLabelText(/^Base URL/), 'http://vllm.internal:8000/v1');
-    await user.click(screen.getByRole('button', { name: /add provider key/i }));
+    await user.click(screen.getByRole('button', { name: /add provider account/i }));
 
     await waitFor(() => expect(onDone).toHaveBeenCalled());
     expect(calls[0]?.body).toEqual({
@@ -55,12 +55,12 @@ describe('ProviderKeyForm (BYOK)', () => {
 
     await user.selectOptions(screen.getByLabelText(/^Provider\*?$/), 'openai');
     expect(screen.queryByLabelText(/^Base URL/)).not.toBeInTheDocument();
-    expect(screen.getByLabelText(/^Trust tier/)).toHaveValue('t2_contracted');
+    expect(screen.getByLabelText(/^Where the model runs/)).toHaveValue('t2_contracted');
     expect(screen.getByLabelText(/^API key/)).toBeRequired();
 
     await user.type(screen.getByLabelText(/^Label/), 'prod-openai');
     await user.type(screen.getByLabelText(/^API key/), 'sk-live-123');
-    await user.click(screen.getByRole('button', { name: /add provider key/i }));
+    await user.click(screen.getByRole('button', { name: /add provider account/i }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('key rejected by provider');
     expect(calls[0]?.body).toMatchObject({ kind: 'openai', api_key: 'sk-live-123' });

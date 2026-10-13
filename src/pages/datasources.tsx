@@ -1,11 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
-import { useMemo, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { usePermissions } from '@/api/auth';
 import {
   datasourcesQuery,
   introspectionQuery,
-  tenantsQuery,
   useCreateDatasource,
   useDeleteDatasource,
   useIntrospectDatasource,
@@ -16,8 +15,9 @@ import {
   type DatasourceKind,
   type IntrospectionJob,
 } from '@/api/types';
-import { DatasourceStatusBadge } from '@/components/badges';
-import { TenantFilter, TenantSelect } from '@/components/tenant-select';
+import { Advanced } from '@/components/help/advanced';
+import { TermTip } from '@/components/help/toggletip';
+import { TenantSelect } from '@/components/tenant-select';
 import {
   Badge,
   Button,
@@ -48,7 +48,9 @@ import {
   initialConnection,
   type ConnectionField,
 } from '@/lib/datasourceFields';
+import { doc } from '@/lib/docs';
 import { DATASOURCE_LABEL } from '@/lib/labels';
+import { useScopedTenant } from '@/lib/workspace';
 import { errorMessage } from '@/lib/errors';
 import { EMPTY, formatDateTime, formatInt } from '@/lib/format';
 
@@ -150,8 +152,8 @@ export function RegisterDatasourceForm({
   };
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4" aria-label="Register datasource">
-      <Field label="Tenant" required>
+    <form onSubmit={onSubmit} className="flex flex-col gap-4" aria-label="Connect a database">
+      <Field label="Workspace" required>
         {({ id }) => (
           <TenantSelect
             id={id}
@@ -174,7 +176,11 @@ export function RegisterDatasourceForm({
             </Select>
           )}
         </Field>
-        <Field label="Name" required hint="Lowercase id used in node scopes, e.g. sales_dw.">
+        <Field
+          label="Name"
+          required
+          hint="A short id, such as sales_dw: lowercase letters, digits and underscores. Assistants are given access to it by this name."
+        >
           {({ id, describedBy }) => (
             <Input
               id={id}
@@ -212,7 +218,7 @@ export function RegisterDatasourceForm({
           loading={create.isPending}
           disabled={!tenantId || !name.trim()}
         >
-          Register datasource
+          Connect
         </Button>
       </div>
     </form>
@@ -234,12 +240,38 @@ function IntrospectButton({ ds }: { ds: Datasource }) {
         loading={introspect.isPending}
         disabled={ds.status === 'introspecting'}
         onClick={() => introspect.mutate(ds.id)}
-        title="Sample the source and propose ontology elements for review"
-        aria-label={`Introspect ${ds.name}`}
+        title="Reads a sample of the database and suggests data dictionary entries for review (also called introspection)"
+        aria-label={`Scan ${ds.name}`}
       >
-        Introspect
+        Scan
       </Button>
     </span>
+  );
+}
+
+const DS_TONE: Record<Datasource['status'], Tone> = {
+  pending: 'neutral',
+  connected: 'ok',
+  ready: 'ok',
+  error: 'danger',
+  failed: 'danger',
+  introspecting: 'info',
+};
+
+const DS_LABEL: Record<Datasource['status'], string> = {
+  pending: 'Not scanned yet',
+  connected: 'Connected',
+  ready: 'Ready',
+  error: 'Error',
+  failed: 'Failed',
+  introspecting: 'Scanning',
+};
+
+function StatusBadge({ status }: { status: Datasource['status'] }) {
+  return (
+    <Badge tone={DS_TONE[status] ?? 'neutral'} dot title={`Status: ${status}`}>
+      {DS_LABEL[status] ?? status}
+    </Badge>
   );
 }
 
@@ -247,6 +279,12 @@ const JOB_TONE: Record<NonNullable<IntrospectionJob['status']>, Tone> = {
   running: 'info',
   succeeded: 'ok',
   failed: 'danger',
+};
+
+const JOB_LABEL: Record<NonNullable<IntrospectionJob['status']>, string> = {
+  running: 'Scanning',
+  succeeded: 'Scanned',
+  failed: 'Scan failed',
 };
 
 /**
@@ -265,16 +303,12 @@ function IntrospectionCell({ ds }: { ds: Datasource }) {
   }
   const j = job.data;
   if (!j?.status) {
-    return (
-      <span className="text-fg-subtle" title="Never introspected.">
-        {EMPTY}
-      </span>
-    );
+    return <span className="text-fg-muted">Not scanned yet</span>;
   }
   return (
     <span className="flex flex-col gap-0.5 text-[12px]">
       <span className="inline-flex items-center gap-1.5">
-        <Badge tone={JOB_TONE[j.status]}>{j.status}</Badge>
+        <Badge tone={JOB_TONE[j.status]}>{JOB_LABEL[j.status]}</Badge>
         <span className="text-fg-subtle">{formatDateTime(j.finished_at ?? j.started_at)}</span>
       </span>
       {j.status === 'failed' ? (
@@ -284,8 +318,8 @@ function IntrospectionCell({ ds }: { ds: Datasource }) {
       ) : (
         j.status === 'succeeded' && (
           <span className="text-fg-muted">
-            {formatInt(j.objects)} collections, {formatInt(j.proposed)} proposed,{' '}
-            {formatInt(j.skipped)} skipped
+            {formatInt(j.objects)} collections read, {formatInt(j.proposed)} entries suggested,{' '}
+            {formatInt(j.skipped)} already reviewed
             {j.version != null && (
               <>
                 {' in '}
@@ -294,7 +328,7 @@ function IntrospectionCell({ ds }: { ds: Datasource }) {
                   search={{ tenant: ds.tenant_id }}
                   className="text-accent hover:underline"
                 >
-                  version {j.version}
+                  the data dictionary (version {j.version})
                 </Link>
               </>
             )}
@@ -306,76 +340,57 @@ function IntrospectionCell({ ds }: { ds: Datasource }) {
 }
 
 export function DatasourcesPage() {
-  const { tenant } = route.useSearch();
-  const navigate = route.useNavigate();
-  const sources = useQuery(datasourcesQuery(tenant));
-  const tenants = useQuery(tenantsQuery());
+  const search = route.useSearch();
+  const tenant = useScopedTenant(search.tenant);
+  const sources = useQuery({ ...datasourcesQuery(tenant), enabled: Boolean(tenant) });
   const [registering, setRegistering] = useState(false);
   const del = useDeleteDatasource();
   const [deleting, setDeleting] = useState<Datasource | null>(null);
   const perms = usePermissions();
   const canRegister = perms.canSomewhere('datasources.write');
-  const names = useMemo(
-    () => new Map((tenants.data ?? []).map((t) => [t.id, t.name])),
-    [tenants.data],
-  );
 
   const closeDelete = () => {
     setDeleting(null);
     del.reset();
   };
 
+  const connect = canRegister && (
+    <Button variant="primary" icon={<IconPlus size={14} />} onClick={() => setRegistering(true)}>
+      Connect a database
+    </Button>
+  );
+
   return (
     <>
       <PageHeader
-        title="Datasources"
-        description="Connect a source once. Introspection proposes ontology elements you approve in the Ontology studio."
-        actions={
-          canRegister && (
-            <Button
-              variant="primary"
-              icon={<IconPlus size={14} />}
-              onClick={() => setRegistering(true)}
-            >
-              Register datasource
-            </Button>
-          )
+        title={
+          <span className="inline-flex items-center gap-1">
+            Data connections <TermTip term="dataConnection" />
+          </span>
         }
+        description="Read-only links to your databases. Scan one to suggest entries for the data dictionary, then review them there."
+        actions={connect}
       />
       <Card>
-        <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
-          <TenantFilter value={tenant} onChange={(t) => void navigate({ search: { tenant: t } })} />
-        </div>
-        {sources.isPending ? (
+        {!tenant || sources.isPending ? (
           <LoadingState />
         ) : sources.isError ? (
           <ErrorState error={sources.error} onRetry={() => void sources.refetch()} />
         ) : sources.data.length === 0 ? (
           <EmptyState
-            title="No datasources"
-            description="Register a MongoDB deployment to get started. Credentials are encrypted at rest like BYOK secrets."
-            action={
-              canRegister && (
-                <Button
-                  variant="primary"
-                  icon={<IconPlus size={14} />}
-                  onClick={() => setRegistering(true)}
-                >
-                  Register datasource
-                </Button>
-              )
-            }
+            title="No data connections yet"
+            description="Connect a database with a read-only user: its credentials are stored encrypted and never shown again."
+            action={connect}
+            learnMore={doc('guides/data-connections', 'connect-mongodb')}
           />
         ) : (
-          <Table label="Datasources">
+          <Table label="Data connections">
             <THead>
               <tr>
                 <TH>Name</TH>
                 <TH>Kind</TH>
-                <TH>Tenant</TH>
                 <TH>Status</TH>
-                <TH>Introspection</TH>
-                <TH className="text-right">Epoch</TH>
+                <TH>Last scan</TH>
                 <TH>
                   <span className="sr-only">Actions</span>
                 </TH>
@@ -387,22 +402,11 @@ export function DatasourcesPage() {
                   <TD className="font-mono text-[12.5px] font-medium">{ds.name}</TD>
                   <TD>{DATASOURCE_LABEL[ds.kind]}</TD>
                   <TD>
-                    <Link
-                      to="/ontology"
-                      search={{ tenant: ds.tenant_id }}
-                      className="hover:text-accent hover:underline"
-                      title="Open this tenant's ontology"
-                    >
-                      {names.get(ds.tenant_id) ?? ds.tenant_id}
-                    </Link>
-                  </TD>
-                  <TD>
-                    <DatasourceStatusBadge status={ds.status} />
+                    <StatusBadge status={ds.status} />
                   </TD>
                   <TD>
                     <IntrospectionCell ds={ds} />
                   </TD>
-                  <TD className="text-right text-fg-muted">{ds.epoch ?? EMPTY}</TD>
                   <TD className="text-right whitespace-nowrap">
                     {perms.can('datasources.write', ds.tenant_id) && (
                       <span className="inline-flex items-center gap-1.5">
@@ -425,11 +429,29 @@ export function DatasourcesPage() {
           </Table>
         )}
       </Card>
+      {sources.data && sources.data.length > 0 && (
+        <Advanced
+          className="mt-4"
+          summary="Schema change counters, for troubleshooting."
+          title="Technical details"
+        >
+          <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 text-[12.5px]">
+            {sources.data.map((ds) => (
+              <div key={ds.id} className="contents">
+                <dt className="font-mono">{ds.name}</dt>
+                <dd className="text-fg-muted">
+                  Epoch {ds.epoch ?? EMPTY} (counts schema changes seen since it was connected)
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </Advanced>
+      )}
       <Drawer
         open={registering}
         onClose={() => setRegistering(false)}
-        title="Register datasource"
-        description="Read-only credentials are recommended. Caliban never writes to your sources during introspection."
+        title="Connect a database"
+        description="Use a read-only user. Caliban never writes to your database when it scans it or answers questions."
       >
         {registering && (
           <RegisterDatasourceForm defaultTenant={tenant} onDone={() => setRegistering(false)} />
@@ -437,8 +459,8 @@ export function DatasourcesPage() {
       </Drawer>
       <ConfirmDialog
         open={deleting !== null}
-        title="Delete datasource?"
-        confirmLabel="Delete datasource"
+        title="Delete this data connection?"
+        confirmLabel="Delete connection"
         loading={del.isPending}
         error={del.error}
         onCancel={closeDelete}
@@ -454,12 +476,10 @@ export function DatasourcesPage() {
       >
         <p>
           Delete <code className="font-mono font-medium">{deleting?.name}</code> from{' '}
-          <span className="font-medium">
-            {deleting ? (names.get(deleting.tenant_id) ?? deleting.tenant_id) : ''}
-          </span>
-          ? Its stored connection settings are wiped and it can no longer be introspected.
+          <span className="font-medium">this workspace</span>? Its stored connection settings are
+          wiped and it can no longer be scanned.
         </p>
-        <p>Audit history is kept, and the name can be used again for a new datasource.</p>
+        <p>The audit log keeps its history, and the name can be used again.</p>
       </ConfirmDialog>
     </>
   );

@@ -20,29 +20,29 @@ export function NodeCostCard({
 }) {
   const costs = nodeCosts(byNode);
   return (
-    <Card role="region" aria-label="Cost per node">
+    <Card role="region" aria-label="Cost per assistant">
       <CardHeader
-        title="Cost per node"
-        description="Model calls made by node runs, per node and version. Charged is what the customer is charged: the caliban/auto price (discounted on cache hits), or the model's cost."
+        title="Cost per assistant"
+        description="Model calls made by assistants, per assistant and version. Charged is what counts against your budget: the automatic routing price (lower when an answer is reused), or the model's cost."
       />
       {costs.length === 0 ? (
         <EmptyState
-          title="No node calls"
+          title="No assistant calls yet"
           description={
             selected
               ? `No usage recorded for ${selected}.`
-              : 'Node runs will appear here once a published node makes model calls.'
+              : 'Assistants appear here once a published assistant calls a model.'
           }
         />
       ) : (
-        <Table label="Cost per node">
+        <Table label="Cost per assistant">
           <THead>
             <tr>
-              <TH>Node</TH>
+              <TH>Assistant</TH>
               <TH>Versions</TH>
               <TH className="text-right">Requests</TH>
               <TH className="text-right">Tokens</TH>
-              <TH className="text-right">Cache hits</TH>
+              <TH className="text-right">Answers reused</TH>
               <TH className="text-right">Model cost</TH>
               <TH className="text-right">Charged</TH>
             </tr>
@@ -54,7 +54,7 @@ export function NodeCostCard({
                   <button
                     type="button"
                     aria-pressed={selected === c.node}
-                    title={selected === c.node ? 'Show every node' : `Only ${c.node}'s events`}
+                    title={selected === c.node ? 'Show every assistant' : `Only ${c.node}'s calls`}
                     onClick={() => onSelect(selected === c.node ? undefined : c.node)}
                     className="font-mono text-[12.5px] font-medium hover:text-accent hover:underline aria-pressed:text-accent"
                   >

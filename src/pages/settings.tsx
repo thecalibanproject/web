@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { LearnMore } from '@/components/help/learn-more';
+import { doc } from '@/lib/docs';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthState, useSignOut } from '@/api/auth';
 import { healthQuery } from '@/api/queries';
@@ -59,7 +61,7 @@ export function SettingsPage() {
 
 client = OpenAI(
     base_url="${dp}",
-    api_key="cal_…",  # a tenant API key minted in Tenants → API keys
+    api_key="cal_…",  # an app key from Workspaces, Apps and keys
 )
 client.chat.completions.create(
     model="caliban/auto",
@@ -107,31 +109,36 @@ client.chat.completions.create(
   return (
     <>
       <PageHeader
-        title="Settings"
-        description="Endpoints, connection snippets and console preferences."
+        title="Developer"
+        description={
+          <>
+            The addresses and code an application needs to call Caliban, and console preferences.{' '}
+            <LearnMore doc={doc('start/gateway-quickstart', 'point-your-app')} />
+          </>
+        }
       />
 
       <div className="flex flex-col gap-4">
         <Card>
-          <CardHeader title="Endpoints" />
+          <CardHeader title="Addresses" />
           <dl className="divide-y divide-border">
-            <Row label="Admin API (control plane)">
+            <Row label="Admin service (for scripts and SDK admin calls)">
               <div className="flex flex-wrap items-center gap-2">
                 <code className="font-mono text-[12.5px] break-all">{api}</code>
                 <CopyButton value={api} />
               </div>
             </Row>
-            <Row label="Data plane (OpenAI-compatible)">
+            <Row label="Gateway address (OpenAI-compatible, for apps)">
               <div className="flex flex-wrap items-center gap-2">
                 <code className="font-mono text-[12.5px] break-all">{dp}</code>
                 <CopyButton value={dp} />
               </div>
               <p className="mt-1 text-[12px] text-fg-subtle">
-                Assumes the data plane listens on port 8080 of this host. Behind a load balancer,
-                use its address instead.
+                Assumes the gateway listens on port 8080 of this host. Behind a load balancer, use
+                its address instead.
               </p>
             </Row>
-            <Row label="Control plane status">
+            <Row label="Admin service status">
               {health.isPending ? (
                 <InlineLoading label="Checking…" />
               ) : health.isError ? (
@@ -158,8 +165,8 @@ client.chat.completions.create(
             description={
               <>
                 Point your OpenAI SDK <code className="font-mono">base_url</code> at{' '}
-                <code className="font-mono">http://&lt;host&gt;:8080/v1</code> and use a tenant API
-                key.
+                <code className="font-mono">http://&lt;host&gt;:8080/v1</code> and use an app key of
+                a workspace.
               </>
             }
           />
@@ -228,7 +235,7 @@ client.chat.completions.create(
             </Row>
             <Row label="Privacy">
               <p className="text-[13px]">
-                Served from your control plane. No CDN, remote fonts, analytics or telemetry.{' '}
+                Served by your own Caliban. No CDN, remote fonts, analytics or telemetry.{' '}
                 {session
                   ? 'Signed in with single sign-on: the session cookie is HttpOnly, and nothing is kept in browser storage.'
                   : 'The admin token is kept in this tab’s sessionStorage only.'}

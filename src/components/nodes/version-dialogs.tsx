@@ -18,19 +18,23 @@ function Code({ children }: { children: string }) {
 }
 
 /**
- * The confirmations of a node version's lifecycle: publish (and promote),
- * promote another published version, retire, and delete a draft or retired
- * version. `live` is the node's live version number, if any.
+ * The confirmations of an assistant version's lifecycle: publish (and make
+ * live), make another published version live, retire, and delete a draft or
+ * retired version. `live` is the live version number, if any.
+ * `promoteByDefault`: whether "Make it live" starts ticked when publishing; it
+ * should not when the go-live bar needs tests first (UX-38).
  */
 export function VersionDialog({
   action,
   version,
   live,
+  promoteByDefault = false,
   onClose,
 }: {
   action: VersionAction | null;
   version: Node | null;
   live: number | null | undefined;
+  promoteByDefault?: boolean;
   onClose: () => void;
 }) {
   const open = action !== null && version !== null;
@@ -40,6 +44,7 @@ export function VersionDialog({
         open={open && action === 'publish'}
         version={version}
         live={live}
+        promoteByDefault={promoteByDefault}
         onClose={onClose}
       />
       <PromoteDialog
@@ -64,13 +69,14 @@ function PublishDialog({
   open,
   version: v,
   live,
+  promoteByDefault,
   onClose,
-}: DialogProps & { live: number | null | undefined }) {
+}: DialogProps & { live: number | null | undefined; promoteByDefault: boolean }) {
   const publish = usePublishNodeVersion(v?.tenant_id ?? '', v?.name ?? '');
-  const [promote, setPromote] = useState(true);
+  const [promote, setPromote] = useState(promoteByDefault);
   const close = () => {
     publish.reset();
-    setPromote(true);
+    setPromote(promoteByDefault);
     onClose();
   };
   return (
@@ -86,10 +92,9 @@ function PublishDialog({
       }}
     >
       <p>
-        The control plane checks {v && <Code>{ref(v)}</Code>} against this tenant first: every MCP
-        tool is an approved manifest with that pin, every datasource scope exists, the budgets fit
-        the tenant&apos;s node caps, and every node it calls is published. Then it ships the
-        version, sealed, to routers and workers.
+        Publishing freezes {v && <Code>{ref(v)}</Code>} so it can be tested. Caliban first checks
+        that every tool it uses is approved, every data source it reads exists, its limits fit the
+        workspace&apos;s limits, and every assistant it calls is published.
       </p>
       <Checkbox
         label="Make it the live version"
@@ -102,17 +107,16 @@ function PublishDialog({
         hint={
           promote
             ? live != null
-              ? `Runs that name no version run it instead of v${live}.`
-              : 'Runs that name no version run it.'
+              ? `New requests go to it instead of v${live}.`
+              : 'New requests go to it.'
             : live != null
-              ? `v${live} stays live. Runs can still name this version.`
-              : 'The node keeps no live version. Runs can still name this version.'
+              ? `v${live} stays live while you test this version.`
+              : 'Nothing is live yet. Test this version, then make it live.'
         }
       />
       <p className="text-fg-muted">
-        Versions are immutable: publishing never changes the spec. Making it live also needs the
-        node&apos;s promotion bar: a draft has no evals yet, so a gated version is published without
-        making it live, evaluated, then made live.
+        A version never changes once published. When the go-live bar needs tests, publish first, run
+        the tests, then make it live.
       </p>
       <NodeProblems error={publish.error} />
     </ConfirmDialog>
@@ -133,7 +137,7 @@ function PromoteDialog({
   return (
     <ConfirmDialog
       open={open}
-      title={v ? `Make ${ref(v)} live?` : 'Promote'}
+      title={v ? `Make ${ref(v)} live?` : 'Make live'}
       confirmLabel="Make live"
       confirmVariant="primary"
       loading={promote.isPending}
@@ -143,19 +147,14 @@ function PromoteDialog({
       }}
     >
       <p>
-        Runs that name no version run {v && <Code>{ref(v)}</Code>} from now on.
+        New requests go to {v && <Code>{ref(v)}</Code>} from now on.
         {live != null && v && live !== v.version && (
-          <>
-            {' '}
-            v{live} stays published, so runs that name it keep working, and you can make it live
-            again to roll back.
-          </>
+          <> v{live} stays published, so you can make it live again to roll back.</>
         )}
       </p>
       <p className="text-fg-muted">
-        Its budgets are checked against the tenant&apos;s current node caps first, and its latest
-        evals against the node&apos;s promotion bar (a version with write tools always needs an
-        injection eval).
+        Caliban checks its limits against the workspace&apos;s limits, and its latest test results
+        against the go-live bar (a version that can change things always needs safety tests).
       </p>
       <NodeProblems error={promote.error} />
     </ConfirmDialog>
@@ -181,20 +180,20 @@ function RetireDialog({ open, version: v, onClose }: DialogProps) {
       }}
     >
       <p>
-        {v && <Code>{ref(v)}</Code>} leaves the data plane: new runs of it are refused.{' '}
+        {v && <Code>{ref(v)}</Code>} stops answering new requests.{' '}
         <strong className="font-medium">
-          Runs already in flight are not cut off: they finish on the version they started on.
+          Conversations already under way are not cut off: they finish on this version.
         </strong>
       </p>
       {v?.live && (
         <p>
-          It is the live version. Until you make another version live, runs that name no version are
-          refused.
+          It is the live version. Until you make another version live, requests that name no version
+          are refused.
         </p>
       )}
       <p className="text-fg-muted">
-        Retirement is final: a retired version cannot be published again. A version that another
-        published version calls (node://) cannot be retired.
+        Retiring is final: a retired version cannot be published again. A version that another
+        published assistant calls cannot be retired.
       </p>
     </ConfirmDialog>
   );
@@ -209,8 +208,8 @@ function DeleteDialog({ open, version: v, onClose }: DialogProps) {
   return (
     <ConfirmDialog
       open={open}
-      title="Delete node version?"
-      confirmLabel="Delete node version"
+      title="Delete this version?"
+      confirmLabel="Delete version"
       loading={del.isPending}
       error={del.error}
       onCancel={close}

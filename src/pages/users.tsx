@@ -1,3 +1,4 @@
+import { LearnMore } from '@/components/help/learn-more';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState, type FormEvent } from 'react';
 import { usePermissions } from '@/api/auth';
@@ -37,6 +38,7 @@ import {
 import { IconLogout, IconPlus, IconTrash } from '@/components/ui/icons';
 import { formatDateTime } from '@/lib/format';
 import { ROLE_DESCRIPTION, ROLE_LABEL } from '@/lib/labels';
+import { doc } from '@/lib/docs';
 import { isTenantRole } from '@/lib/permissions';
 
 function userLabel(u: User): string {
@@ -68,7 +70,7 @@ function Subject({ binding, users }: { binding: RoleBinding; users: Map<string, 
 }
 
 function Scope({ tenantId, names }: { tenantId?: string | null; names: Map<string, string> }) {
-  if (!tenantId) return <span className="text-fg-muted">Deployment</span>;
+  if (!tenantId) return <span className="text-fg-muted">Whole installation</span>;
   return (
     <span>
       {names.get(tenantId) ?? tenantId}{' '}
@@ -196,7 +198,7 @@ function GrantRoleForm({
             {ROLES.map((r) => (
               <option key={r} value={r} disabled={r === 'owner' && !isOwner}>
                 {ROLE_LABEL[r]}
-                {isTenantRole(r) ? ' (one tenant)' : ' (deployment)'}
+                {isTenantRole(r) ? ' (one workspace)' : ' (whole installation)'}
                 {r === 'owner' && !isOwner ? ': only owners can grant it' : ''}
               </option>
             ))}
@@ -204,7 +206,7 @@ function GrantRoleForm({
         )}
       </Field>
       {tenantRole && (
-        <Field label="Tenant" required>
+        <Field label="Workspace" required>
           {({ id }) => <TenantSelect id={id} value={tenantId} onChange={setTenantId} required />}
         </Field>
       )}
@@ -255,8 +257,14 @@ export function UsersPage() {
   return (
     <>
       <PageHeader
-        title="Users and roles"
-        description="Who can do what in this console. Roles from identity provider groups and from bindings add up, and a change applies from the next request."
+        title="People and roles"
+        description={
+          <>
+            Who can do what in this console. Roles from sign-in groups and roles granted here add
+            up, and a change applies from the next request.{' '}
+            <LearnMore doc={doc('guides/people-and-roles', 'roles')} />
+          </>
+        }
         actions={
           canWrite && (
             <Button
@@ -273,8 +281,8 @@ export function UsersPage() {
       <div className="flex flex-col gap-4">
         <Card>
           <CardHeader
-            title="Role bindings"
-            description="Roles granted here, to a user or to an identity provider group."
+            title="Roles granted here"
+            description="To a person, or to a group from your sign-in provider."
           />
           {bindings.isPending ? (
             <LoadingState rows={3} />
@@ -282,12 +290,20 @@ export function UsersPage() {
             <ErrorState error={bindings.error} onRetry={() => void bindings.refetch()} />
           ) : bindings.data.bindings.length === 0 ? (
             <EmptyState
-              title="No role bindings"
+              title="No roles granted here yet"
               description={
                 canWrite
-                  ? 'Grant a role to a user after their first sign-in, or to a group from your identity provider.'
+                  ? 'Grant a role to a person after their first sign-in, or to a group from your sign-in provider.'
                   : 'No roles have been granted here yet.'
               }
+              action={
+                canWrite && (
+                  <Button variant="primary" onClick={() => setGranting(true)}>
+                    Grant a role
+                  </Button>
+                )
+              }
+              learnMore={doc('guides/people-and-roles', 'roles')}
             />
           ) : (
             <Table label="Role bindings">
@@ -362,8 +378,9 @@ export function UsersPage() {
             <LoadingState rows={2} />
           ) : bindings.isError ? null : bindings.data.groups_claim == null ? (
             <EmptyState
-              title="Single sign-on is not configured"
-              description="Group mappings apply once the control plane has an [security.oidc] section."
+              title="Single sign-on is not set up"
+              description="Roles for sign-in groups apply once your IT administrator sets up single sign-on."
+              learnMore={doc('guides/people-and-roles', 'single-sign-on')}
             />
           ) : bindings.data.group_mappings.length === 0 ? (
             <EmptyState
@@ -418,8 +435,9 @@ export function UsersPage() {
             <ErrorState error={users.error} onRetry={() => void users.refetch()} />
           ) : users.data.length === 0 ? (
             <EmptyState
-              title="No users yet"
-              description="Users appear here after they sign in with single sign-on."
+              title="No people yet"
+              description="People appear here after they first sign in with single sign-on."
+              learnMore={doc('guides/people-and-roles', 'invite')}
             />
           ) : (
             <Table label="Users">

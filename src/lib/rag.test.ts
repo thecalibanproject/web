@@ -16,6 +16,8 @@ import {
   documentCounts,
   findingPlace,
   hasActiveDocuments,
+  readUploads,
+  titleFromContent,
 } from './rag';
 
 describe('collection settings', () => {
@@ -192,5 +194,33 @@ describe('findingPlace', () => {
     );
     expect(findingPlace({ chunk: 0 })).toBe('chunk 1');
     expect(findingPlace({ chunk: 0, heading_path: [] })).toBe('chunk 1');
+  });
+});
+
+describe('titleFromContent', () => {
+  it('takes the first Markdown heading, the HTML title or first h1, else the file name', () => {
+    expect(titleFromContent('intro\n## Leave policy ##\n# Later', 'text/markdown', 'a.md')).toBe(
+      'Leave policy',
+    );
+    expect(titleFromContent('<title>Benefits</title><h1>x</h1>', 'text/html', 'b.html')).toBe(
+      'Benefits',
+    );
+    expect(titleFromContent('<h1>Dental <em>plan</em></h1>', 'text/html', 'b.html')).toBe(
+      'Dental plan',
+    );
+    expect(titleFromContent('no heading', 'text/plain', 'Team notes.txt')).toBe('Team notes');
+  });
+});
+
+describe('readUploads', () => {
+  it('reads files into rows and keeps refused ones apart with the reason', async () => {
+    const { items, refused } = await readUploads([
+      new File(['# A'], 'Travel 2026.md', { type: 'text/markdown' }),
+      new File(['%PDF'], 'scan.pdf', { type: 'application/pdf' }),
+    ]);
+    expect(items.map((i) => [i.docId, i.title, i.contentType, i.state])).toEqual([
+      ['Travel-2026', 'A', 'text/markdown', 'ready'],
+    ]);
+    expect(refused).toEqual([{ fileName: 'scan.pdf', reason: expect.stringMatching(/PDF/) }]);
   });
 });

@@ -204,6 +204,37 @@ export const IconChevronRight = (p: IconProps) => (
 
 /** Caliban mark: an orbit "C" around a sovereign core, with Caliban (the moon) in its opening.
  *  Same geometry as website/public/brand/favicon.svg. */
+export const IconHelp = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6" />
+    <path d="M12 17h.01" />
+  </Svg>
+);
+export const IconHome = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 11l9-7 9 7" />
+    <path d="M5 10v10h14V10" />
+    <path d="M10 20v-5h4v5" />
+  </Svg>
+);
+export const IconChevronDown = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M6 9l6 6 6-6" />
+  </Svg>
+);
+export const IconExternal = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M14 4h6v6" />
+    <path d="M20 4l-9 9" />
+    <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+  </Svg>
+);
+export const IconCircle = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="8" />
+  </Svg>
+);
 export const LogoMark = ({ size = 22 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true" focusable="false">
     <defs>

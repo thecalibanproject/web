@@ -1,0 +1,163 @@
+{
+  "id": "router-to-specialists",
+  "title": "Router to specialists",
+  "description": "Reads each customer message, decides whether it is about billing, a bug or how to do something, and hands it to the specialist assistant for that kind of request.",
+  "source": "Developer orchestrator demo",
+  "fields": [
+    {
+      "key": "org",
+      "label": "Your product's name",
+      "kind": "text",
+      "default": ""
+    },
+    {
+      "key": "billing",
+      "label": "Billing specialist",
+      "kind": "assistant",
+      "default": "",
+      "hint": "A published assistant that takes {\"request\": text}."
+    },
+    {
+      "key": "bug",
+      "label": "Bug report specialist",
+      "kind": "assistant",
+      "default": "",
+      "hint": "A published assistant that takes {\"request\": text}."
+    },
+    {
+      "key": "docs",
+      "label": "How-to specialist",
+      "kind": "assistant",
+      "default": "",
+      "hint": "A published assistant that takes {\"request\": text}, usually one that searches your documentation."
+    }
+  ],
+  "spec": {
+    "kind": "workflow",
+    "description": "Support router of {{org}}: sends each message to the billing, bug or how-to specialist.",
+    "prompt": {
+      "system": "You are the intake of the support desk of {{org}}. You route each request to the right specialist; you never answer it yourself.",
+      "input_schema": {
+        "type": "object",
+        "required": ["message"],
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          }
+        }
+      }
+    },
+    "model_policy": {
+      "model": "caliban/auto"
+    },
+    "tools": [
+      {
+        "ref": "node://{{billing}}",
+        "effect": "read"
+      },
+      {
+        "ref": "node://{{bug}}",
+        "effect": "read"
+      },
+      {
+        "ref": "node://{{docs}}",
+        "effect": "read"
+      }
+    ],
+    "guardrails": {
+      "pii": "reversible",
+      "answer": "redact"
+    },
+    "budgets": {
+      "steps": 12,
+      "tokens": 100000,
+      "wall_clock_s": 600,
+      "usd": 0.5,
+      "depth": 2,
+      "fanout": 1
+    },
+    "graph": {
+      "entry": "intake",
+      "vertices": [
+        {
+          "id": "intake",
+          "type": "router",
+          "config": {
+            "system": "Classify a customer message into exactly one of the labels below. Answer with the label only.",
+            "prompt": "Message:\n<<<\n{{input.message}}\n>>>",
+            "structured_output": "json_schema",
+            "routes": {
+              "billing": "Charges, refunds, invoices, payment methods or plan changes",
+              "bug": "Something in the product does not work as expected: crashes, errors, sync problems",
+              "docs": "How to do something with the product"
+            }
+          }
+        },
+        {
+          "id": "billing",
+          "type": "subnode",
+          "config": {
+            "node": "node://{{billing}}",
+            "input": {
+              "request": "{{input.message}}"
+            }
+          }
+        },
+        {
+          "id": "bug",
+          "type": "subnode",
+          "config": {
+            "node": "node://{{bug}}",
+            "input": {
+              "request": "{{input.message}}"
+            }
+          }
+        },
+        {
+          "id": "docs",
+          "type": "subnode",
+          "config": {
+            "node": "node://{{docs}}",
+            "input": {
+              "request": "{{input.message}}"
+            }
+          }
+        }
+      ],
+      "edges": [
+        {
+          "from": "intake",
+          "to": "billing",
+          "when": "billing"
+        },
+        {
+          "from": "intake",
+          "to": "bug",
+          "when": "bug"
+        },
+        {
+          "from": "intake",
+          "to": "docs",
+          "when": "docs"
+        }
+      ]
+    }
+  },
+  "tests": [
+    {
+      "id": "double-charge",
+      "input": {
+        "message": "I was charged twice this month."
+      },
+      "checks": [
+        {
+          "type": "llm_judge",
+          "rubric": "The billing specialist handled the request."
+        }
+      ]
+    }
+  ]
+}

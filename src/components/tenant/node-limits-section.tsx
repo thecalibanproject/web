@@ -2,6 +2,9 @@ import { useId, useState, type FormEvent } from 'react';
 import { useUpdateTenant } from '@/api/queries';
 import type { NodeCaps, Tenant, TenantUpdate } from '@/api/types';
 import { formatInt } from '@/lib/format';
+import { doc } from '@/lib/docs';
+import { Advanced } from '../help/advanced';
+import { Toggletip } from '../help/toggletip';
 import { Badge, Button, Field, FormError, Input } from '../ui';
 import { useSavedTenant } from './use-saved-tenant';
 
@@ -16,24 +19,35 @@ const DEFAULT_NODE_CAPS = {
 
 type CapKey = keyof typeof DEFAULT_NODE_CAPS;
 
-const CAP_FIELDS: Array<{ key: CapKey; label: string; hint: string }> = [
+/** `advanced`: shown under Advanced (UX-46: rarely changed, engine-shaped). */
+const CAP_FIELDS: Array<{ key: CapKey; label: string; hint: string; advanced?: boolean }> = [
   {
     key: 'steps',
-    label: 'Steps per run',
-    hint: 'Vertex executions that call a model, a tool or a human.',
+    label: 'Steps per conversation',
+    hint: 'Each call to a model, a tool or a person is a step.',
   },
   {
     key: 'tokens',
-    label: 'Tokens per run',
-    hint: 'Prompt plus completion tokens of every model call.',
+    label: 'Words processed per conversation (tokens)',
+    hint: 'Counted in tokens, about 0.75 words each, read and written by every model call.',
   },
   {
     key: 'wall_clock_s',
-    label: 'Wall clock per run (seconds)',
-    hint: 'Execution time, not time waiting for a human or a timer.',
+    label: 'Time limit per conversation (seconds)',
+    hint: 'Working time, not time spent waiting for a person.',
   },
-  { key: 'depth', label: 'Subnode depth', hint: 'Nesting of subnode vertices and node:// tools.' },
-  { key: 'fanout', label: 'Map fan-out', hint: 'map branches running at once.' },
+  {
+    key: 'depth',
+    label: 'Assistants calling assistants (levels)',
+    hint: 'How deep sub-assistants may be nested. Also called subnode depth.',
+    advanced: true,
+  },
+  {
+    key: 'fanout',
+    label: 'Tasks in parallel',
+    hint: 'How many parts of a task may run at the same time. Also called map fan-out.',
+    advanced: true,
+  },
 ];
 
 interface Limits extends Record<CapKey, string> {
@@ -81,7 +95,7 @@ function validate(v: Limits): Errors {
   }
   const usd = v.usd.trim();
   if (usd && !(Number(usd) > 0)) {
-    e.usd = 'Enter an amount above 0, or leave it empty for no per-run cap.';
+    e.usd = 'Enter an amount above 0, or leave it empty for no cap per conversation.';
   }
   for (const key of ['daily_usd', 'monthly_usd'] as const) {
     const raw = v[key].trim();
@@ -222,32 +236,57 @@ export function NodeLimitsSection({
   return (
     <section
       aria-labelledby={headingId}
-      className="mt-6 rounded-lg border border-border bg-surface"
+      className="mt-4 rounded-lg border first:mt-0 border-border bg-surface"
     >
       <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border px-4 py-2.5">
         <div className="min-w-0">
           <h2 id={headingId} className="text-[13px] font-semibold text-fg">
-            Node limits
+            Limits and budget
           </h2>
           <p className="text-[12px] text-fg-muted">
             {deleted
-              ? 'This tenant was deleted. Its limits can no longer be changed.'
+              ? 'This workspace was deleted. Its limits can no longer be changed.'
               : readOnly
                 ? 'Read only: your role cannot change these limits.'
-                : 'Every node version must fit the caps when it is published or made live. Lowering them does not change versions already published. Every change is recorded in the audit log.'}
+                : 'Every assistant version must fit these limits when it is published or made live. Lowering them does not change versions already published. Every change is recorded in the audit log.'}
           </p>
         </div>
         {usingDefaults && !draft && (
-          <Badge title="node_caps is not set: the control plane's defaults apply.">Defaults</Badge>
+          <Badge title="No limits of its own: the installation's defaults apply.">Defaults</Badge>
         )}
       </div>
-      <form onSubmit={onSubmit} aria-label="Node limits" className="flex flex-col gap-5 p-4">
+      <form onSubmit={onSubmit} aria-label="Limits and budget" className="flex flex-col gap-5 p-4">
         <fieldset className="flex flex-col gap-3">
-          <legend className="mb-2 text-[12.5px] font-medium text-fg">
-            Caps on a version&apos;s budgets
+          <legend className="mb-2 flex items-center gap-1 text-[12.5px] font-medium text-fg">
+            Spend caps
+            <Toggletip label="spend caps" doc={doc('guides/workspaces', 'limits-and-budget')}>
+              Checked before every model call, across every assistant of the workspace: a
+              conversation that reaches a cap stops at its next model call. Enforced, not estimated.
+            </Toggletip>
           </legend>
-          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
-            {CAP_FIELDS.map(({ key, label, hint }) => (
+          <p className="-mt-1 text-[12px] text-fg-muted">
+            What this workspace&apos;s assistants may spend on models per day and per month (UTC).
+            Empty: no cap.
+          </p>
+          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-4">
+            <Field label="Daily spend cap (USD)" error={errors.daily_usd}>
+              {input('daily_usd', true)}
+            </Field>
+            <Field label="Monthly spend cap (USD)" error={errors.monthly_usd}>
+              {input('monthly_usd', true)}
+            </Field>
+          </div>
+        </fieldset>
+        <fieldset className="flex flex-col gap-3">
+          <legend className="mb-2 flex items-center gap-1 text-[12.5px] font-medium text-fg">
+            Limits per conversation
+            <Toggletip label="limits per conversation" doc={doc('reference/limits')}>
+              The most any one conversation of an assistant may use. Each assistant version declares
+              its own budget, which must fit within these.
+            </Toggletip>
+          </legend>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {CAP_FIELDS.filter((f) => !f.advanced).map(({ key, label, hint }) => (
               <Field
                 key={key}
                 label={label}
@@ -258,29 +297,30 @@ export function NodeLimitsSection({
               </Field>
             ))}
             <Field
-              label="USD per run"
+              label="Cost per conversation (USD)"
               error={errors.usd}
-              hint="When set, every version must declare budgets.usd within it. Empty: no per-run cap."
+              hint="When set, every assistant must declare its own cost limit within it. Empty: no cap."
             >
               {input('usd', true)}
             </Field>
           </div>
-        </fieldset>
-        <fieldset className="flex flex-col gap-3">
-          <legend className="mb-2 text-[12.5px] font-medium text-fg">Node spend caps</legend>
-          <p className="-mt-1 text-[12px] text-fg-muted">
-            What the tenant&apos;s node runs may spend on model calls, priced like the metering, per
-            UTC day and month, across all workers. Checked before every model call: a run that
-            reaches a cap ends gracefully as budget_exhausted. Empty: no cap.
-          </p>
-          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
-            <Field label="Daily spend cap (USD)" error={errors.daily_usd}>
-              {input('daily_usd', true)}
-            </Field>
-            <Field label="Monthly spend cap (USD)" error={errors.monthly_usd}>
-              {input('monthly_usd', true)}
-            </Field>
-          </div>
+          <Advanced
+            summary={`${values.depth} levels of sub-assistants, ${values.fanout} tasks in parallel`}
+            defaultOpen={Boolean(errors.depth ?? errors.fanout)}
+          >
+            <div className="grid gap-4 md:grid-cols-2">
+              {CAP_FIELDS.filter((f) => f.advanced).map(({ key, label, hint }) => (
+                <Field
+                  key={key}
+                  label={label}
+                  error={errors[key]}
+                  hint={`${hint} Default ${formatInt(DEFAULT_NODE_CAPS[key])}.`}
+                >
+                  {input(key)}
+                </Field>
+              ))}
+            </div>
+          </Advanced>
         </fieldset>
         <FormError error={update.error} />
         {!readOnly && (
@@ -294,7 +334,7 @@ export function NodeLimitsSection({
               onClick={restoreDefaults}
               disabled={locked || (usingDefaults && !draft) || reset}
             >
-              Restore default caps
+              Restore default limits
             </Button>
             <Button onClick={cancel} disabled={!dirty || locked}>
               Cancel

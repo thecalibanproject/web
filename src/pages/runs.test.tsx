@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import type { ConsoleRun, NodeRunSummary, Tenant } from '@/api/types';
+import { expectNoAxeViolations } from '@/test/a11y';
 import { meWith, ssoRoutes, type Grant } from '@/test/auth';
 import { mockApi, renderApp, type RecordedCall } from '@/test/utils';
 
@@ -127,16 +128,17 @@ describe('RunsPage', () => {
   it('lists runs newest first with status, node version, invoker and cost', async () => {
     mockRuns();
     await renderApp('/runs');
-    const table = await screen.findByRole('table', { name: 'Runs' });
+    const table = await screen.findByRole('table', { name: 'Conversations' });
     const rows = within(table).getAllByRole('row');
     expect(rows[1]).toHaveTextContent('run_3');
-    expect(rows[1]).toHaveTextContent('Waiting for a human');
-    expect(rows[1]).toHaveTextContent('write#0@approve');
+    expect(rows[1]).toHaveTextContent('Waiting for a person');
+    expect(rows[1]).toHaveTextContent('at the write step');
+    expect(rows[1]).not.toHaveTextContent('write#0@approve');
     expect(rows[1]).toHaveTextContent('not ended');
     expect(rows[2]).toHaveTextContent('run_2');
     expect(rows[2]).toHaveTextContent('v1');
     expect(rows[2]).toHaveTextContent('Failed');
-    expect(rows[2]).toHaveTextContent('api_key:ab12cd');
+    expect(rows[2]).toHaveTextContent('An app key (ab12cd)');
     expect(rows[2]).toHaveTextContent('$0.0042');
     expect(rows[2]).toHaveTextContent('3.00 s');
     expect(within(rows[1]!).getByRole('link', { name: 'run_3' })).toHaveAttribute(
@@ -149,7 +151,7 @@ describe('RunsPage', () => {
     const user = userEvent.setup();
     const calls = mockRuns();
     await renderApp('/runs?tenant=t1&node=triage');
-    await screen.findByRole('table', { name: 'Runs' });
+    await screen.findByRole('table', { name: 'Conversations' });
     expect(listCalls(calls).at(-1)!.query.get('node')).toBe('triage');
 
     await user.selectOptions(screen.getByLabelText('Status'), 'Not ended');
@@ -168,12 +170,14 @@ describe('RunsPage', () => {
     const user = userEvent.setup();
     const calls = mockRuns();
     await renderApp('/runs?tenant=t1');
-    const table = await screen.findByRole('table', { name: 'Runs' });
+    const table = await screen.findByRole('table', { name: 'Conversations' });
 
-    await user.click(screen.getByRole('button', { name: 'Load older runs' }));
+    await user.click(screen.getByRole('button', { name: 'Load older conversations' }));
     await within(table).findByText('run_1');
     expect(listCalls(calls).at(-1)!.query.get('cursor')).toBe('c2');
-    expect(screen.queryByRole('button', { name: 'Load older runs' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Load older conversations' }),
+    ).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText('Version'), '1');
     await user.click(screen.getByRole('button', { name: 'Apply' }));
@@ -185,27 +189,30 @@ describe('RunsPage', () => {
     mockRuns(ssoRoutes(meWith([{ role: 'billing', tenant_id: 't1' }])));
     await renderApp('/', { token: null });
     const nav = await screen.findByRole('navigation', { name: 'Primary' });
-    await within(nav).findByRole('link', { name: 'Settings' });
-    expect(within(nav).queryByRole('link', { name: 'Runs' })).not.toBeInTheDocument();
-    expect(within(nav).queryByRole('link', { name: 'Inbox' })).not.toBeInTheDocument();
+    await within(nav).findByRole('link', { name: 'Home' });
+    expect(within(nav).queryByRole('link', { name: 'Conversations' })).not.toBeInTheDocument();
+    expect(within(nav).queryByRole('link', { name: 'Approvals' })).not.toBeInTheDocument();
   });
 });
 
 describe('RunDetailPage', () => {
   it('shows the step timeline: vertex, kind, timings, tokens, cost and taint labels', async () => {
     await openDetail(null, run);
-    expect(screen.getByRole('heading', { name: 'run_7' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Conversation with triage' })).toBeInTheDocument();
     const steps = within(screen.getByRole('table', { name: 'Steps' })).getAllByRole('row');
     expect(steps[1]).toHaveTextContent('fetch#0');
-    expect(steps[1]).toHaveTextContent('tool');
+    expect(steps[1]).toHaveTextContent('Tool or lookup');
     expect(steps[1]).toHaveTextContent('400 ms');
-    expect(steps[1]).toHaveTextContent('tool:mail/read_inbox');
+    expect(steps[1]).toHaveTextContent('Result of mail/read_inbox');
     expect(steps[2]).toHaveTextContent('classify#0');
     expect(steps[2]).toHaveTextContent('+500 ms');
     expect(steps[2]).toHaveTextContent('2.50 s');
     expect(steps[2]).toHaveTextContent('900');
     expect(steps[2]).toHaveTextContent('$0.0042');
-    expect(within(steps[2]!).getByText('pii')).toHaveAttribute('title', 'Holds personal data.');
+    expect(within(steps[2]!).getByText('Personal data')).toHaveAttribute(
+      'title',
+      'Holds personal data.',
+    );
 
     const budget = screen.getByRole('table', { name: 'Budget' });
     expect(within(budget).getByText('Steps').closest('tr')).toHaveTextContent(/^Steps38$/);
@@ -241,7 +248,7 @@ describe('RunDetailPage', () => {
     const steps = within(screen.getByRole('table', { name: 'Steps' })).getAllByRole('row');
     expect(steps[2]).toHaveTextContent('$0.01model $0.0042');
     expect(steps[1]).not.toHaveTextContent('model');
-    expect(screen.queryByText('Answer guard')).not.toBeInTheDocument();
+    expect(screen.queryByText('Answer check')).not.toBeInTheDocument();
   });
 
   it('shows what the answer guard found, by rule and place, never the text', async () => {
@@ -258,17 +265,17 @@ describe('RunDetailPage', () => {
       },
     });
     const guard = screen
-      .getByText('Answer guard')
+      .getByText('Answer check')
       .closest('section, div.rounded-lg') as HTMLElement;
-    expect(guard).toHaveTextContent('redacted');
+    expect(guard).toHaveTextContent('Parts removed');
     expect(guard).toHaveTextContent(/were removed from the answer/);
-    const rows = within(screen.getByRole('table', { name: 'Answer guard findings' })).getAllByRole(
+    const rows = within(screen.getByRole('table', { name: 'Answer check findings' })).getAllByRole(
       'row',
     );
     expect(rows[1]).toHaveTextContent('Contact from untrusted text');
     expect(rows[1]).toHaveTextContent('/recommendation');
     expect(rows[2]).toHaveTextContent('Echo of an injected instruction');
-    expect(rows[2]).toHaveTextContent('tool:catalogue/search');
+    expect(rows[2]).toHaveTextContent('Result of catalogue/search');
   });
 
   it('shows the answer guard to roles without runs.data, as metadata only', async () => {
@@ -281,17 +288,19 @@ describe('RunDetailPage', () => {
         action: 'refused',
       },
     });
-    const rows = within(screen.getByRole('table', { name: 'Answer guard findings' })).getAllByRole(
+    const rows = within(screen.getByRole('table', { name: 'Answer check findings' })).getAllByRole(
       'row',
     );
     expect(rows[1]).toHaveTextContent('Link from untrusted text');
     expect(rows[1]).toHaveTextContent('/answer');
-    expect(screen.getByText(/Run content .* is hidden/)).toBeInTheDocument();
+    expect(screen.getByText(/The content of this conversation .* is hidden/)).toBeInTheDocument();
   });
 
   it('hides run content from roles without runs.data', async () => {
     await openDetail([{ role: 'viewer', tenant_id: 't1' }], run);
-    expect(screen.getByText(/Run content .* is hidden/)).toHaveTextContent('needs runs.data');
+    expect(screen.getByText(/The content of this conversation .* is hidden/)).toHaveTextContent(
+      'needs runs.data',
+    );
     expect(screen.queryByLabelText('Run input')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /output of/ })).not.toBeInTheDocument();
   });
@@ -299,9 +308,15 @@ describe('RunDetailPage', () => {
   it('shows the input, the output and each step output with runs.data', async () => {
     const user = userEvent.setup();
     await openDetail([{ role: 'developer', tenant_id: 't1' }], withContent);
+    // The conversation first, as text in its own direction; JSON on demand.
+    expect(screen.getByText('Chest pain since Tuesday')).toHaveAttribute('dir', 'auto');
+    expect(screen.getByText('high')).toHaveAttribute('dir', 'auto');
+    await user.click(screen.getByRole('button', { name: 'Show as JSON' }));
     expect(screen.getByLabelText('Run input')).toHaveTextContent('Chest pain since Tuesday');
     expect(screen.getByLabelText('Run output')).toHaveTextContent('"urgency": "high"');
-    expect(screen.queryByText(/Run content .* is hidden/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/The content of this conversation .* is hidden/),
+    ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Show output of classify#0' }));
     expect(screen.getByLabelText('Output of classify#0')).toHaveTextContent('"label": "clinical"');
@@ -340,10 +355,17 @@ describe('RunDetailPage', () => {
         },
       }),
     });
-    expect(screen.getByText('Waiting for approval of a tainted call')).toBeInTheDocument();
-    expect(await screen.findByText('mcp://crm/update_ticket#sha256:abc')).toBeInTheDocument();
-    expect(screen.getByText('(effect: write)')).toBeInTheDocument();
-    const approve = screen.getByRole('button', { name: 'Approve the call of run run_7' });
+    expect(screen.getByText('Waiting for your approval')).toBeInTheDocument();
+    expect(screen.getByText(/At the write step\. Your decision is recorded/)).toBeInTheDocument();
+    // The pinned reference and the step id sit under Technical details, not in the basic copy.
+    const ref = await screen.findByText('mcp://crm/update_ticket#sha256:abc');
+    const technical = ref.closest('details');
+    expect(technical).toHaveTextContent('Technical details');
+    expect(technical).toHaveTextContent('write#0@approve');
+    expect(screen.getByText(/It changes something in another system/)).toBeInTheDocument();
+    const approve = screen.getByRole('button', {
+      name: 'Approve update_ticket on crm for conversation run_7',
+    });
     expect(approve).toHaveAttribute('aria-disabled', 'true');
     expect(approve).toHaveAccessibleDescription(/needs runs\.answer/);
     expect(screen.getByRole('button', { name: 'Cancel run' })).toHaveAccessibleDescription(
@@ -376,16 +398,172 @@ describe('RunDetailPage', () => {
 
   it('shows the taint labels the run input carries', async () => {
     await openDetail(null, { ...run, input_labels: ['caller'] });
-    expect(screen.getByText('caller')).toHaveAttribute(
+    expect(screen.getByText("Customer's message")).toHaveAttribute(
       'title',
-      'Untrusted data the caller passed in the run input.',
+      "From the customer's message: untrusted data.",
     );
   });
 
   it('says when the run does not exist', async () => {
     mockRuns();
     await renderApp('/runs/t1/run_404');
-    expect(await screen.findByText('Run not found')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Back to runs' })).toBeInTheDocument();
+    expect(await screen.findByText('Conversation not found')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to conversations' })).toBeInTheDocument();
+  });
+});
+
+describe('Conversations: test runs', () => {
+  const withTests = [
+    summary({ id: 'run_real' }),
+    summary({ id: 'run_new_trial', origin: 'eval:eval_01:fr-research' }),
+    summary({ id: 'run_old_trial', origin: 'eval:eval_00' }),
+  ];
+
+  it('hides test runs by default, in both origin forms, and shows them on demand', async () => {
+    const user = userEvent.setup();
+    mockApi({
+      'GET /api/v1/tenants': () => ({ body: tenants }),
+      'GET /api/v1/nodes': () => ({ body: [] }),
+      [`GET ${R}`]: () => ({ body: { object: 'list', data: withTests, next_cursor: null } }),
+    });
+    await renderApp('/runs');
+    const table = await screen.findByRole('table', { name: 'Conversations' });
+    expect(within(table).getByText('run_real')).toBeInTheDocument();
+    expect(within(table).queryByText('run_new_trial')).not.toBeInTheDocument();
+    expect(within(table).queryByText('run_old_trial')).not.toBeInTheDocument();
+    expect(screen.getByText('2 test runs hidden on this page.')).toBeInTheDocument();
+    await expectNoAxeViolations();
+
+    await user.click(screen.getByLabelText('Hide test runs'));
+    const row = within(table).getByText('run_new_trial').closest('tr')!;
+    expect(row).toHaveTextContent('Test run');
+    expect(row).toHaveTextContent('A test run');
+    expect(within(table).getByText('run_old_trial')).toBeInTheDocument();
+  });
+});
+
+describe('Save as test', () => {
+  const C = `${R}/run_7/golden-case`;
+  const captured = {
+    object: 'node.golden_case',
+    run_id: 'run_7',
+    node: 'triage',
+    version: 2,
+    run_version: 2,
+    case_id: 'run_7',
+    verdict: 'good',
+    checks: ['llm_judge'],
+    golden_set: {
+      object: 'node.golden_set',
+      node: 'triage',
+      version: 2,
+      hash: 'h',
+      case_count: 4,
+      updated_at: '2026-10-13T10:00:00Z',
+      updated_by: 'ada',
+      content_visible: true,
+    },
+    content_visible: true,
+  };
+
+  it('saves a right answer as a test case, and links to the tests', async () => {
+    const user = userEvent.setup();
+    const calls = await openDetail([{ role: 'tenant_admin', tenant_id: 't1' }], withContent, {
+      [`POST ${C}`]: () => ({ status: 201, body: captured }),
+    });
+    await expectNoAxeViolations();
+    await user.click(screen.getByRole('button', { name: 'Save as test' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Save this conversation as a test' });
+    const save = within(dialog).getByRole('button', { name: 'Save test case' });
+    expect(save).toBeEnabled();
+    await user.click(save);
+    expect(within(dialog).getByRole('alert')).toHaveTextContent(
+      'Choose whether the answer was right or wrong.',
+    );
+    expect(calls.some((c) => c.method === 'POST' && c.path === C)).toBe(false);
+    await user.click(within(dialog).getByLabelText('This answer was right'));
+    await user.click(save);
+    await waitFor(() =>
+      expect(calls.find((c) => c.method === 'POST' && c.path === C)?.body).toEqual({
+        verdict: 'good',
+        version: 2,
+      }),
+    );
+    expect(await screen.findByText(/Saved as a test case of version 2/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open the tests of triage' })).toHaveAttribute(
+      'href',
+      '/nodes/t1/triage?tab=evals&ev=2',
+    );
+  });
+
+  it('saves a wrong answer only with what it should have done, and an optional reason', async () => {
+    const user = userEvent.setup();
+    const calls = await openDetail([{ role: 'tenant_admin', tenant_id: 't1' }], withContent, {
+      [`POST ${C}`]: () => ({ status: 201, body: { ...captured, verdict: 'bad' } }),
+    });
+    await user.click(screen.getByRole('button', { name: 'Save as test' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Save this conversation as a test' });
+    await user.click(within(dialog).getByLabelText('This answer was wrong'));
+    const save = within(dialog).getByRole('button', { name: 'Save test case' });
+    await user.click(save);
+    expect(within(dialog).getByLabelText(/What should it have done/)).toHaveAccessibleDescription(
+      /Say what it should have done/,
+    );
+    expect(calls.some((c) => c.method === 'POST' && c.path === C)).toBe(false);
+    await user.type(
+      within(dialog).getByLabelText(/What should it have done/),
+      'Send to cardiology',
+    );
+    await user.selectOptions(
+      within(dialog).getByLabelText('What went wrong (optional)'),
+      'Should have asked a question first',
+    );
+    await user.click(save);
+    await waitFor(() =>
+      expect(calls.find((c) => c.method === 'POST' && c.path === C)?.body).toEqual({
+        verdict: 'bad',
+        note: 'Send to cardiology',
+        mast_label: 'fail_to_ask_for_clarification',
+        version: 2,
+      }),
+    );
+  });
+
+  it('says in plain words why a save was refused', async () => {
+    const user = userEvent.setup();
+    await openDetail([{ role: 'tenant_admin', tenant_id: 't1' }], withContent, {
+      [`POST ${C}`]: () => ({
+        status: 409,
+        body: { error: { message: 'the run is already in that golden set', type: 'conflict' } },
+      }),
+    });
+    await user.click(screen.getByRole('button', { name: 'Save as test' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Save this conversation as a test' });
+    await user.click(within(dialog).getByLabelText('This answer was right'));
+    await user.click(within(dialog).getByRole('button', { name: 'Save test case' }));
+    expect(
+      await within(dialog).findByText(
+        'This conversation is already saved as a test case of that version.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('offers only "wrong" for a conversation that did not succeed, and needs nodes.write', async () => {
+    const user = userEvent.setup();
+    await openDetail([{ role: 'tenant_admin', tenant_id: 't1' }], {
+      ...withContent,
+      status: 'failed',
+    });
+    await user.click(screen.getByRole('button', { name: 'Save as test' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Save this conversation as a test' });
+    expect(within(dialog).getByLabelText('This answer was right')).toBeDisabled();
+    expect(within(dialog).getByLabelText('This answer was wrong')).toBeChecked();
+  });
+
+  it('is offered only to roles that may change test cases', async () => {
+    await openDetail([{ role: 'viewer', tenant_id: 't1' }], run);
+    expect(screen.getByRole('button', { name: 'Save as test' })).toHaveAccessibleDescription(
+      /needs nodes\.write/,
+    );
   });
 });

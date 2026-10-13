@@ -61,8 +61,8 @@ export function AcknowledgedBreaking({
       className="flex flex-col gap-2 rounded-md border border-danger/50 bg-danger-soft p-3 text-[12.5px]"
     >
       <p className="text-fg">
-        These node versions now fail on their fixed queries until versions written on the new
-        ontology are published:
+        These assistant versions now fail on their saved questions until new versions, written for
+        the new dictionary, are published:
       </p>
       <BreakingList tenantId={tenantId} changes={changes} />
     </section>
@@ -100,7 +100,7 @@ export function BreakingChanges({
     >
       <h4 className="flex items-center gap-1.5 text-[13px] font-semibold text-danger">
         <IconAlert size={15} className="shrink-0" />
-        This breaks published node versions
+        This breaks published assistant versions
       </h4>
       {changes.length === 0 ? (
         <p className="text-fg">{message}</p>
@@ -108,11 +108,12 @@ export function BreakingChanges({
         <BreakingList tenantId={tenantId} changes={changes} />
       )}
       <p className="text-fg-muted">
-        Their fixed queries were written for an earlier ontology version. Once this goes ahead they
-        fail on those queries until versions written on the new ontology are published.
+        Their saved questions were written for an earlier version of the dictionary. Once this goes
+        ahead they fail on those questions until new versions, written for the new dictionary, are
+        published.
       </p>
       <Checkbox
-        label="I understand these node versions will fail on their queries"
+        label="I understand these assistant versions will fail on their questions"
         checked={acknowledged}
         disabled={disabled}
         onChange={(e) => onAcknowledge(e.target.checked)}

@@ -60,24 +60,24 @@ export function settingsError(s: Required<RagCollectionSettings>): string | null
 }
 
 export const TRUST_LABEL: Record<RagTrust, string> = {
-  trusted: 'Trusted',
-  untrusted: 'Untrusted',
+  trusted: 'From your team',
+  untrusted: 'From outside',
 };
 
 export const TRUST_HINT: Record<RagTrust, string> = {
   trusted:
-    'A source the tenant curates. Scan findings are recorded, and only hidden characters quarantine the document.',
+    'Documents your team writes or curates. Problems the checks find are recorded, and only hidden characters hold a document back for review.',
   untrusted:
-    'Anything else (the default). Any finding other than a link quarantines the document, near-copies of other documents are flagged, and its checks must pass within the vetting deadline.',
+    'Documents from anyone else (the safe default). Any problem the checks find, other than a link, holds the document back for review, near-copies of other documents are flagged, and its checks must pass in the time allowed.',
 };
 
 export const STATUS_LABEL: Record<RagDocumentStatus, string> = {
-  pending: 'Pending',
-  indexing: 'Indexing',
+  pending: 'Waiting',
+  indexing: 'Being prepared',
   ready: 'Ready',
-  quarantined: 'Quarantined',
+  quarantined: 'Held for review',
   failed: 'Failed',
-  superseded: 'Superseded',
+  superseded: 'Replaced',
   deleted: 'Deleted',
 };
 
@@ -92,13 +92,13 @@ export const STATUS_TONE: Record<RagDocumentStatus, Tone> = {
 };
 
 export const STATUS_HINT: Record<RagDocumentStatus, string> = {
-  pending: 'Waiting for a worker to index it. Not searched yet.',
-  indexing: 'A worker is indexing it. Not searched yet.',
-  ready: 'Indexed and its checks passed: rag_search serves it.',
+  pending: 'Waiting to be prepared for search. Not searched yet.',
+  indexing: 'Being prepared for search. Not searched yet.',
+  ready: 'Prepared and its checks passed: assistants can search it.',
   quarantined:
-    'A check flagged it. Not searched until someone with rag.approve releases it with the findings acknowledged.',
+    'A check found a problem. Not searched until someone allowed to approve documents releases it.',
   failed:
-    'Indexing failed for good (bad content, a credential in the text, or the vetting deadline). Not searched.',
+    'Could not be prepared (bad content, a password or key in the text, or its checks ran out of time). Not searched.',
   superseded: 'A newer version became ready and replaced it.',
   deleted: 'Deleted.',
 };
@@ -192,6 +192,76 @@ export function docIdError(id: string): string | null {
     return 'Use 1 to 200 visible ASCII characters (letters, digits, punctuation), no spaces and no /.';
   }
   return null;
+}
+
+/**
+ * A title for an uploaded document: its first Markdown heading, its HTML
+ * <title> or first <h1>, else the file name without its extension.
+ */
+export function titleFromContent(content: string, type: ContentType, fileName: string): string {
+  let found: string | undefined;
+  if (type === 'text/markdown') {
+    found = /^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/m.exec(content)?.[1];
+  } else if (type === 'text/html') {
+    const raw =
+      /<title[^>]*>([\s\S]*?)<\/title>/i.exec(content)?.[1] ??
+      /<h1[^>]*>([\s\S]*?)<\/h1>/i.exec(content)?.[1];
+    found = raw?.replace(/<[^>]+>/g, '');
+  }
+  const title = (found ?? fileName.replace(/\.[^.]+$/, '')).replace(/\s+/g, ' ').trim();
+  return title.slice(0, 500);
+}
+
+/** One file of a multi-file upload, before and while it is sent. */
+export interface UploadItem {
+  key: string;
+  fileName: string;
+  size: number;
+  contentType: ContentType;
+  content: string;
+  docId: string;
+  title: string;
+  state: 'ready' | 'sending' | 'added' | 'unchanged' | 'failed';
+  /** Why it failed (sending), in the server's words. */
+  error?: string;
+}
+
+/**
+ * Reads picked or dropped files into upload rows: id from the file name, title
+ * from the content. Files that cannot be sent (format, size) are returned
+ * apart with the reason, so nothing is dropped silently.
+ */
+export async function readUploads(
+  files: readonly File[],
+): Promise<{ items: UploadItem[]; refused: Array<{ fileName: string; reason: string }> }> {
+  const items: UploadItem[] = [];
+  const refused: Array<{ fileName: string; reason: string }> = [];
+  for (const [i, f] of files.entries()) {
+    const type = contentTypeOf(f);
+    if (!type.ok) {
+      refused.push({ fileName: f.name, reason: type.error });
+      continue;
+    }
+    if (f.size > MAX_DOCUMENT_BYTES) {
+      refused.push({
+        fileName: f.name,
+        reason: `${f.name} is ${formatBytes(f.size)}; a document can be at most 5 MB of text.`,
+      });
+      continue;
+    }
+    const content = await f.text();
+    items.push({
+      key: `${Date.now()}-${i}-${f.name}`,
+      fileName: f.name,
+      size: f.size,
+      contentType: type.type,
+      content,
+      docId: docIdFromFileName(f.name),
+      title: titleFromContent(content, type.type, f.name),
+      state: 'ready',
+    });
+  }
+  return { items, refused };
 }
 
 /** UTF-8 size of a string, as the control plane counts the 5 MB limit. */

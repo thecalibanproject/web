@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { accessBody, accessError, accessOf, DEFAULT_KEY_ACCESS, splitList } from './apiKeys';
+import {
+  accessBody,
+  accessError,
+  accessOf,
+  DEFAULT_KEY_ACCESS,
+  describeAccess,
+  initialKeyAccess,
+  splitList,
+} from './apiKeys';
 
 describe('API key access', () => {
   it('sends nothing for the defaults: every published node, the nodes own scopes', () => {
@@ -18,9 +26,9 @@ describe('API key access', () => {
   });
 
   it('checks the allowlist and the scope format', () => {
-    expect(accessError({ nodes: 'only', names: [], scopes: [] })).toMatch(/at least one node/);
+    expect(accessError({ nodes: 'only', names: [], scopes: [] })).toMatch(/at least one assistant/);
     expect(accessError({ nodes: 'all', names: [], scopes: ['shop.orders:write', 'shop'] })).toBe(
-      'Scopes are <datasource>.<object>:read or rag.<collection>:read, such as shop.orders:read. Not valid: shop.orders:write, shop.',
+      'Write other data as <connection>.<collection>:read or rag.<library>:read, such as shop.orders:read. Not valid: shop.orders:write, shop.',
     );
     expect(accessError({ nodes: 'all', names: [], scopes: ['shop.*:read'] })).toBeNull();
     expect(accessError({ nodes: 'all', names: [], scopes: ['rag.handbook:read'] })).toBeNull();
@@ -37,5 +45,16 @@ describe('API key access', () => {
 
   it('splits lists on commas and new lines', () => {
     expect(splitList('a.b:read, c.d:read\n a.b:read ,')).toEqual(['a.b:read', 'c.d:read']);
+  });
+});
+
+describe('new key defaults (UX-28)', () => {
+  it('starts with only the ticked assistants, or model calls only when there is none', () => {
+    expect(initialKeyAccess(['triage'], true)).toEqual({ nodes: 'only', names: [], scopes: [] });
+    expect(initialKeyAccess([], true).nodes).toBe('none');
+    expect(initialKeyAccess(['triage'], false).nodes).toBe('none');
+    expect(describeAccess({ nodes: 'only', names: ['triage'], scopes: [] }, true)).toBe(
+      "This key can run triage, with each assistant's own data access.",
+    );
   });
 });

@@ -1,7 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { usePermissions } from '@/api/auth';
-import { apiKeysQuery, useMintApiKey, useRevokeApiKey, useRotateEvalKey } from '@/api/queries';
+import {
+  apiKeysQuery,
+  nodesQuery,
+  useMintApiKey,
+  useRevokeApiKey,
+  useRotateEvalKey,
+} from '@/api/queries';
 import type { ApiKeyCreated, ApiKeyInfo } from '@/api/types';
 import {
   Badge,
@@ -30,11 +36,13 @@ import {
   accessBody,
   accessError,
   accessOf,
-  DEFAULT_KEY_ACCESS,
   describeAccess,
+  initialKeyAccess,
   type KeyAccess,
 } from '@/lib/apiKeys';
+import { doc } from '@/lib/docs';
 import { formatDateTime } from '@/lib/format';
+import { Toggletip } from '../help/toggletip';
 import { KeyAccessFields } from './key-access-fields';
 import { TenantDeletedState } from './tenant-deleted-state';
 
@@ -43,7 +51,7 @@ function NewKeyNotice({ created, onDismiss }: { created: ApiKeyCreated; onDismis
   return (
     <div
       role="region"
-      aria-label="New API key"
+      aria-label="New app key"
       className="mx-4 mt-4 rounded-md border border-warn/50 bg-warn-soft p-3"
     >
       <p className="flex items-center gap-2 text-[13px] font-medium text-fg">
@@ -51,8 +59,8 @@ function NewKeyNotice({ created, onDismiss }: { created: ApiKeyCreated; onDismis
         Copy this key now. It will not be shown again.
       </p>
       <p className="mt-0.5 text-[12.5px] text-fg-muted">
-        Caliban stores only a SHA-256 hash of{' '}
-        <span className="font-medium text-fg">{created.name}</span>.
+        Caliban keeps only a fingerprint of{' '}
+        <span className="font-medium text-fg">{created.name}</span>, not the key itself.
       </p>
       <div className="mt-2.5 flex flex-wrap items-center gap-2">
         <code
@@ -66,20 +74,26 @@ function NewKeyNotice({ created, onDismiss }: { created: ApiKeyCreated; onDismis
           I&apos;ve stored it
         </Button>
       </div>
+      <p className="mt-2 text-[12.5px]">
+        {/* A plain hash link: the panel also renders outside the router (tests, embeds). */}
+        <a href="#/settings" className="font-medium text-accent hover:underline">
+          Use this key: copy a snippet
+        </a>
+      </p>
     </div>
   );
 }
 
-/** A key's node allowlist: every published node, none, or the names. */
+/** The assistants a key may run: every published one, none, or the names. */
 function NodeAccessCell({ access }: { access: KeyAccess }) {
   if (access.nodes === 'all') {
-    return <span className="text-fg-muted">All published</span>;
+    return <span className="text-fg-muted">Every published</span>;
   }
-  if (access.nodes === 'none') return <Badge>None</Badge>;
+  if (access.nodes === 'none') return <Badge>Model calls only</Badge>;
   return (
     <span className="inline-flex flex-wrap gap-1">
       {access.names.map((n) => (
-        <Badge key={n} tone="info" className="font-mono">
+        <Badge key={n} tone="info">
           {n}
         </Badge>
       ))}
@@ -100,7 +114,14 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
   const perms = usePermissions();
   const canWrite = perms.can('api_keys.write', tenantId);
   const canGrantNodes = perms.can('nodes.run', tenantId);
-  const [access, setAccess] = useState<KeyAccess>(DEFAULT_KEY_ACCESS);
+  const nodes = useQuery({
+    ...nodesQuery(tenantId),
+    enabled: canGrantNodes && perms.can('nodes.read', tenantId),
+  });
+  const assistants = [...new Set((nodes.data ?? []).map((n) => n.name))];
+  // Null until the user changes it: then the narrowest default applies (UX-28).
+  const [chosen, setAccess] = useState<KeyAccess | null>(null);
+  const access = chosen ?? initialKeyAccess(assistants, canGrantNodes);
   // Remounts the access fields (and their text) after a key is minted.
   const [accessKey, setAccessKey] = useState(0);
   const invalidAccess = accessError(access);
@@ -120,7 +141,7 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
         onSuccess: (k) => {
           setCreated(k);
           setName('');
-          setAccess(DEFAULT_KEY_ACCESS);
+          setAccess(null);
           setAccessKey((n) => n + 1);
         },
       },
@@ -130,8 +151,16 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
   return (
     <Card>
       <CardHeader
-        title="Caliban API keys"
-        description="Apps send these as Authorization: Bearer cal_… to the data plane."
+        title={
+          <span className="inline-flex items-center gap-1">
+            App keys
+            <Toggletip label="app keys" doc={doc('guides/api-keys', 'create')}>
+              Applications send the key with every request to Caliban (as Authorization: Bearer
+              cal_…). Also called API keys.
+            </Toggletip>
+          </span>
+        }
+        description="Each application calls Caliban with a key of this workspace."
         actions={
           <Checkbox
             label="Show revoked"
@@ -144,43 +173,43 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
       {canWrite && (
         <form
           onSubmit={onSubmit}
-          className="flex flex-wrap items-end gap-2 border-b border-border px-4 py-3"
+          aria-label="Create an app key"
+          className="flex flex-col gap-3 border-b border-border px-4 py-3"
         >
-          <label className="flex min-w-56 flex-1 flex-col gap-1 text-[12.5px] font-medium">
+          <label className="flex max-w-md flex-col gap-1 text-[12.5px] font-medium">
             Key name
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. billing-service-prod"
+              placeholder="e.g. clinic-website"
             />
           </label>
-          <Button
-            type="submit"
-            variant="primary"
-            icon={<IconPlus size={14} />}
-            loading={mint.isPending}
-            disabled={invalidAccess != null}
-          >
-            Mint key
-          </Button>
-          <details className="w-full rounded-md border border-border">
-            <summary className="cursor-pointer px-3 py-2 text-[12.5px] text-fg-muted hover:text-fg">
-              <span className="font-medium text-fg">Node access</span>:{' '}
+          <div className="rounded-md border border-border p-3">
+            <KeyAccessFields
+              key={accessKey}
+              tenantId={tenantId}
+              value={access}
+              onChange={(a) => {
+                setAccess(a);
+                mint.reset();
+              }}
+              disabled={mint.isPending}
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              type="submit"
+              variant="primary"
+              icon={<IconPlus size={14} />}
+              loading={mint.isPending}
+              disabled={invalidAccess != null}
+            >
+              Create key
+            </Button>
+            <p className="text-[12.5px] text-fg-muted" aria-live="polite">
               {describeAccess(access, canGrantNodes)}
-            </summary>
-            <div className="border-t border-border p-3">
-              <KeyAccessFields
-                key={accessKey}
-                tenantId={tenantId}
-                value={access}
-                onChange={(a) => {
-                  setAccess(a);
-                  mint.reset();
-                }}
-                disabled={mint.isPending}
-              />
-            </div>
-          </details>
+            </p>
+          </div>
           {mint.error ? (
             <div className="w-full">
               <FormError error={mint.error} />
@@ -196,21 +225,22 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
         <ErrorState error={keys.error} onRetry={() => void keys.refetch()} />
       ) : keys.data.length === 0 ? (
         <EmptyState
-          title="No API keys"
+          title="No app keys yet"
           description={
             canWrite
-              ? 'Mint a key to let an application call Caliban as this tenant.'
-              : 'This tenant has no API keys yet.'
+              ? 'Create a key above so an application can call Caliban in this workspace.'
+              : 'This workspace has no app keys yet.'
           }
+          learnMore={doc('guides/api-keys', 'create')}
         />
       ) : (
-        <Table label="API keys">
+        <Table label="App keys">
           <THead>
             <tr>
               <TH>Name</TH>
               <TH>Prefix</TH>
-              <TH>Nodes</TH>
-              <TH>Datasource scopes</TH>
+              <TH>Assistants</TH>
+              <TH>Data it may read</TH>
               <TH>Created</TH>
               {showRevoked && <TH>Status</TH>}
               <TH>
@@ -229,9 +259,9 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
                       <Badge
                         tone="info"
                         className="ml-2"
-                        title="Managed by the control plane: node evals run as this key. It cannot be used on the data plane."
+                        title="Managed by Caliban: tests run with this key. Applications cannot use it."
                       >
-                        Eval key
+                        Test key
                       </Badge>
                     )}
                   </TD>
@@ -248,7 +278,7 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
                         {k.datasource_scopes.join(', ')}
                       </span>
                     ) : (
-                      <span title="Every scope of the nodes it runs">Nodes&apos; scopes</span>
+                      <span>Each assistant&apos;s own</span>
                     )}
                   </TD>
                   <TD className="text-fg-muted">{formatDateTime(k.created_at)}</TD>
@@ -268,7 +298,7 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
                     {!revoked && canWrite && k.purpose === 'eval' && (
                       <Button
                         size="sm"
-                        aria-label={`Rotate the eval key ${k.name}`}
+                        aria-label={`Rotate the test key ${k.name}`}
                         onClick={() => {
                           rotate.reset();
                           setRotating(true);
@@ -297,21 +327,21 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
 
       <ConfirmDialog
         open={rotating}
-        title="Rotate the eval key?"
-        confirmLabel="Rotate eval key"
+        title="Rotate the test key?"
+        confirmLabel="Rotate test key"
         loading={rotate.isPending}
         error={rotate.error}
         onCancel={() => setRotating(false)}
         onConfirm={() => rotate.mutate(undefined, { onSuccess: () => setRotating(false) })}
       >
         <p>
-          The eval key is revoked and a new one created. Its plaintext is never shown: the control
-          plane keeps it for evals. Evals in flight lose their key, so rotate between evals.
+          The test key is revoked and a new one created. It is never shown: Caliban keeps it for
+          tests. Tests already running lose their key, so rotate between test runs.
         </p>
       </ConfirmDialog>
       <ConfirmDialog
         open={revoking !== null}
-        title="Revoke API key?"
+        title="Revoke this app key?"
         confirmLabel="Revoke key"
         loading={revoke.isPending}
         error={revoke.error}
@@ -326,8 +356,8 @@ export function ApiKeysPanel({ tenantId }: { tenantId: string }) {
           <code className="font-mono">{revoking?.prefix}…</code>)? Apps that use it lose access.
         </p>
         <p>
-          The key stops working immediately in standalone mode, and within one snapshot poll
-          interval (10 s by default) on split-mode routers. A revoked key cannot be restored.
+          The key stops working within seconds (at most about 10 s on a gateway that runs apart from
+          the admin service). A revoked key cannot be restored.
         </p>
       </ConfirmDialog>
     </Card>

@@ -97,13 +97,20 @@ const tenantsRoute = createRoute({
   component: lazyRouteComponent(() => import('@/pages/tenants'), 'TenantsPage'),
 });
 
-export type TenantTab = 'api-keys' | 'provider-keys' | 'intents';
+export const TENANT_TABS = [
+  'api-keys',
+  'provider-keys',
+  'intents',
+  'privacy',
+  'limits',
+  'danger',
+] as const;
+export type TenantTab = (typeof TENANT_TABS)[number];
 const tenantDetailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: 'tenants/$tenantId',
   validateSearch: (s: Record<string, unknown>): { tab?: TenantTab } => ({
-    tab:
-      s.tab === 'provider-keys' || s.tab === 'api-keys' || s.tab === 'intents' ? s.tab : undefined,
+    tab: TENANT_TABS.find((t) => t === s.tab),
   }),
   component: lazyRouteComponent(() => import('@/pages/tenant-detail'), 'TenantDetailPage'),
 });
@@ -135,7 +142,11 @@ const ontologyRoute = createRoute({
 const nodesRoute = createRoute({
   getParentRoute: () => appRoute,
   path: 'nodes',
-  validateSearch: tenantSearch,
+  validateSearch: (s: Record<string, unknown>): { tenant?: string; new?: 1 } => ({
+    tenant: str(s.tenant),
+    // Opens "New assistant" (the command palette's action).
+    new: s.new === 1 || s.new === '1' ? 1 : undefined,
+  }),
   component: lazyRouteComponent(() => import('@/pages/nodes'), 'NodesPage'),
 });
 
@@ -332,6 +343,9 @@ export function createAppRouter(queryClient: QueryClient, history = createHashHi
     defaultPreload: 'intent',
     defaultPreloadStaleTime: 0,
     scrollRestoration: true,
+    // Route changes cross-fade where the View Transition API exists (index.css
+    // holds the timing and the reduced-motion rule); ignored elsewhere.
+    defaultViewTransition: true,
   });
 }
 

@@ -71,7 +71,7 @@ describe('Console session (single sign-on)', () => {
     await renderApp('/tenants/acme', { token: null });
 
     await user.type(await screen.findByLabelText('Key name'), 'billing');
-    await user.click(screen.getByRole('button', { name: 'Mint key' }));
+    await user.click(screen.getByRole('button', { name: 'Create key' }));
 
     expect(await screen.findByTestId('plaintext-key')).toHaveTextContent('cal_abcd_secret');
     const post = calls.find((c) => c.method === 'POST')!;
@@ -164,7 +164,7 @@ describe('Console session (single sign-on)', () => {
     const user = userEvent.setup();
     await renderApp('/tenants/acme', { token: null });
 
-    await user.click(await screen.findByRole('button', { name: 'Mint key' }));
+    await user.click(await screen.findByRole('button', { name: 'Create key' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       "Your role does not allow this (permission 'api_keys.write' is required).",
     );
@@ -175,7 +175,7 @@ describe('Console session (single sign-on)', () => {
     await renderApp('/', { token: null });
 
     expect(await screen.findByText('You are signed in, but have no role yet')).toBeInTheDocument();
-    expect(within(nav()).queryByRole('link', { name: 'Tenants' })).not.toBeInTheDocument();
+    expect(within(nav()).queryByRole('link', { name: 'Workspaces' })).not.toBeInTheDocument();
   });
 });
 
@@ -184,9 +184,9 @@ describe('Token mode', () => {
     const calls = mockApi({ 'GET /api/v1/tenants': () => ({ body: [acme] }) });
     await renderApp('/tenants');
 
-    expect(await screen.findByRole('table', { name: 'Tenants' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'New tenant' })).toBeInTheDocument();
-    expect(within(nav()).getByRole('link', { name: 'Audit' })).toBeInTheDocument();
+    expect(await screen.findByRole('table', { name: 'Workspaces' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'New workspace' })).toBeInTheDocument();
+    expect(within(nav()).getByRole('link', { name: 'Audit log' })).toBeInTheDocument();
     const list = calls.find((c) => c.path === '/api/v1/tenants')!;
     expect(list.headers.get('Authorization')).toBe('Bearer test-admin-token');
   });
@@ -204,61 +204,74 @@ describe('Token mode', () => {
 });
 
 describe('Role-gated console', () => {
-  it('a tenant viewer reads the tenant but gets no controls to change it', async () => {
+  it('a workspace viewer reads the workspace but gets no controls to change it', async () => {
     mockApi(tenantRoutes([{ role: 'viewer', tenant_id: 'acme' }]));
     await renderApp('/tenants/acme', { token: null });
 
-    expect(await screen.findByRole('tab', { name: 'API keys' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Provider keys' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Mint key' })).not.toBeInTheDocument();
-    const settings = await screen.findByRole('region', { name: 'Privacy and caching' });
+    const user = userEvent.setup();
+    expect(await screen.findByRole('tab', { name: 'Apps and keys' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Provider accounts' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Danger zone' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Create key' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Privacy' }));
+    const settings = await screen.findByRole('region', {
+      name: 'Personal data and reuse of answers',
+    });
     expect(within(settings).getByText(/Read only: your role cannot change/)).toBeInTheDocument();
-    expect(within(settings).getByLabelText('PII default mode')).toBeDisabled();
+    expect(within(settings).getByRole('radio', { name: /Hide everywhere/ })).toBeDisabled();
     expect(within(settings).queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
-    const limits = screen.getByRole('region', { name: 'Node limits' });
-    expect(within(limits).getByLabelText('Steps per run')).toBeDisabled();
+    await user.click(screen.getByRole('tab', { name: 'Limits and budget' }));
+    const limits = await screen.findByRole('region', { name: 'Limits and budget' });
+    expect(within(limits).getByLabelText('Steps per conversation')).toBeDisabled();
     expect(within(limits).queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: 'Danger zone' })).not.toBeInTheDocument();
 
-    expect(within(nav()).queryByRole('link', { name: 'Audit' })).not.toBeInTheDocument();
-    expect(within(nav()).queryByRole('link', { name: 'Users and roles' })).not.toBeInTheDocument();
+    expect(within(nav()).queryByRole('link', { name: 'Audit log' })).not.toBeInTheDocument();
+    expect(within(nav()).queryByRole('link', { name: 'People and roles' })).not.toBeInTheDocument();
   });
 
-  it('a tenant admin manages the tenant but cannot delete it', async () => {
+  it('a workspace admin manages the workspace but cannot delete it', async () => {
     mockApi(tenantRoutes([{ role: 'tenant_admin', tenant_id: 'acme' }]));
     const user = userEvent.setup();
     await renderApp('/tenants/acme', { token: null });
 
-    expect(await screen.findByRole('button', { name: 'Mint key' })).toBeInTheDocument();
-    const settings = await screen.findByRole('region', { name: 'Privacy and caching' });
+    expect(await screen.findByRole('button', { name: 'Create key' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Danger zone' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Privacy' }));
+    const settings = await screen.findByRole('region', {
+      name: 'Personal data and reuse of answers',
+    });
     expect(within(settings).getByRole('button', { name: 'Save' })).toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: 'Danger zone' })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('tab', { name: 'Provider keys' }));
-    expect(await screen.findByRole('button', { name: 'Add provider key' })).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Provider accounts' }));
+    expect(await screen.findByRole('button', { name: 'Add provider account' })).toBeInTheDocument();
   });
 
-  it('a developer mints API keys but cannot add BYOK keys', async () => {
+  it('a developer creates app keys but cannot add provider accounts', async () => {
     mockApi(tenantRoutes([{ role: 'developer', tenant_id: 'acme' }]));
     const user = userEvent.setup();
     await renderApp('/tenants/acme', { token: null });
 
-    expect(await screen.findByRole('button', { name: 'Mint key' })).toBeInTheDocument();
-    await user.click(screen.getByRole('tab', { name: 'Provider keys' }));
-    expect(await screen.findByText('No provider keys')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Add provider key' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Create key' })).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Provider accounts' }));
+    expect(await screen.findByText('No provider accounts')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add provider account' })).not.toBeInTheDocument();
   });
 
-  it('billing sees the tenant and its usage, not its keys', async () => {
+  it('billing sees the workspace and its usage, not its keys', async () => {
     mockApi(tenantRoutes([{ role: 'billing', tenant_id: 'acme' }]));
     await renderApp('/tenants/acme', { token: null });
 
     expect(await screen.findByRole('heading', { name: 'Acme' })).toBeInTheDocument();
-    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
-    for (const page of ['Datasources', 'Ontology', 'Nodes', 'Audit']) {
+    const tabs = await screen.findByRole('tablist', { name: 'Workspace sections' });
+    expect(
+      within(tabs)
+        .getAllByRole('tab')
+        .map((t) => t.textContent),
+    ).toEqual(['Privacy', 'Limits and budget']);
+    for (const page of ['Data connections', 'Data dictionary', 'Assistants', 'Audit log']) {
       expect(within(nav()).queryByRole('link', { name: page })).not.toBeInTheDocument();
     }
-    expect(within(nav()).getByRole('link', { name: 'Usage' })).toBeInTheDocument();
+    expect(within(nav()).getByRole('link', { name: 'Usage and costs' })).toBeInTheDocument();
   });
 
   it('an auditor reads everything and changes nothing', async () => {
@@ -270,13 +283,15 @@ describe('Role-gated console', () => {
     const user = userEvent.setup();
     await renderApp('/tenants', { token: null });
 
-    expect(await screen.findByRole('table', { name: 'Tenants' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'New tenant' })).not.toBeInTheDocument();
-    expect(within(nav()).getByRole('link', { name: 'Audit' })).toBeInTheDocument();
-    expect(within(nav()).getByRole('link', { name: 'Users and roles' })).toBeInTheDocument();
+    expect(await screen.findByRole('table', { name: 'Workspaces' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'New workspace' })).not.toBeInTheDocument();
+    expect(within(nav()).getByRole('link', { name: 'Audit log' })).toBeInTheDocument();
+    expect(within(nav()).getByRole('link', { name: 'People and roles' })).toBeInTheDocument();
 
     await user.click(within(nav()).getByRole('link', { name: 'Models' }));
-    expect(await screen.findByText('No models registered')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add server' })).not.toBeInTheDocument();
+    await user.click(await screen.findByRole('tab', { name: 'Models' }));
+    expect(await screen.findByText('No models yet')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add model' })).not.toBeInTheDocument();
   });
 
@@ -311,9 +326,12 @@ describe('Role-gated console', () => {
 
     expect(await screen.findByText('triage')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'New node' }));
-    const form = await screen.findByRole('form', { name: 'Create node' });
-    const options = within(within(form).getByLabelText(/Tenant/)).getAllByRole('option');
-    expect(options.map((o) => o.textContent)).toEqual(['Select a tenant…', 'Acme']);
+    await user.click(screen.getByRole('button', { name: 'New assistant' }));
+    const start = await screen.findByRole('form', { name: 'Start from' });
+    await user.click(within(start).getByRole('radio', { name: /Blank assistant/ }));
+    await user.click(within(start).getByRole('button', { name: 'Next' }));
+    const form = await screen.findByRole('form', { name: 'Create assistant' });
+    const options = within(within(form).getByLabelText(/Workspace/)).getAllByRole('option');
+    expect(options.map((o) => o.textContent)).toEqual(['Select a workspace…', 'Acme']);
   });
 });

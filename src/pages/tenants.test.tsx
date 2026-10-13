@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import type { Tenant } from '@/api/types';
 import { formatDate } from '@/lib/format';
+import { expectNoAxeViolations } from '@/test/a11y';
 import { mockApi, renderApp } from '@/test/utils';
 
 const active: Tenant = {
@@ -29,7 +30,7 @@ describe('TenantsPage', () => {
     const user = userEvent.setup();
     await renderApp('/tenants');
 
-    const table = await screen.findByRole('table', { name: 'Tenants' });
+    const table = await screen.findByRole('table', { name: 'Workspaces' });
     expect(within(table).getByRole('link', { name: 'Acme' })).toBeInTheDocument();
     expect(within(table).queryByText('Globex')).not.toBeInTheDocument();
 
@@ -44,5 +45,37 @@ describe('TenantsPage', () => {
     const activeRow = screen.getByRole('link', { name: 'Acme' }).closest('tr')!;
     expect(within(activeRow).getByText('Active')).toBeInTheDocument();
     expect(calls.some((c) => c.query.get('include_deleted') === 'true')).toBe(true);
+  });
+
+  it('teaches when empty and creates a workspace with the recommended personal data mode', async () => {
+    let tenants: Tenant[] = [];
+    const calls = mockApi({
+      'GET /api/v1/tenants': () => ({ body: tenants }),
+      'POST /api/v1/tenants': (c) => {
+        const t = { ...active, name: (c.body as { name: string }).name };
+        tenants = [t];
+        return { status: 201, body: t };
+      },
+    });
+    const user = userEvent.setup();
+    await renderApp('/tenants');
+    expect(await screen.findByText('No workspaces yet')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Learn more/ })).toHaveAttribute(
+      'href',
+      '/docs/guides/workspaces/#create',
+    );
+    await expectNoAxeViolations();
+    await user.click(screen.getAllByRole('button', { name: 'New workspace' })[0]!);
+    const dialog = await screen.findByRole('dialog', { name: 'New workspace' });
+    await user.type(within(dialog).getByLabelText(/^Name/), 'Clinic');
+    expect(within(dialog).getByLabelText('How personal data is protected')).toHaveValue(
+      'reversible',
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Create workspace' }));
+    expect(await screen.findByRole('link', { name: 'Clinic' })).toBeInTheDocument();
+    expect(calls.find((c) => c.method === 'POST')?.body).toEqual({
+      name: 'Clinic',
+      pii_default: 'reversible',
+    });
   });
 });

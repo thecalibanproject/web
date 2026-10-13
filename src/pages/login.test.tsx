@@ -27,8 +27,29 @@ describe('Sign-in screen', () => {
     await renderApp('/login', { token: null });
 
     expect(await screen.findByLabelText(/Admin token/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Sign in' })).toBeDisabled();
     expect(screen.queryByRole('link', { name: 'Sign in with SSO' })).not.toBeInTheDocument();
+  });
+
+  it('keeps Sign in enabled and says what is missing when the token is empty', async () => {
+    const calls = mockApi({
+      'GET /auth/config': () => ({
+        body: { sso_enabled: false, break_glass_enabled: true, login_url: null },
+      }),
+    });
+    const user = userEvent.setup();
+    await renderApp('/login', { token: null });
+
+    const submit = await screen.findByRole('button', { name: 'Sign in' });
+    expect(submit).toBeEnabled();
+    await user.click(submit);
+    const field = screen.getByLabelText(/Admin token/);
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+    expect(field).toHaveAccessibleDescription(/Enter the admin token to sign in/);
+    expect(field).toHaveFocus();
+    expect(calls.some((c) => c.path === '/auth/me')).toBe(false);
+
+    await user.type(field, 'x');
+    expect(field).not.toHaveAttribute('aria-invalid', 'true');
   });
 
   it('with single sign-on: SSO first, and the break-glass token behind a second option', async () => {
@@ -107,10 +128,10 @@ describe('Sign-in screen', () => {
     await user.click(screen.getByRole('button', { name: 'Sign in with the token' }));
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/tenants'));
-    expect(await screen.findByRole('table', { name: 'Tenants' })).toBeInTheDocument();
+    expect(await screen.findByRole('table', { name: 'Workspaces' })).toBeInTheDocument();
     expect(getToken()).toBe('adm_secret');
     // The shell says it is the break-glass token, not a person.
-    expect(screen.getByText('Break-glass')).toBeInTheDocument();
+    expect(screen.getByText('Shared admin token')).toBeInTheDocument();
   });
 
   it('keeps a rejected token out and says so', async () => {

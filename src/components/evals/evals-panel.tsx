@@ -1,8 +1,10 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { usePermissions } from '@/api/auth';
 import { evalPolicyQuery, evalsQuery, gateQuery, usePutEvalPolicy } from '@/api/queries';
 import type { Eval, Node } from '@/api/types';
+import { cn } from '@/lib/cn';
+import { doc } from '@/lib/docs';
 import {
   defaultEvalVersion,
   EVAL_SUITE_LABEL,
@@ -18,6 +20,10 @@ import {
   type PolicyTextField,
 } from '@/lib/evals';
 import { EMPTY, formatDateTime, formatMs, formatPercent, formatUsd } from '@/lib/format';
+import { failedEveryTry, failingCases, latestSucceeded, requirements } from '@/lib/goLive';
+import { Advanced } from '../help/advanced';
+import { LearnMore } from '../help/learn-more';
+import { TermTip } from '../help/toggletip';
 import { deniedReason } from '@/lib/permissions';
 import { LiveBadge, NodeStateBadge } from '../nodes/node-badges';
 import { VersionDialog } from '../nodes/version-dialogs';
@@ -53,6 +59,7 @@ function GateCard({
   name,
   version,
   live,
+  evals,
   polling,
   onOpenEval,
 }: {
@@ -60,6 +67,8 @@ function GateCard({
   name: string;
   version: Node;
   live: number | undefined;
+  /** The version's evals, newest first. */
+  evals: readonly Eval[];
   polling: boolean;
   onOpenEval: (id: string) => void;
 }) {
@@ -67,32 +76,48 @@ function GateCard({
     ...gateQuery(tenantId, name, version.version),
     refetchInterval: polling ? 5_000 : false,
   });
+  const policy = useQuery(evalPolicyQuery(tenantId, name));
   const cannotPublish = deniedReason(usePermissions(), 'nodes.publish', tenantId);
   const [promoting, setPromoting] = useState(false);
+  const notReadyId = useId();
   const g = gate.data;
-  // `path` names a pinned subnode version whose own gate failed.
-  const problems = (g?.problems ?? []).map((p) => (p.path ? `${p.path}: ${p.message}` : p.message));
+  const input = { version, evals, gate: g, policy: policy.data?.policy };
+  const reqs = requirements(input);
+  const latest = latestSucceeded(evals, 'golden');
+  const failing = failingCases(latest ? goldenSummary(latest) : null);
+  const zero = failedEveryTry(failing);
   const evidence = evidenceEvals(g?.evidence);
   return (
     <Card>
       <CardHeader
-        title="Promotion gate"
+        title="Go-live check"
         description={`What making v${version.version} live would say now.`}
         actions={
           version.state === 'published' &&
           !version.live && (
-            <GatedButton
-              size="sm"
-              variant="primary"
-              deniedReason={cannotPublish}
-              onClick={() => setPromoting(true)}
-            >
-              Make v{version.version} live
-            </GatedButton>
+            // Primary only when the check passes; otherwise it stays available
+            // (the dialog shows the control plane's reasons) but says why it
+            // would be refused.
+            <span className="flex flex-wrap items-center justify-end gap-2">
+              {g && !g.allowed && (
+                <span id={notReadyId} className="text-[12px] text-fg-muted">
+                  Refused until every requirement below is met.
+                </span>
+              )}
+              <GatedButton
+                size="sm"
+                variant={g?.allowed ? 'primary' : 'secondary'}
+                deniedReason={cannotPublish}
+                aria-describedby={g && !g.allowed ? notReadyId : undefined}
+                onClick={() => setPromoting(true)}
+              >
+                Make v{version.version} live
+              </GatedButton>
+            </span>
           )
         }
       />
-      <div className="flex flex-col gap-2 p-4 text-[12.5px]">
+      <div className="flex flex-col gap-3 p-4 text-[12.5px]">
         {gate.isPending ? (
           <LoadingState rows={2} />
         ) : gate.isError ? (
@@ -100,64 +125,105 @@ function GateCard({
         ) : (
           <>
             <p className="flex flex-wrap items-center gap-2">
-              {g?.allowed ? (
-                <Badge tone="ok">
-                  <IconCheck size={12} /> Meets the bar
+              {!g?.allowed ? (
+                <Badge tone="danger">
+                  <IconAlert size={12} /> Not ready to go live
+                </Badge>
+              ) : zero.length > 0 ? (
+                <Badge tone="warn">
+                  <IconAlert size={12} /> Allowed to go live, with failing test cases
                 </Badge>
               ) : (
-                <Badge tone="danger">
-                  <IconAlert size={12} /> Blocked by the promotion bar
+                <Badge tone="ok">
+                  <IconCheck size={12} /> Ready to go live
                 </Badge>
               )}
               {g?.has_write_tools && (
-                <Badge
-                  tone="warn"
-                  title="An injection eval is always required before it is made live."
-                >
-                  Write tools
+                <Badge tone="warn" title="Safety tests are always required before it goes live.">
+                  Can change things
                 </Badge>
               )}
               {g?.has_untrusted_reads && !g.has_write_tools && (
                 <Badge
                   tone="info"
-                  title="Read tools that bring data in (MCP, datasource_query, rag_search): what it reads can steer its answer, so it needs an injection eval unless the bar makes that optional for read-only versions."
+                  title="It reads documents, databases or tools, and what it reads can steer its answer, so it needs safety tests unless the bar makes them optional."
                 >
-                  Untrusted reads
+                  Reads outside data
                 </Badge>
               )}
               {version.live && <LiveBadge />}
             </p>
-            {g?.allowed && evidence.length === 0 && (
+            {failing.length > 0 && (
+              <section aria-label="Failing test cases" className="rounded-md bg-surface-2 p-3">
+                <h3 className="mb-1 font-semibold">
+                  {zero.length > 0
+                    ? `${zero.length} test case${zero.length === 1 ? '' : 's'} failed every try`
+                    : 'Test cases that failed some tries'}
+                </h3>
+                <ul className="flex flex-col gap-0.5">
+                  {failing.map((c) => (
+                    <li key={c.case} className="flex flex-wrap items-baseline gap-2">
+                      <code className="font-mono text-[12px]">{c.case}</code>
+                      <span className={c.passed === 0 ? 'text-danger' : 'text-warn'}>
+                        {c.passed === 0
+                          ? `failed all ${c.tries} tries`
+                          : `passed ${c.passed} of ${c.tries} tries`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {latest && (
+                  <button
+                    type="button"
+                    className="mt-1 text-accent hover:underline"
+                    onClick={() => onOpenEval(latest.id)}
+                  >
+                    See every try
+                  </button>
+                )}
+              </section>
+            )}
+            {reqs.length === 0 ? (
               <p className="text-fg-muted">
-                No bar applies: the node sets no golden bar, and the version has no write tools and
-                no reads that need an injection eval.
+                No bar applies: there is no quality bar, and this version neither changes things nor
+                reads outside data.
               </p>
+            ) : (
+              <ul aria-label="Requirements" className="flex flex-col gap-1.5">
+                {reqs.map((r, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className={cn('mt-0.5 shrink-0', r.met ? 'text-ok' : 'text-danger')}>
+                      {r.met ? <IconCheck size={14} /> : <IconAlert size={14} />}
+                    </span>
+                    <span>
+                      <span className="sr-only">{r.met ? 'Met: ' : 'Not met: '}</span>
+                      {r.label}
+                      {r.detail && <span className="block text-fg-muted">{r.detail}</span>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
             {evidence.length > 0 && (
               <p className="text-fg-muted">
-                Met by{' '}
+                Based on{' '}
                 {evidence.map(({ label, eval: id }, i) => (
                   <span key={id}>
                     {i > 0 && ', '}
-                    the {label} eval{' '}
                     <button
                       type="button"
-                      className="font-mono text-accent hover:underline"
+                      className="text-accent hover:underline"
+                      title={id}
                       onClick={() => onOpenEval(id)}
                     >
-                      {id}
+                      {label
+                        .replace(/\bgolden\b/, 'the quality tests')
+                        .replace(/\binjection\b/, 'the safety tests')}
                     </button>
                   </span>
                 ))}
                 .
               </p>
-            )}
-            {problems.length > 0 && (
-              <ul aria-label="Why the gate refuses" className="list-disc pl-5 text-danger">
-                {problems.map((p, i) => (
-                  <li key={i}>{p}</li>
-                ))}
-              </ul>
             )}
           </>
         )}
@@ -176,6 +242,40 @@ function GateCard({
 }
 
 const pctText = (r: number | undefined) => (r == null ? null : formatPercent(r));
+
+/** Ready-made bars, in plain sentences (UX-40). */
+const PRESETS: ReadonlyArray<{
+  id: string;
+  label: string;
+  detail: string;
+  minPassK: string;
+  minK: string;
+}> = [
+  {
+    id: 'strict',
+    label: 'Strict',
+    detail: '9 of 10 test cases must pass all 3 tries.',
+    minPassK: '90',
+    minK: '3',
+  },
+  {
+    id: 'standard',
+    label: 'Standard (recommended)',
+    detail: '8 of 10 test cases must pass all 3 tries.',
+    minPassK: '80',
+    minK: '3',
+  },
+  {
+    id: 'lenient',
+    label: 'Lenient',
+    detail: '6 of 10 test cases must pass all 3 tries. Only for early trials.',
+    minPassK: '60',
+    minK: '3',
+  },
+];
+
+/** Below this share, lowering the bar gets a warning. */
+const RECOMMENDED_MIN_PASS = 80;
 
 function PolicyEditor({
   tenantId,
@@ -204,6 +304,12 @@ function PolicyEditor({
     }
     put.mutate(r.policy, { onSuccess: onClose });
   };
+  const minPass = Number(form.minPassK);
+  const lowered =
+    form.minPassK.trim() !== '' &&
+    Number.isFinite(minPass) &&
+    minPass < RECOMMENDED_MIN_PASS &&
+    minPass < (Number(initial.minPassK) || 100);
   const field = (k: PolicyTextField, label: string, hint: string, unit?: string) => (
     <Field label={label} hint={hint} error={errors[k]}>
       {({ id, describedBy, invalid }) => (
@@ -226,8 +332,8 @@ function PolicyEditor({
     <Drawer
       open
       onClose={onClose}
-      title={`Promotion bar of ${name}`}
-      description="What a version's latest evals must meet before it is made live. Changes are audited with the old and new bar."
+      title={`Go-live bar of ${name}`}
+      description="What a version's latest test results must meet before it can go live. Every change is recorded in the audit log with the old and the new bar."
       footer={
         <>
           <Button onClick={onClose}>Cancel</Button>
@@ -238,46 +344,82 @@ function PolicyEditor({
       }
     >
       <form id="eval-policy" onSubmit={submit} className="flex flex-col gap-4">
-        <h3 className="text-[12.5px] font-semibold">Golden set</h3>
-        {field(
-          'minPassK',
-          'Least pass^k',
-          'The share of cases whose k runs all passed. Empty: no golden bar.',
-          '%',
-        )}
-        {field('minK', 'Least k', 'Runs per case the eval must have used. Default 1.')}
-        {field('maxCostPerSuccess', 'Most cost per success', 'Optional.', 'USD')}
-        {field('maxP95', 'Most p95 latency', 'Optional.', 'ms')}
-        <h3 className="text-[12.5px] font-semibold">Injection suite</h3>
-        {field(
-          'injectionMinPassRate',
-          'Least share of attacks blocked',
-          'Empty: 100%, every attack blocked. Versions with write tools always need an injection eval, whatever the bar.',
-          '%',
-        )}
-        <Field
-          label="Read-only versions"
-          hint="Versions with read tools that bring data in (MCP, datasource_query, rag_search) and no write tool: what they read can steer their answer, their only effect. Optional lets them be made live without an injection eval; one that ran is still checked against the bar."
-        >
-          {({ id, describedBy }) => (
-            <Select
-              id={id}
-              aria-describedby={describedBy}
-              value={form.injectionReadOnly}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  injectionReadOnly: e.target.value === 'optional' ? 'optional' : 'required',
-                }))
-              }
-              className="w-auto"
-            >
-              <option value="required">Need an injection eval (default)</option>
-              <option value="optional">Injection eval optional</option>
-            </Select>
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-1 text-[12.5px] font-semibold">Quality tests</legend>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Ready-made bars">
+            {PRESETS.map((p) => (
+              <Button
+                key={p.id}
+                size="sm"
+                aria-pressed={form.minPassK === p.minPassK && form.minK === p.minK}
+                title={p.detail}
+                onClick={() => {
+                  setForm((f) => ({ ...f, minPassK: p.minPassK, minK: p.minK }));
+                  setErrors({});
+                }}
+              >
+                {p.label}
+              </Button>
+            ))}
+          </div>
+          {field(
+            'minPassK',
+            'Test cases that must pass every try',
+            'Empty: no quality bar. Also called pass^k.',
+            '%',
           )}
-        </Field>
+          {lowered && (
+            <p role="note" className="rounded-md bg-warn-soft px-3 py-2 text-[12.5px] text-warn">
+              This is below the recommended {RECOMMENDED_MIN_PASS}%: versions that fail a test case
+              more often can go live. The change is recorded in the audit log under your name.
+            </p>
+          )}
+          {field('minK', 'Tries per test case', 'How many times each case runs. Default 1.')}
+          <Advanced summary="No limit on cost or answer time">
+            {field('maxCostPerSuccess', 'Most a good answer may cost', 'Optional.', 'USD')}
+            {field(
+              'maxP95',
+              'Slowest typical answer',
+              'Optional. 95 of 100 answers must be faster than this.',
+              'seconds',
+            )}
+          </Advanced>
+        </fieldset>
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-1 text-[12.5px] font-semibold">Safety tests</legend>
+          {field(
+            'injectionMinPassRate',
+            'Attacks that must be blocked',
+            'Empty: 100%, every attack. Versions that can change things always need safety tests.',
+            '%',
+          )}
+          <Field
+            label="Versions that only read"
+            hint="Versions that read documents, databases or tools but change nothing: what they read can still steer their answer."
+          >
+            {({ id, describedBy }) => (
+              <Select
+                id={id}
+                aria-describedby={describedBy}
+                value={form.injectionReadOnly}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    injectionReadOnly: e.target.value === 'optional' ? 'optional' : 'required',
+                  }))
+                }
+                className="w-auto"
+              >
+                <option value="required">Need safety tests (default)</option>
+                <option value="optional">Safety tests optional</option>
+              </Select>
+            )}
+          </Field>
+        </fieldset>
         <FormError error={put.error} />
+        <p className="text-[12.5px]">
+          <LearnMore doc={doc('guides/tests-and-go-live', 'the-bar')}>How to set the bar</LearnMore>
+        </p>
       </form>
     </Drawer>
   );
@@ -290,35 +432,39 @@ function PolicyCard({ tenantId, name }: { tenantId: string; name: string }) {
   const p = q.data?.policy;
   const rows: Array<[string, string]> = p?.golden
     ? [
-        ['Least pass^k', pctText(p.golden.min_pass_k) ?? EMPTY],
-        ['Least k', String(p.golden.min_k ?? 1)],
+        ['Test cases that must pass every try', pctText(p.golden.min_pass_k) ?? EMPTY],
+        ['Tries per test case', String(p.golden.min_k ?? 1)],
         [
-          'Most cost per success',
+          'Most a good answer may cost',
           p.golden.max_cost_per_success_usd != null
             ? formatUsd(p.golden.max_cost_per_success_usd)
-            : 'none',
+            : 'no limit',
         ],
         [
-          'Most p95 latency',
-          p.golden.max_p95_latency_ms != null ? formatMs(p.golden.max_p95_latency_ms) : 'none',
+          'Slowest typical answer',
+          p.golden.max_p95_latency_ms != null ? formatMs(p.golden.max_p95_latency_ms) : 'no limit',
         ],
       ]
-    : [['Golden bar', 'none']];
+    : [['Quality bar', 'none']];
   rows.push([
-    'Attacks blocked',
+    'Attacks that must be blocked',
     `${pctText(q.data?.injection_bar) ?? EMPTY}${p?.injection ? '' : ' (default)'}`,
   ]);
   rows.push([
-    'Read-only versions',
+    'Versions that only read',
     p?.injection?.read_only === 'optional'
-      ? 'Injection eval optional'
-      : 'Need an injection eval (default)',
+      ? 'Safety tests optional'
+      : 'Need safety tests (default)',
   ]);
   return (
     <Card>
       <CardHeader
-        title="Promotion bar"
-        description="For every version of this node."
+        title={
+          <span className="inline-flex items-center gap-1">
+            Go-live bar <TermTip term="goLiveBar" />
+          </span>
+        }
+        description="For every version of this assistant."
         actions={
           q.isSuccess && (
             <GatedButton size="sm" deniedReason={cannotPublish} onClick={() => setEditing(true)}>
@@ -370,16 +516,21 @@ function Metrics({ e }: { e: Eval }) {
   if (g) {
     return (
       <span className="tabular-nums">
-        pass^k {formatPercent(g.pass_hat_k)} · pass@1 {formatPercent(g.pass_at_1)} · per success{' '}
-        {formatUsd(g.cost_per_success_usd)} · p95 {formatMs(g.latency_ms?.p95)}
+        {g.by_case.filter((c) => c.all_passed).length} of {g.cases} passed all {g.k} tries
+        {failedEveryTry(failingCases(g)).length > 0 &&
+          `, ${failedEveryTry(failingCases(g)).length} failed every try`}{' '}
+        · {formatUsd(g.cost_per_success_usd)} per good answer · 95% under{' '}
+        {formatMs(g.latency_ms?.p95)}
       </span>
     );
   }
   if (i) {
     return (
       <span className="tabular-nums">
-        blocked {formatPercent(i.pass_rate)} · attack success {formatPercent(i.attack_success_rate)}{' '}
-        · utility {formatPercent(i.utility_under_attack)}
+        {i.pass_rate == null
+          ? 'No result (errors)'
+          : `${formatPercent(i.pass_rate)} of attacks blocked`}{' '}
+        · still did its job in {formatPercent(i.utility_under_attack)}
       </span>
     );
   }
@@ -399,20 +550,21 @@ function EvalList({
   if (list.length === 0) {
     return (
       <EmptyState
-        title="No evals of this version yet"
-        description="Start a golden eval to measure pass^k and cost per success, or the injection suite to measure how the defenses hold."
+        title="No tests of this version yet"
+        description="Quality tests check its answers against your test cases; safety tests check it is not tricked by what it reads."
+        learnMore={doc('guides/tests-and-go-live', 'run-tests')}
       />
     );
   }
   return (
-    <Table label="Evals">
+    <Table label="Test runs">
       <THead>
         <tr>
-          <TH>Eval</TH>
-          <TH>Suite</TH>
+          <TH>Test run</TH>
+          <TH>Tests</TH>
           <TH>Status</TH>
-          <TH className="text-right">Trials</TH>
-          <TH>Metrics</TH>
+          <TH className="text-right">Cases × tries</TH>
+          <TH>Results</TH>
           <TH>Started</TH>
           <TH>By</TH>
         </tr>
@@ -425,10 +577,11 @@ function EvalList({
                 size="sm"
                 variant="ghost"
                 className="font-mono"
-                aria-label={`Open eval ${e.id}`}
+                aria-label={`Open test run ${e.id}`}
+                title={e.id}
                 onClick={() => onOpen(e.id)}
               >
-                {e.id}
+                {formatDateTime(e.created_at)}
               </Button>
             </TD>
             <TD>
@@ -457,8 +610,8 @@ function EvalList({
 }
 
 /**
- * The Evals tab of a node: per version, the promotion gate, the node's
- * promotion bar, the golden set, and the version's evals with their detail.
+ * The Tests tab of an assistant: per version, the go-live check, the go-live
+ * bar, the test cases, and the version's test runs with their detail.
  */
 export function EvalsPanel({
   tenantId,
@@ -488,10 +641,13 @@ export function EvalsPanel({
   });
   if (!selected) return null;
   const running = (evals.data?.data ?? []).some((e) => isEvalActive(e.status));
+  const hasWriteTools = (
+    (selected.spec as { tools?: Array<{ effect?: string }> }).tools ?? []
+  ).some((t) => t.effect === 'write');
   const cannotStart = !perms.can('nodes.run', tenantId)
     ? NO_RUN(tenantId)
     : selected.state !== 'published'
-      ? `Only published versions are evaluated: v${selected.version} is ${selected.state}.`
+      ? `Only published versions can be tested: v${selected.version} is a ${selected.state === 'draft' ? 'draft' : 'retired version'}.`
       : null;
 
   return (
@@ -506,7 +662,8 @@ export function EvalsPanel({
           >
             {[...versions].reverse().map((v) => (
               <option key={v.version} value={v.version}>
-                v{v.version} ({v.state}
+                v{v.version} (
+                {v.state === 'draft' ? 'draft' : v.state === 'published' ? 'published' : 'retired'}
                 {v.live ? ', live' : ''})
               </option>
             ))}
@@ -522,7 +679,7 @@ export function EvalsPanel({
           deniedReason={cannotStart}
           onClick={() => setStarting(true)}
         >
-          Start eval
+          Run tests
         </GatedButton>
       </div>
       <div className="mb-4 grid gap-4 lg:grid-cols-2">
@@ -532,6 +689,7 @@ export function EvalsPanel({
           name={name}
           version={selected}
           live={versions.find((v) => v.live)?.version}
+          evals={evals.data?.data ?? []}
           polling={running}
           onOpenEval={onEval}
         />
@@ -540,8 +698,8 @@ export function EvalsPanel({
       <GoldenSetCard tenantId={tenantId} name={name} version={selected.version} />
       <Card>
         <CardHeader
-          title={`Evals of v${selected.version}`}
-          description="Newest first. The gate counts each suite's latest succeeded eval of this version."
+          title={`Test runs of v${selected.version}`}
+          description="Newest first. The go-live check counts the latest finished run of each kind of test."
         />
         <EvalList evals={evals} onOpen={onEval} />
       </Card>
@@ -550,6 +708,7 @@ export function EvalsPanel({
           tenantId={tenantId}
           name={name}
           version={selected.version}
+          hasWriteTools={hasWriteTools}
           onClose={() => setStarting(false)}
           onStarted={(e) => {
             setStarting(false);
@@ -560,8 +719,8 @@ export function EvalsPanel({
       <Drawer
         open={evalId !== undefined}
         onClose={() => onEval(undefined)}
-        title={evalId ? `Eval ${evalId}` : ''}
-        description={`${name}: metrics, results per case and every trial.`}
+        title={evalId ? 'Test run' : ''}
+        description={`${name}: results per test case and every try.`}
       >
         {evalId && <EvalDetail tenantId={tenantId} evalId={evalId} />}
       </Drawer>

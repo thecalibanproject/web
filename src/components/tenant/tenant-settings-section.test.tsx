@@ -24,34 +24,48 @@ function FromQuery() {
 }
 
 function controls() {
-  const section = screen.getByRole('region', { name: 'Privacy and caching' });
+  const section = screen.getByRole('region', { name: 'Personal data and reuse of answers' });
   const q = within(section);
   return {
     section,
-    pii: q.getByLabelText('PII default mode'),
-    scope: q.getByLabelText('Surrogate scope'),
-    semantic: q.getByRole('switch', { name: 'Semantic cache' }),
-    hitPrice: q.getByLabelText('Cache-hit price for caliban/auto (%)'),
+    pii: q.getByRole('group', { name: /How personal data is protected/ }),
+    scope: q.getByLabelText('Placeholder consistency'),
+    semantic: q.getByRole('switch', { name: 'Reuse answers to similar questions' }),
+    hitPrice: q.getByLabelText('Price of a reused answer (%)'),
     save: q.getByRole('button', { name: 'Save' }),
     cancel: q.getByRole('button', { name: 'Cancel' }),
   };
 }
 
+/** The checked personal data mode. */
+function piiMode() {
+  return within(controls().pii)
+    .getAllByRole('radio')
+    .find((r) => (r as HTMLInputElement).checked)
+    ?.getAttribute('value');
+}
+
 describe('TenantSettingsSection', () => {
-  it('shows the saved values and explains surrogate scope and the semantic cache', () => {
+  it('asks how personal data is protected, with an example, and keeps the expert settings under Advanced', () => {
     renderWithClient(<TenantSettingsSection tenant={acme} />);
     const c = controls();
-    expect(c.pii).toHaveValue('reversible');
+    expect(piiMode()).toBe('reversible');
+    expect(c.pii).toHaveTextContent('Recommended');
+    expect(c.pii).toHaveTextContent('the caller sees [PHONE] in the answer too');
     expect(c.scope).toHaveValue('tenant');
     expect(c.semantic).toHaveAttribute('aria-checked', 'false');
+    // The expert settings are in the Advanced section, its summary naming the defaults.
+    const advanced = within(c.section).getByText('Advanced').closest('details')!;
+    expect(advanced).not.toHaveAttribute('open');
+    expect(advanced).toContainElement(c.scope);
+    expect(advanced).toContainElement(c.semantic);
     expect(c.scope).toHaveAccessibleDescription(
-      /The model provider can link this tenant's sessions through those stand-ins/,
+      /the model provider can link conversations through them/,
     );
-    expect(c.scope).toHaveAccessibleDescription(
-      /disables caching for requests that contain personal data/,
-    );
-    expect(c.semantic).toHaveAccessibleDescription(/reused only within this tenant/);
-    expect(c.semantic).toHaveAccessibleDescription(/\[cache\.semantic\] enabled/);
+    expect(c.scope).toHaveAccessibleDescription(/Also called surrogate scope/);
+    expect(c.semantic).toHaveAccessibleDescription(/IT administrator must also turn it on/);
+    // Config keys are for administrators, inside Advanced, not in basic help.
+    expect(advanced).toHaveTextContent('[cache.semantic] enabled');
   });
 
   it('defaults absent fields to the server defaults', () => {
@@ -73,7 +87,7 @@ describe('TenantSettingsSection', () => {
     c = controls();
     expect(c.save).toBeEnabled();
     expect(c.cancel).toBeEnabled();
-    expect(within(c.section).getByRole('status')).toHaveTextContent('Unsaved changes');
+    expect(within(c.section).getByText('Unsaved changes')).toBeInTheDocument();
 
     // Changing a value back to what is saved is not a change.
     await user.selectOptions(c.scope, 'tenant');
@@ -99,21 +113,19 @@ describe('TenantSettingsSection', () => {
     });
     const user = userEvent.setup();
     renderWithClient(<FromQuery />);
-    await screen.findByRole('region', { name: 'Privacy and caching' });
+    await screen.findByRole('region', { name: 'Personal data and reuse of answers' });
 
-    await user.selectOptions(controls().pii, 'mask');
+    await user.click(within(controls().pii).getByRole('radio', { name: /Hide everywhere/ }));
     await user.click(controls().semantic);
     await user.click(controls().save);
 
     const section = controls().section;
-    await waitFor(() =>
-      expect(within(section).getByRole('status')).toHaveTextContent('Settings saved.'),
-    );
+    await waitFor(() => expect(within(section).getByText('Settings saved.')).toBeInTheDocument());
     const patches = calls.filter((call) => call.method === 'PATCH');
     expect(patches.map((call) => call.path)).toEqual(['/api/v1/tenants/acme']);
     expect(patches[0]?.body).toEqual({ pii_default: 'mask', semantic_cache: 'on' });
     const c = controls();
-    expect(c.pii).toHaveValue('mask');
+    expect(piiMode()).toBe('mask');
     expect(c.scope).toHaveValue('tenant');
     expect(c.semantic).toHaveAttribute('aria-checked', 'true');
     expect(c.save).toBeDisabled();
@@ -131,7 +143,7 @@ describe('TenantSettingsSection', () => {
     });
     const user = userEvent.setup();
     renderWithClient(<FromQuery />);
-    await screen.findByRole('region', { name: 'Privacy and caching' });
+    await screen.findByRole('region', { name: 'Personal data and reuse of answers' });
 
     await user.click(controls().semantic);
     await user.clear(controls().hitPrice);
@@ -149,7 +161,7 @@ describe('TenantSettingsSection', () => {
     try {
       await user.click(controls().save);
       await waitFor(() =>
-        expect(within(controls().section).getByRole('status')).toHaveTextContent('Settings saved.'),
+        expect(within(controls().section).getByText('Settings saved.')).toBeInTheDocument(),
       );
       record();
     } finally {
@@ -177,7 +189,7 @@ describe('TenantSettingsSection', () => {
     expect(await within(section).findByRole('alert')).toHaveTextContent('database unavailable');
     expect(controls().scope).toHaveValue('session');
     expect(controls().save).toBeEnabled();
-    expect(within(section).getByRole('status')).not.toHaveTextContent('Settings saved.');
+    expect(within(section).queryByText('Settings saved.')).not.toBeInTheDocument();
 
     // Editing again clears the stale error.
     await user.click(controls().semantic);
@@ -191,8 +203,9 @@ describe('TenantSettingsSection', () => {
       />,
     );
     const c = controls();
-    expect(c.section).toHaveTextContent(/This tenant was deleted/);
+    expect(c.section).toHaveTextContent(/This workspace was deleted/);
     expect(c.pii).toBeDisabled();
+    expect(within(c.pii).getAllByRole('radio')[0]).toBeDisabled();
     expect(c.scope).toBeDisabled();
     expect(c.semantic).toBeDisabled();
     expect(c.hitPrice).toBeDisabled();
@@ -204,8 +217,8 @@ describe('TenantSettingsSection', () => {
     renderWithClient(<TenantSettingsSection tenant={acme} />);
     const c = controls();
     expect(c.hitPrice).toHaveValue('');
-    expect(c.hitPrice).toHaveAttribute('placeholder', 'Deployment default');
-    expect(c.hitPrice).toHaveAccessibleDescription(/20% unless\s+configured/);
+    expect(c.hitPrice).toHaveAttribute('placeholder', 'Installation default');
+    expect(c.hitPrice).toHaveAccessibleDescription(/20% unless your administrator changed it/);
   });
 
   it('saves a cache-hit percent as a fraction and clears it with null', async () => {
@@ -219,7 +232,7 @@ describe('TenantSettingsSection', () => {
     });
     const user = userEvent.setup();
     renderWithClient(<FromQuery />);
-    await screen.findByRole('region', { name: 'Privacy and caching' });
+    await screen.findByRole('region', { name: 'Personal data and reuse of answers' });
     expect(controls().hitPrice).toHaveValue('10');
 
     await user.clear(controls().hitPrice);
@@ -231,7 +244,7 @@ describe('TenantSettingsSection', () => {
     await user.clear(controls().hitPrice);
     await user.click(controls().save);
     await waitFor(() =>
-      expect(within(controls().section).getByRole('status')).toHaveTextContent('Settings saved.'),
+      expect(within(controls().section).getByText('Settings saved.')).toBeInTheDocument(),
     );
     const patches = calls.filter((call) => call.method === 'PATCH').map((call) => call.body);
     expect(patches).toEqual([{ auto_cache_hit_fraction: 0.15 }, { auto_cache_hit_fraction: null }]);
@@ -265,7 +278,9 @@ describe('TenantSettingsSection', () => {
     });
     const user = userEvent.setup();
     renderWithClient(<FromQuery />);
-    const sovereign = await screen.findByRole('switch', { name: 'PII mode on sovereign models' });
+    const sovereign = await screen.findByRole('switch', {
+      name: 'Also hide personal data from models on your servers',
+    });
     expect(sovereign).toHaveAttribute('aria-checked', 'false');
     expect(sovereign).toHaveAccessibleDescription(/get the text as is/);
 

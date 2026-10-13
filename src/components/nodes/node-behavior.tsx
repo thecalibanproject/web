@@ -4,12 +4,23 @@ import { Badge, Table, TBody, TD, TH, THead, TR, type Tone } from '../ui';
 
 const GUARD_TONE: Record<AnswerGuardMode, Tone> = { redact: 'ok', refuse: 'info', off: 'danger' };
 
+const GUARD_LABEL: Record<AnswerGuardMode, string> = {
+  redact: 'Remove suspicious parts',
+  refuse: 'Refuse to answer',
+  off: 'Off',
+};
+
 const GUARD_HINT: Record<AnswerGuardMode, string> = {
   redact:
-    'When the answer carries untrusted data, links, contacts and references that only untrusted text supplied, and echoes of injected instructions, are removed and the run succeeds.',
-  refuse:
-    'When the answer carries what only untrusted text supplied, the run fails instead of answering.',
-  off: 'The answer is not checked: what the node reads can steer what it tells the user.',
+    'Links, contacts and references that only outside text supplied, and echoes of hidden instructions, are removed from the answer.',
+  refuse: 'When the answer carries what only outside text supplied, the assistant does not answer.',
+  off: 'The answer is not checked: what the assistant reads can steer what it tells people.',
+};
+
+const PII_LABEL: Record<string, string> = {
+  reversible: 'Hide from the model, restore in the answer',
+  mask: 'Hide everywhere',
+  off: 'Do not hide',
 };
 
 /**
@@ -19,17 +30,17 @@ const GUARD_HINT: Record<AnswerGuardMode, string> = {
  */
 const PII_FLOOR_HINT: Record<string, string> = {
   reversible:
-    'Tool results enter the run as they are: models get surrogates, and the caller gets the real values.',
-  mask: 'Irreversible: tool results are masked as they enter the run, so the caller sees [PHONE] too. A node that must quote contacts from a catalogue should use reversible.',
-  off: "Adds nothing: the floor only strengthens the tenant's mode.",
+    'What tools return comes in as it is: models see placeholders, and the person asking gets the real values.',
+  mask: 'Hidden for good: what tools return is hidden as it comes in, so the person asking sees [PHONE] too. An assistant that must quote contacts from your data should restore them in the answer instead.',
+  off: "Adds nothing: this setting can only make the workspace's protection stronger.",
 };
 
 const NO_FLOOR_HINT =
-  'In reversible mode tool results enter the run as they are and the caller gets the real values; mask is irreversible, so the caller sees [PHONE] too.';
+  "The workspace's setting applies. When it restores data in the answer, people get the real values; when it hides everywhere, they see [PHONE] too.";
 
 function reasoningText(own: Reasoning | undefined, node: Reasoning | undefined): string {
   if (own) return own;
-  return node ? `${node} (node default)` : "model's default";
+  return node ? `${node} (assistant default)` : "model's default";
 }
 
 /**
@@ -42,42 +53,44 @@ export function NodeBehavior({ spec }: { spec: unknown }) {
   return (
     <div className="flex flex-col gap-3 text-[12.5px]">
       <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5">
-        <dt className="text-fg-muted">Answer guard</dt>
+        <dt className="text-fg-muted">Answer check</dt>
         <dd className="flex min-w-0 flex-col gap-0.5">
           <span className="inline-flex items-center gap-1.5">
-            <Badge tone={GUARD_TONE[b.answerGuard]}>{b.answerGuard}</Badge>
+            <Badge tone={GUARD_TONE[b.answerGuard]} title={`guardrails.answer: ${b.answerGuard}`}>
+              {GUARD_LABEL[b.answerGuard]}
+            </Badge>
             {!b.answerGuardSet && <span className="text-fg-subtle">(default)</span>}
           </span>
           <span className="text-[12px] text-fg-subtle">{GUARD_HINT[b.answerGuard]}</span>
         </dd>
-        <dt className="text-fg-muted">PII floor</dt>
+        <dt className="text-fg-muted">Personal data, at least</dt>
         <dd className="flex min-w-0 flex-col gap-0.5">
           {b.piiFloor ? (
-            <span>
-              <code className="font-mono">{b.piiFloor}</code>
+            <span title={`guardrails.pii: ${b.piiFloor}`}>
+              {PII_LABEL[b.piiFloor] ?? b.piiFloor}
               <span className="text-fg-subtle">
                 {' '}
-                on every model call, sovereign models included
+                on every model call, models on your own servers included
               </span>
             </span>
           ) : (
-            <span className="text-fg-subtle">None: the tenant&apos;s PII settings apply</span>
+            <span className="text-fg-subtle">Not set: the workspace&apos;s setting applies</span>
           )}
           <span className="text-[12px] text-fg-subtle">
             {b.piiFloor ? (PII_FLOOR_HINT[b.piiFloor] ?? '') : NO_FLOOR_HINT}
           </span>
         </dd>
-        <dt className="text-fg-muted">Reasoning</dt>
+        <dt className="text-fg-muted">Thinking</dt>
         <dd>{reasoningText(b.reasoning, undefined)}</dd>
       </dl>
       {b.vertices.length > 0 && (
-        <Table label="Model vertices">
+        <Table label="Model steps">
           <THead>
             <tr>
-              <TH>Vertex</TH>
-              <TH>Type</TH>
-              <TH>Reasoning</TH>
-              <TH>Structured output</TH>
+              <TH>Step</TH>
+              <TH>Kind</TH>
+              <TH>Thinking</TH>
+              <TH>Answer in a fixed format</TH>
             </tr>
           </THead>
           <TBody>
@@ -98,9 +111,9 @@ export function NodeBehavior({ spec }: { spec: unknown }) {
                   }
                 >
                   {v.structuredOutput === 'json_schema'
-                    ? 'Constrained decoding'
+                    ? 'Enforced by the model server'
                     : v.structuredOutput === 'prompt'
-                      ? 'In the prompt'
+                      ? 'Asked in the instructions'
                       : EMPTY}
                 </TD>
               </TR>

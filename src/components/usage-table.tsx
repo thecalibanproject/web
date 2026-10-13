@@ -78,16 +78,20 @@ export function UsageTable({
         <tr>
           <TH>Time</TH>
           {!compact && <TH>Request</TH>}
-          <TH>Tenant</TH>
-          {!compact && <TH>Node</TH>}
+          <TH>Workspace</TH>
+          {!compact && <TH>Assistant</TH>}
           {compact ? <TH>Model</TH> : <TH>Route</TH>}
           <TH className="text-right">Prompt</TH>
           <TH className="text-right">Completion</TH>
           {!compact && <TH className="text-right">Cached</TH>}
           {!compact && <TH className="text-right">Saved</TH>}
-          <TH>Cache</TH>
-          {!compact && <TH>Cache tier</TH>}
-          {!compact && <TH className="text-right">PII</TH>}
+          <TH>Answer</TH>
+          {!compact && <TH>Reuse</TH>}
+          {!compact && (
+            <TH className="text-right">
+              <span title="Personal data items hidden from the model">Personal data</span>
+            </TH>
+          )}
           <TH className="text-right">Cost</TH>
           {!compact && <TH className="text-right">Billed</TH>}
           <TH className="text-right">Latency</TH>

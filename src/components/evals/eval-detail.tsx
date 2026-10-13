@@ -5,6 +5,7 @@ import { usePermissions } from '@/api/auth';
 import { evalQuery, useCancelEval } from '@/api/queries';
 import type { Eval, GoldenSummary, InjectionSummary } from '@/api/types';
 import {
+  checkLabel,
   EVAL_SUITE_LABEL,
   goldenSummary,
   injectionSummary,
@@ -50,61 +51,65 @@ function GoldenMetrics({ s }: { s: GoldenSummary }) {
     <>
       <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <StatTile
-          label="pass^k"
+          label="Passed every try"
           value={formatPercent(s.pass_hat_k)}
-          detail={`Cases whose ${s.k ?? 'k'} runs all passed`}
+          detail={`Test cases that passed all ${s.k} tries`}
         />
         <StatTile
-          label="pass@1"
+          label="Tries that passed"
           value={formatPercent(s.pass_at_1)}
-          detail={`${formatInt(s.passed_trials)} of ${formatInt(s.trials)} trials passed`}
+          detail={`${formatInt(s.passed_trials)} of ${formatInt(s.trials)} tries`}
         />
         <StatTile
-          label="Cost per success"
+          label="Cost of a good answer"
           value={formatUsd(s.cost_per_success_usd)}
-          detail={`${formatUsd(s.cost_usd)} in all, judge ${formatUsd(s.judge_cost_usd)}`}
+          detail={`${formatUsd(s.cost_usd)} in all, grader ${formatUsd(s.judge_cost_usd)}`}
         />
         <StatTile
-          label="p95 latency"
+          label="Slowest typical answer"
           value={formatMs(s.latency_ms?.p95)}
-          detail={`p50 ${formatMs(s.latency_ms?.p50)}`}
+          detail={`Half under ${formatMs(s.latency_ms?.p50)}`}
         />
       </dl>
       <p className="mt-2 text-[12px] text-fg-muted">
-        pass@k {formatPercent(s.pass_at_k)} (cases with at least one passing run) ·{' '}
-        {formatInt(s.cases)} cases · {formatInt(s.errors ?? 0)} errors · {formatInt(s.tokens)}{' '}
-        tokens
+        {formatPercent(s.pass_at_k)} of test cases passed at least once · {formatInt(s.cases)} test
+        cases · {formatInt(s.errors ?? 0)} errors · {formatInt(s.tokens)} tokens
         {s.golden_hash && (
           <>
             {' '}
-            · golden set <code className="font-mono">{shortHash(s.golden_hash)}</code>
+            · test cases{' '}
+            <code className="font-mono" title="Fingerprint of the test cases">
+              {shortHash(s.golden_hash)}
+            </code>
           </>
         )}
       </p>
       {s.by_case && s.by_case.length > 0 && (
-        <Section title="By case">
-          <Table label="Cases">
+        <Section title="By test case (failing first)">
+          <Table label="Test cases">
             <THead>
               <tr>
-                <TH>Case</TH>
-                <TH className="text-right">Passed</TH>
-                <TH>All k passed</TH>
+                <TH>Test case</TH>
+                <TH className="text-right">Tries passed</TH>
+                <TH>Passed all tries</TH>
               </tr>
             </THead>
             <TBody>
-              {s.by_case.map((c) => (
-                <TR key={c.case}>
-                  <TD className="font-mono text-[12px]">{c.case}</TD>
-                  <TD className="text-right tabular-nums">
-                    {c.passed} of {c.trials}
-                  </TD>
-                  <TD>
-                    <Badge tone={c.all_passed ? 'ok' : 'danger'}>
-                      {c.all_passed ? 'yes' : 'no'}
-                    </Badge>
-                  </TD>
-                </TR>
-              ))}
+              {[...s.by_case]
+                .sort((a, b) => Number(a.all_passed) - Number(b.all_passed) || a.passed - b.passed)
+                .map((c) => (
+                  <TR key={c.case}>
+                    <TD className="font-mono text-[12px] whitespace-nowrap">{c.case}</TD>
+                    <TD className="text-right tabular-nums">
+                      {c.passed} of {c.trials}
+                    </TD>
+                    <TD>
+                      <Badge tone={c.all_passed ? 'ok' : 'danger'}>
+                        {c.all_passed ? 'Yes' : c.passed === 0 ? 'No, failed every try' : 'No'}
+                      </Badge>
+                    </TD>
+                  </TR>
+                ))}
             </TBody>
           </Table>
         </Section>
@@ -125,33 +130,39 @@ function InjectionMetrics({ s }: { s: InjectionSummary }) {
           detail={`${formatInt(s.blocked)} of ${formatInt(s.trials)}`}
         />
         <StatTile
-          label="Attack success rate"
+          label="Attacks that worked"
           value={formatPercent(s.attack_success_rate)}
-          detail={`${formatInt(s.attacks_succeeded)} attacks got through`}
+          detail={`${formatInt(s.attacks_succeeded)} got through`}
         />
         <StatTile
-          label="Utility under attack"
+          label="Still did its job"
           value={formatPercent(s.utility_under_attack)}
-          detail="Runs that still did their job"
+          detail="Conversations that still answered the request"
         />
         <StatTile
-          label="Model followed"
+          label="Model fooled, then stopped"
           value={`${formatInt(s.attacked)} of ${formatInt(s.trials)}`}
-          detail="Blocked by the defenses, not the model"
+          detail="The model obeyed the attack; Caliban's defenses blocked it"
         />
       </dl>
+      {s.inconclusive && (
+        <p role="note" className="mt-2 rounded-md bg-warn-soft px-3 py-2 text-[12.5px] text-warn">
+          {formatInt(s.errors ?? 0)} tries ended on an error, so these results do not count toward
+          going live. Run the safety tests again.
+        </p>
+      )}
       <p className="mt-2 text-[12px] text-fg-muted">
-        Suite v{s.suite_version ?? '?'} · {formatUsd(s.cost_usd)} · p95{' '}
+        Attack set v{s.suite_version ?? '?'} · {formatUsd(s.cost_usd)} · 95% under{' '}
         {formatMs(s.latency_ms?.p95)} · {formatInt(s.errors ?? 0)} errors
       </p>
       {categories.length > 0 && (
-        <Section title="By category">
-          <Table label="Categories">
+        <Section title="By kind of attack">
+          <Table label="Kinds of attack">
             <THead>
               <tr>
-                <TH>Category</TH>
+                <TH>Kind of attack</TH>
                 <TH className="text-right">Blocked</TH>
-                <TH className="text-right">Pass rate</TH>
+                <TH className="text-right">Share blocked</TH>
               </tr>
             </THead>
             <TBody>
@@ -169,7 +180,7 @@ function InjectionMetrics({ s }: { s: InjectionSummary }) {
         </Section>
       )}
       {na.length > 0 && (
-        <Section title="Not applicable to this version">
+        <Section title="Attacks that do not apply to this version">
           <ul className="list-disc pl-5 text-[12.5px] text-fg-muted">
             {na.map((n) => (
               <li key={n.case}>
@@ -192,7 +203,7 @@ function Verdict({ verdict: v }: { verdict: TrialVerdict | undefined }) {
       <span className="inline-flex flex-wrap items-center gap-1">
         <Badge>{v.category}</Badge>
         <Badge tone={v.attacked ? 'warn' : 'neutral'}>
-          {v.attacked ? 'model followed' : 'model ignored'}
+          {v.attacked ? 'model fooled' : 'model not fooled'}
         </Badge>
         {v.defenses.map((d) => (
           <Badge key={d} tone="ok" className="font-mono">
@@ -200,7 +211,9 @@ function Verdict({ verdict: v }: { verdict: TrialVerdict | undefined }) {
           </Badge>
         ))}
         {v.utility != null && (
-          <Badge tone={v.utility ? 'ok' : 'neutral'}>{v.utility ? 'useful' : 'not useful'}</Badge>
+          <Badge tone={v.utility ? 'ok' : 'neutral'}>
+            {v.utility ? 'did its job' : 'did not do its job'}
+          </Badge>
         )}
       </span>
     );
@@ -214,7 +227,7 @@ function Verdict({ verdict: v }: { verdict: TrialVerdict | undefined }) {
       title={checks
         .map(
           (c) =>
-            `${c.type}: ${c.passed ? 'passed' : 'failed'}${c.score != null ? ` (${c.score})` : ''}`,
+            `${checkLabel(c.type)}: ${c.passed ? 'passed' : 'failed'}${c.score != null ? ` (${c.score})` : ''}`,
         )
         .join(', ')}
     >
@@ -225,9 +238,14 @@ function Verdict({ verdict: v }: { verdict: TrialVerdict | undefined }) {
         .filter((c) => !c.passed)
         .map((c, i) => (
           <Badge key={i} tone="danger">
-            {c.type}
+            {checkLabel(c.type)}
           </Badge>
         ))}
+      {isGoldenVerdict(v) && (v.sandboxed_calls ?? 0) > 0 && (
+        <Badge tone="info" title="Actions that change things go to a stand-in during tests.">
+          {v.sandboxed_calls} action{v.sandboxed_calls === 1 ? '' : 's'} answered by the stand-in
+        </Badge>
+      )}
     </span>
   );
 }
@@ -237,19 +255,19 @@ function Trials({ e, tenantId }: { e: Eval; tenantId: string }) {
   const injection = e.suite === 'injection';
   const trials = e.trials ?? [];
   if (trials.length === 0) {
-    return <p className="text-[12.5px] text-fg-muted">No trial has finished yet.</p>;
+    return <p className="text-[12.5px] text-fg-muted">No try has finished yet.</p>;
   }
   return (
     <Table label="Trials">
       <THead>
         <tr>
-          <TH>Case</TH>
-          <TH className="text-right">Trial</TH>
+          <TH>Test case</TH>
+          <TH className="text-right">Try</TH>
           <TH>Result</TH>
           <TH>Verdict</TH>
           <TH className="text-right">Cost</TH>
           <TH className="text-right">Latency</TH>
-          <TH>Run</TH>
+          <TH>Conversation</TH>
           {e.content_visible && (
             <TH>
               <span className="sr-only">Detail</span>
@@ -263,7 +281,7 @@ function Trials({ e, tenantId }: { e: Eval; tenantId: string }) {
           return (
             <Fragment key={key}>
               <TR>
-                <TD className="font-mono text-[12px]">{t.case}</TD>
+                <TD className="font-mono text-[12px] whitespace-nowrap">{t.case}</TD>
                 <TD className="text-right tabular-nums">{t.trial}</TD>
                 <TD>
                   <TrialStatusBadge status={t.status} injection={injection} />
@@ -345,7 +363,7 @@ export function EvalDetail({ tenantId, evalId }: { tenantId: string; evalId: str
           {EVAL_SUITE_LABEL[e.suite]}
         </Badge>
         <EvalStatusBadge status={e.status} />
-        {e.cancel_requested && <Badge>cancel requested</Badge>}
+        {e.cancel_requested && <Badge>Stopping</Badge>}
         {active && (
           <GatedButton
             size="sm"
@@ -355,7 +373,7 @@ export function EvalDetail({ tenantId, evalId }: { tenantId: string; evalId: str
             onClick={() => cancel.mutate(e.id)}
             className="ml-auto"
           >
-            Cancel eval
+            Cancel tests
           </GatedButton>
         )}
       </div>
@@ -368,15 +386,15 @@ export function EvalDetail({ tenantId, evalId }: { tenantId: string; evalId: str
             {shortHash(e.hash)}
           </code>
         </dd>
-        <dt className="text-fg-muted">Trials</dt>
+        <dt className="text-fg-muted">Tries</dt>
         <dd>
-          {e.case_count} cases × k = {e.k}
+          {e.case_count} test cases × {e.k} tries
           {e.concurrency != null && `, ${e.concurrency} at a time`}
         </dd>
         <dt className="text-fg-muted">Started by</dt>
         <dd className="break-all">
           {e.created_by ?? EMPTY}
-          {e.api_key_id && <span className="text-fg-muted"> as API key {e.api_key_id}</span>}
+          {e.api_key_id && <span className="text-fg-muted"> with app key {e.api_key_id}</span>}
         </dd>
         <dt className="text-fg-muted">Created</dt>
         <dd>{formatDateTime(e.created_at)}</dd>
@@ -396,27 +414,27 @@ export function EvalDetail({ tenantId, evalId }: { tenantId: string; evalId: str
         )}
       </dl>
       {(golden || injection) && (
-        <Section title="Metrics">
+        <Section title="Results">
           {golden && <GoldenMetrics s={golden} />}
           {injection && <InjectionMetrics s={injection} />}
         </Section>
       )}
       {!e.summary && active && (
         <p className="mt-4 text-[12.5px] text-fg-muted">
-          Metrics appear when the eval ends. Refreshing while it runs.
+          Results appear when the tests end. This page updates while they run.
         </p>
       )}
-      <Section title="Trials">
+      <Section title="Every try">
         <Trials e={e} tenantId={tenantId} />
         {e.content_purged && (
           <p className="mt-2 text-[12px] text-fg-muted">
-            The run retention cleared this eval&apos;s trial detail. Its metrics and verdicts stay.
+            The retention period cleared the detail of these tries. Results and verdicts stay.
           </p>
         )}
         {!e.content_visible && !e.content_purged && (e.trials?.length ?? 0) > 0 && (
           <p className="mt-2 text-[12px] text-fg-muted">
-            Trial detail (outputs, what the scorers said, what sandboxed tools received) is run
-            content: your role cannot see it (needs runs.data).
+            The detail of each try (answers, what the checks said, what the stand-in tools received)
+            is conversation content: your role cannot see it (needs runs.data).
           </p>
         )}
       </Section>

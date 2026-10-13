@@ -35,7 +35,7 @@ export function DocFindingsBadge({ findings }: { findings: RagFinding[] }) {
   if (n === 0) return <span className="text-fg-subtle">None</span>;
   return (
     <Badge tone="danger" title={[...new Set(findings.map((f) => findingLabel(f.kind)))].join(', ')}>
-      <IconAlert size={12} /> {n} finding{n === 1 ? '' : 's'}
+      <IconAlert size={12} /> {n} problem{n === 1 ? '' : 's'}
     </Badge>
   );
 }
@@ -46,7 +46,7 @@ export function VettingBadge({ vetting }: { vetting: Vetting }) {
   if (vetting.kind === 'on_release') {
     return (
       <Badge
-        title={`Waiting on a decision. Releasing it gives its checks ${vetting.window} from the release.`}
+        title={`Waiting for a person to decide. Releasing it gives its checks ${vetting.window} from the release.`}
       >
         {vetting.window} after release
       </Badge>
@@ -62,7 +62,7 @@ export function VettingBadge({ vetting }: { vetting: Vetting }) {
       tone="danger"
       title={`The deadline passed at ${at}. A worker fails it instead of indexing it.`}
     >
-      Deadline passed
+      Time ran out
     </Badge>
   );
 }

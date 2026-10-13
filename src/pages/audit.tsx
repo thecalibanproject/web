@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi } from '@tanstack/react-router';
 import { useMemo } from 'react';
+import { usePermissions } from '@/api/auth';
 import { auditQuery, tenantsQuery } from '@/api/queries';
 import type { AuditEntry, AuditLog } from '@/api/types';
+import { LearnMore } from '@/components/help/learn-more';
 import {
   Badge,
   Button,
@@ -24,6 +26,8 @@ import {
 } from '@/components/ui';
 import { IconRefresh } from '@/components/ui/icons';
 import {
+  actionLabel,
+  actorLabel,
   AUDIT_LIMITS,
   AUDIT_PAGE_SIZE,
   chainLinks,
@@ -32,7 +36,12 @@ import {
   type ChainLink,
 } from '@/lib/audit';
 import { cn } from '@/lib/cn';
+import { doc } from '@/lib/docs';
 import { formatDateTime, formatInt } from '@/lib/format';
+import { useWorkspace } from '@/lib/workspace';
+
+/** `?tenant=all`: every workspace, for deployment-wide roles. */
+const ALL = 'all';
 
 const route = getRouteApi('/_app/audit');
 
@@ -67,13 +76,14 @@ function ChainStatus({ log, links }: { log: AuditLog; links: Map<number, ChainLi
     >
       <div className="flex min-w-0 max-w-3xl items-start gap-3">
         <Badge tone={ok ? 'ok' : 'danger'} dot className="mt-px">
-          {ok ? 'Chain verified' : 'Chain not verified'}
+          {ok ? 'Untampered' : 'Possibly tampered with'}
         </Badge>
         <p className="text-[12.5px] text-fg-muted">
           {ok
             ? `The control plane recomputed the hashes of ${range} and checked that each one links to the entry before it.`
             : `The control plane could not verify ${range}: an entry's hash does not match its contents, or an entry does not link to the one before it. Treat these entries as tampered with until you have investigated.`}
-          {!ok && broken > 0 && ` Entries with a broken link are marked below.`}
+          {!ok && broken > 0 && ` Entries with a broken link are marked below.`}{' '}
+          <LearnMore doc={doc('guides/audit', 'verify-the-chain')} />
           {oldest.seq > 1
             ? ` Entries before #${oldest.seq} are outside this window and were not checked.`
             : ' This window starts at the first entry of the log.'}
@@ -81,7 +91,7 @@ function ChainStatus({ log, links }: { log: AuditLog; links: Map<number, ChainLi
       </div>
       {log.head?.hash && (
         <div className="flex items-center gap-1.5 text-[12px] text-fg-muted">
-          <span>Head #{log.head.seq}</span>
+          <span>Latest entry #{log.head.seq}</span>
           <code className="font-mono text-fg" title={log.head.hash}>
             {shortHash(log.head.hash)}
           </code>
@@ -141,10 +151,10 @@ function AuditTable({
           <TH>Time</TH>
           <TH>Actor</TH>
           <TH>Action</TH>
-          <TH>Tenant</TH>
+          <TH>Workspace</TH>
           <TH>Target</TH>
           <TH>Details</TH>
-          <TH>Hash</TH>
+          <TH>Fingerprint</TH>
         </tr>
       </THead>
       <TBody>
@@ -155,10 +165,16 @@ function AuditTable({
             <TR key={e.seq} className="align-top">
               <TD className="text-right font-mono text-[12px] text-fg-muted">{e.seq}</TD>
               <TD className="whitespace-nowrap text-fg-muted">{formatDateTime(e.ts)}</TD>
-              <TD className="whitespace-nowrap">{e.actor}</TD>
+              <TD className="max-w-48 break-words" title={e.actor}>
+                {e.actor === 'break_glass' ? (
+                  <Badge tone="warn">{actorLabel(e.actor)}</Badge>
+                ) : (
+                  actorLabel(e.actor)
+                )}
+              </TD>
               <TD>
-                <Badge tone={actionTone(e.action)} className="font-mono">
-                  {e.action}
+                <Badge tone={actionTone(e.action)} title={e.action}>
+                  {actionLabel(e.action)}
                 </Badge>
               </TD>
               <TD className="max-w-40 truncate" title={e.tenant_id ?? undefined}>
@@ -170,7 +186,10 @@ function AuditTable({
                   <span className="text-fg-subtle">Global</span>
                 )}
               </TD>
-              <TD className="max-w-48 truncate font-mono text-[12px]" title={e.target ?? undefined}>
+              <TD
+                className="max-w-48 font-mono text-[12px] break-all"
+                title={e.target ?? undefined}
+              >
                 {e.target ?? <span className="font-sans text-fg-subtle">None</span>}
               </TD>
               <TD className="max-w-md min-w-56">
@@ -203,8 +222,15 @@ function AuditTable({
 
 export function AuditPage() {
   const search = route.useSearch();
-  const { tenant, action } = search;
+  const { action } = search;
   const limit = search.limit ?? 100;
+  const perms = usePermissions();
+  const ws = useWorkspace();
+  // Deployment-wide roles (auditors) see every workspace and the global
+  // entries by default, and can narrow to one; others see the header's.
+  const canAll = perms.tenantsWith('audit.read') === 'all';
+  const all = canAll && (search.tenant === ALL || !search.tenant);
+  const tenant = all ? undefined : search.tenant && search.tenant !== ALL ? search.tenant : ws.id;
   const navigate = route.useNavigate();
   const audit = useQuery(auditQuery(limit));
   // Deleted tenants included: their history stays in the log.
@@ -260,7 +286,13 @@ export function AuditPage() {
     <>
       <PageHeader
         title="Audit log"
-        description="Every change made through the admin API, newest first. Each entry is hash-chained to the one before it, so editing or removing an entry breaks every later hash. Secrets are never recorded."
+        description={
+          <>
+            Every change and decision, newest first. Each entry is linked to the one before it, so
+            editing or removing an entry shows. Secrets are never recorded.{' '}
+            <LearnMore doc={doc('guides/audit', 'read-the-log')} />
+          </>
+        }
         actions={
           <Button
             icon={<IconRefresh size={14} />}
@@ -273,22 +305,24 @@ export function AuditPage() {
       />
       <Card>
         <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-2.5">
-          <label className="flex items-center gap-2 text-[12.5px] text-fg-muted">
-            Tenant
-            <Select
-              value={tenant ?? ''}
-              onChange={(e) => setSearch({ tenant: e.target.value || undefined })}
-              disabled={!audit.isSuccess}
-              className="w-52"
-            >
-              <option value="">All tenants</option>
-              {tenantIds.map((id) => (
-                <option key={id} value={id}>
-                  {names.get(id) ?? id}
-                </option>
-              ))}
-            </Select>
-          </label>
+          {canAll && (
+            <label className="flex items-center gap-2 text-[12.5px] text-fg-muted">
+              Entries of
+              <Select
+                value={all ? ALL : (tenant ?? '')}
+                onChange={(e) => setSearch({ tenant: e.target.value || undefined })}
+                disabled={!audit.isSuccess}
+                className="w-52"
+              >
+                <option value={ALL}>All workspaces</option>
+                {tenantIds.map((id) => (
+                  <option key={id} value={id}>
+                    {names.get(id) ?? id}
+                  </option>
+                ))}
+              </Select>
+            </label>
+          )}
           <label className="flex items-center gap-2 text-[12.5px] text-fg-muted">
             Action
             <Select
@@ -300,7 +334,7 @@ export function AuditPage() {
               <option value="">All actions</option>
               {actions.map((a) => (
                 <option key={a} value={a}>
-                  {a}
+                  {actionLabel(a)}
                 </option>
               ))}
             </Select>
@@ -332,7 +366,8 @@ export function AuditPage() {
         ) : audit.data.entries.length === 0 ? (
           <EmptyState
             title="No audit entries yet"
-            description="Changes made through the admin API, such as creating a tenant or revoking a key, are recorded here."
+            description="Changes and decisions, such as creating a workspace or approving an action, are recorded here."
+            learnMore={doc('guides/audit', 'read-the-log')}
           />
         ) : (
           <>
@@ -340,7 +375,7 @@ export function AuditPage() {
             {rows.length === 0 ? (
               <EmptyState
                 title="No entries match"
-                description="Try a different tenant or action, or load more entries."
+                description="Try another workspace or action, or load more entries."
               />
             ) : (
               <AuditTable entries={rows} links={links} tenantNames={names} />

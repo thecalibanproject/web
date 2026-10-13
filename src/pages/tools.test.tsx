@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import type { Tenant, ToolManifest, ToolServer } from '@/api/types';
 import { meWith, ssoRoutes, type Grant } from '@/test/auth';
+import { expectNoAxeViolations } from '@/test/a11y';
 import { mockApi, renderApp } from '@/test/utils';
 
 const tenants: Tenant[] = [
@@ -84,6 +85,13 @@ const manifestRow = (name: string, pinHead: string) =>
     .find((tr) => tr.textContent?.includes(pinHead))!;
 
 describe('ToolsPage', () => {
+  it('has no axe violations', async () => {
+    mockRegistry([], {}, [crm]);
+    await openTools(null, '/tools');
+    await screen.findByRole('table', { name: 'Connected systems' });
+    await expectNoAxeViolations();
+  });
+
   it("lists the tenant's servers with their authentication, trust and credential", async () => {
     mockRegistry([], {}, [
       crm,
@@ -98,16 +106,16 @@ describe('ToolsPage', () => {
     ]);
     await openTools(null, '/tools');
 
-    const table = await screen.findByRole('table', { name: 'Tool servers' });
+    const table = await screen.findByRole('table', { name: 'Connected systems' });
     const row = (name: string) => within(table).getByRole('button', { name }).closest('tr')!;
     expect(row('crm')).toHaveTextContent('https://crm.internal:8443/mcp');
     expect(row('crm')).toHaveTextContent('API key');
-    expect(within(row('crm')).getByText('Surrogates')).toBeInTheDocument();
-    expect(within(row('crm')).getByText('Sealed')).toBeInTheDocument();
+    expect(within(row('crm')).getByText('Gets placeholders')).toBeInTheDocument();
+    expect(within(row('crm')).getByText('Stored, encrypted')).toBeInTheDocument();
     expect(row('billing')).toHaveTextContent('Caliban token');
-    expect(within(row('billing')).getByText('Trusted: real values')).toHaveAttribute(
+    expect(within(row('billing')).getByText('Gets real values')).toHaveAttribute(
       'title',
-      expect.stringContaining('Caliban puts the real values back before the call'),
+      expect.stringContaining('Caliban puts the real values back before each call'),
     );
   });
 
@@ -123,12 +131,12 @@ describe('ToolsPage', () => {
     });
     const user = userEvent.setup();
     const { router } = await openTools(null, '/tools?tenant=t1');
-    expect(await screen.findByText('No tool servers')).toBeInTheDocument();
+    expect(await screen.findByText('No connected systems yet')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Register server' }));
-    const form = await screen.findByRole('form', { name: 'Register tool server' });
+    await user.click(screen.getByRole('button', { name: 'Add your first system' }));
+    const form = await screen.findByRole('form', { name: 'Add a connected system' });
     await user.type(within(form).getByLabelText(/^Name/), 'crm');
-    await user.type(within(form).getByLabelText(/^URL/), 'https://crm.internal:8443/mcp');
+    await user.type(within(form).getByLabelText(/^Address/), 'https://crm.internal:8443/mcp');
     await user.selectOptions(within(form).getByLabelText(/^Authentication/), 'api_key');
     await user.type(within(form).getByLabelText(/^Header/), 'X-Api-Key');
     const secret = within(form).getByLabelText(/^API key/);
@@ -138,11 +146,11 @@ describe('ToolsPage', () => {
     const trusted = within(form).getByRole('switch', { name: 'Trusted with personal data' });
     expect(trusted).toHaveAttribute('aria-checked', 'false');
     expect(trusted).toHaveAccessibleDescription(
-      /Caliban puts the real values back before the call/,
+      /Caliban puts the real values back before each call/,
     );
-    await user.click(within(form).getByRole('button', { name: 'Register server' }));
+    await user.click(within(form).getByRole('button', { name: 'Add system' }));
 
-    const table = await screen.findByRole('table', { name: 'Tool servers' });
+    const table = await screen.findByRole('table', { name: 'Connected systems' });
     expect(within(table).getByRole('button', { name: 'crm' })).toBeInTheDocument();
     expect(calls.find((c) => c.method === 'POST')?.body).toEqual({
       name: 'crm',
@@ -159,10 +167,10 @@ describe('ToolsPage', () => {
     mockRegistry([]);
     const user = userEvent.setup();
     await openTools(null);
-    await user.click(await screen.findByRole('button', { name: 'Register server' }));
-    const form = await screen.findByRole('form', { name: 'Register tool server' });
+    await user.click(await screen.findByRole('button', { name: 'Add a system' }));
+    const form = await screen.findByRole('form', { name: 'Add a connected system' });
     await user.click(within(form).getByRole('switch', { name: 'Trusted with personal data' }));
-    expect(form).toHaveTextContent('This server will receive the personal data in tool arguments.');
+    expect(form).toHaveTextContent('This system will receive personal data in its arguments.');
   });
 
   it("shows the control plane's refusal of a server", async () => {
@@ -179,11 +187,11 @@ describe('ToolsPage', () => {
     });
     const user = userEvent.setup();
     await openTools(null);
-    await user.click(await screen.findByRole('button', { name: 'Register server' }));
-    const form = await screen.findByRole('form', { name: 'Register tool server' });
+    await user.click(await screen.findByRole('button', { name: 'Add a system' }));
+    const form = await screen.findByRole('form', { name: 'Add a connected system' });
     await user.type(within(form).getByLabelText(/^Name/), 'meta');
-    await user.type(within(form).getByLabelText(/^URL/), 'http://169.254.169.254/');
-    await user.click(within(form).getByRole('button', { name: 'Register server' }));
+    await user.type(within(form).getByLabelText(/^Address/), 'http://169.254.169.254/');
+    await user.click(within(form).getByRole('button', { name: 'Add system' }));
     expect(await within(form).findByRole('alert')).toHaveTextContent('cloud metadata address');
   });
 
@@ -199,10 +207,10 @@ describe('ToolsPage', () => {
     const user = userEvent.setup();
     await openTools(null);
     const region = await screen.findByRole('region', { name: 'Tools of crm' });
-    expect(await within(region).findByText('No tools discovered yet')).toBeInTheDocument();
+    expect(await within(region).findByText('No actions found yet')).toBeInTheDocument();
 
-    await user.click(within(region).getByRole('button', { name: 'Discover tools' }));
-    expect(await within(region).findByText(/The server lists 1 tool\./)).toBeInTheDocument();
+    await user.click(within(region).getByRole('button', { name: 'Check for tools' }));
+    expect(await within(region).findByText(/The system offers 1 action\./)).toBeInTheDocument();
     const row = await within(region).findByText('find_customer');
     const tr = row.closest('tr')!;
     expect(within(tr).getByText(`sha256:${'a'.repeat(12)}`)).toHaveAttribute('title', PIN_A);
@@ -225,7 +233,7 @@ describe('ToolsPage', () => {
     const user = userEvent.setup();
     await openTools(null);
     const region = await screen.findByRole('region', { name: 'Tools of crm' });
-    await user.click(within(region).getByRole('button', { name: 'Discover tools' }));
+    await user.click(within(region).getByRole('button', { name: 'Check for tools' }));
     expect(await within(region).findByRole('alert')).toHaveTextContent('cannot reach');
   });
 
@@ -236,7 +244,7 @@ describe('ToolsPage', () => {
     const user = userEvent.setup();
     await openTools(null);
     const region = await screen.findByRole('region', { name: 'Tools of crm' });
-    await user.click(within(region).getByRole('button', { name: 'Import manifests' }));
+    await user.click(within(region).getByRole('button', { name: 'Import descriptions' }));
     const form = await screen.findByRole('form', { name: 'Import manifests' });
     const text = within(form).getByLabelText('Manifests (JSON)');
     await user.clear(text);
@@ -337,7 +345,7 @@ describe('ToolsPage', () => {
     await openTools(null);
 
     const region = await screen.findByRole('region', { name: 'Tools of crm' });
-    expect(await within(region).findByText(/1 tool changed since approval/)).toBeInTheDocument();
+    expect(await within(region).findByText(/1 action changed since approval/)).toBeInTheDocument();
     const newRow = manifestRow('find_customer', 'sha256:bbbb');
     expect(within(newRow).getByText('Changed: needs approval')).toBeInTheDocument();
     expect(
@@ -346,7 +354,7 @@ describe('ToolsPage', () => {
 
     await user.click(within(newRow).getByRole('button', { name: /^Review find_customer/ }));
     const drawer = await screen.findByRole('dialog', { name: 'Review find_customer' });
-    expect(drawer).toHaveTextContent('The server changed this tool since it was approved.');
+    expect(drawer).toHaveTextContent('The system changed this action since it was approved.');
     await user.click(within(drawer).getByRole('button', { name: 'Approve tool' }));
     await within(drawer).findByRole('region', { name: 'Reference' });
     expect(calls.find((c) => c.path.endsWith('/approve'))?.body).toEqual({ pin: PIN_B });
@@ -380,7 +388,7 @@ describe('ToolsPage', () => {
     const user = userEvent.setup();
     await openTools(null);
     await user.click(await screen.findByRole('button', { name: 'Delete crm' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Delete tool server?' });
+    const dialog = await screen.findByRole('dialog', { name: 'Delete connected system?' });
     expect(dialog).toHaveTextContent('Its credential is wiped');
     await user.click(within(dialog).getByRole('button', { name: 'Delete server' }));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
@@ -392,12 +400,12 @@ describe('ToolsPage', () => {
     mockRegistry([find], ssoRoutes(meWith([{ role: 'developer', tenant_id: 't1' }])));
     const user = userEvent.setup();
     await openTools([{ role: 'developer', tenant_id: 't1' }]);
-    expect(await screen.findByRole('button', { name: 'Register server' })).not.toHaveAttribute(
+    expect(await screen.findByRole('button', { name: 'Add a system' })).not.toHaveAttribute(
       'aria-disabled',
     );
-    expect(
-      await screen.findByRole('button', { name: 'Discover the tools of crm' }),
-    ).not.toHaveAttribute('aria-disabled');
+    expect(await screen.findByRole('button', { name: 'Check crm for tools' })).not.toHaveAttribute(
+      'aria-disabled',
+    );
     await user.click(await screen.findByRole('button', { name: /^Review find_customer/ }));
     const drawer = await screen.findByRole('dialog', { name: 'Review find_customer' });
     const approve = within(drawer).getByRole('button', { name: 'Approve tool' });
@@ -412,15 +420,11 @@ describe('ToolsPage', () => {
     const calls = mockRegistry([find], ssoRoutes(meWith([{ role: 'viewer', tenant_id: 't1' }])));
     const user = userEvent.setup();
     await openTools([{ role: 'viewer', tenant_id: 't1' }], '/tools');
-    const register = await screen.findByRole('button', { name: 'Register server' });
+    const register = await screen.findByRole('button', { name: 'Add a system' });
     expect(register).toHaveAccessibleDescription(/needs tools\.write/);
-    // Only the tenants the user may read are offered.
-    expect(
-      within(screen.getByRole('combobox', { name: 'Tenant' }))
-        .getAllByRole('option')
-        .map((o) => o.textContent),
-    ).toEqual(['Select a tenant…', 'Acme']);
-    await user.click(await screen.findByRole('button', { name: 'Discover the tools of crm' }));
+    // The page follows the header's workspace: no tenant picker of its own.
+    expect(screen.queryByRole('combobox', { name: 'Tenant' })).not.toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Check crm for tools' }));
     await user.click(screen.getByRole('button', { name: 'Delete crm' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(calls.every((c) => c.method === 'GET')).toBe(true);
@@ -434,7 +438,7 @@ describe('ToolsPage', () => {
     });
     await renderApp('/', { token: null });
     const nav = await screen.findByRole('navigation', { name: 'Primary' });
-    expect(within(nav).queryByRole('link', { name: 'Tools' })).not.toBeInTheDocument();
-    expect(within(nav).queryByRole('link', { name: 'Nodes' })).not.toBeInTheDocument();
+    expect(within(nav).queryByRole('link', { name: 'Connected systems' })).not.toBeInTheDocument();
+    expect(within(nav).queryByRole('link', { name: 'Assistants' })).not.toBeInTheDocument();
   });
 });

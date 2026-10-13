@@ -56,8 +56,8 @@ export function ProposeDrawer({
     <Drawer
       open={open}
       onClose={close}
-      title="Propose elements"
-      description="Elements made outside Caliban, such as an exported model or a curated file. They are written as proposals in one ontology version, for review."
+      title="Import entries"
+      description="Entries made outside Caliban, such as an export or a curated file. They arrive as suggestions in one new version of the dictionary, for review."
       footer={
         result ? (
           <Button onClick={close}>Close</Button>
@@ -70,7 +70,7 @@ export function ProposeDrawer({
               disabled={!text.trim() || propose.isPending || breaking !== null}
               onClick={() => submit(false)}
             >
-              Propose
+              Import
             </Button>
           </>
         )
@@ -80,22 +80,22 @@ export function ProposeDrawer({
         <div className="flex flex-col gap-3 text-[13px]">
           <p role="status" className="text-ok">
             {result.proposed
-              ? `Wrote ${formatInt(result.proposed)} proposal${result.proposed === 1 ? '' : 's'} in version ${result.version}.`
-              : `Nothing written: every element matches version ${result.version} already.`}
+              ? `Added ${formatInt(result.proposed)} suggestion${result.proposed === 1 ? '' : 's'} in version ${result.version}.`
+              : `Nothing added: every entry matches version ${result.version} already.`}
           </p>
           <p className="text-fg-muted">
-            Skipped: {formatInt(result.skipped)}{' '}
-            {result.skipped === 1 ? 'element is' : 'elements are'} unchanged, so{' '}
-            {result.skipped === 1 ? 'it keeps its' : 'they keep their'} review decisions.
+            Skipped: {formatInt(result.skipped)} {result.skipped === 1 ? 'entry is' : 'entries are'}{' '}
+            unchanged, so {result.skipped === 1 ? 'it keeps its' : 'they keep their'} review
+            decisions.
           </p>
           <AcknowledgedBreaking tenantId={tenantId} changes={readBreaking(result.breaking) ?? []} />
         </div>
       ) : (
         <div className="flex flex-col gap-4 text-[13px]">
           <Field
-            label="Elements (JSON)"
+            label="Entries (JSON)"
             hint={
-              'An array of elements, or an exported ontology ({"elements": [...]}). Each needs id, kind and name; status may be left out (every one is written as proposed). Elements whose spec, name and description match are skipped and keep their review decisions. A changed approved element is withdrawn until it is approved again.'
+              'A JSON array of entries, or an export of the dictionary ({"elements": [...]}). Each needs id, kind and name. Unchanged entries are skipped and keep their decisions; a changed entry that was in use is withdrawn until it is approved again.'
             }
             error={parseError ?? undefined}
           >
@@ -132,7 +132,7 @@ export function ProposeDrawer({
                 loading={propose.isPending}
                 onClick={() => submit(true)}
               >
-                Propose anyway
+                Import anyway
               </Button>
             </BreakingChanges>
           ) : (

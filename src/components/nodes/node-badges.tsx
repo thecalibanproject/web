@@ -3,25 +3,31 @@ import { Badge, type Tone } from '../ui';
 
 const STATE_TONE: Record<NodeState, Tone> = { draft: 'info', published: 'ok', retired: 'neutral' };
 
+const STATE_LABEL: Record<NodeState, string> = {
+  draft: 'Draft',
+  published: 'Published',
+  retired: 'Retired',
+};
+
 const STATE_HINT: Record<NodeState, string> = {
-  draft: 'Not on the data plane yet. Publish it to make it runnable.',
-  published: 'On the data plane: runs can name this version.',
-  retired: 'Off the data plane: new runs are refused. Runs already started finished on it.',
+  draft: 'Not answering requests yet. Publish it to test it.',
+  published: 'Frozen and ready to test. Requests can name this version.',
+  retired: 'No longer answers new requests. Conversations already started finished on it.',
 };
 
 export function NodeStateBadge({ state }: { state: NodeState }) {
   return (
     <Badge tone={STATE_TONE[state]} title={STATE_HINT[state]}>
-      {state}
+      {STATE_LABEL[state]}
     </Badge>
   );
 }
 
-/** The version the promotion pointer names: what a run without a version runs. */
+/** The live version: what answers requests that name no version. */
 export function LiveBadge() {
   return (
-    <Badge tone="accent" dot title="The live version: what a run that names no version runs.">
-      live
+    <Badge tone="accent" dot title="The live version answers requests that name no version.">
+      Live
     </Badge>
   );
 }

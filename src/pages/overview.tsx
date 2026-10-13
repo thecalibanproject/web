@@ -1,7 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useMemo } from 'react';
+import { usePermissions } from '@/api/auth';
 import { tenantsQuery, usageQuery } from '@/api/queries';
+import { Attention } from '@/components/home/attention';
+import { SetupChecklist } from '@/components/home/setup-checklist';
+import { useSetupFacts } from '@/components/home/use-setup-facts';
 import { UsageTable } from '@/components/usage-table';
 import {
   Card,
@@ -12,12 +16,40 @@ import {
   PageHeader,
   StatTile,
 } from '@/components/ui';
+import { doc } from '@/lib/docs';
 import { formatCompact, formatInt, formatPercent, formatUsd } from '@/lib/format';
+import { useWorkspace } from '@/lib/workspace';
 
 const RECENT = 15;
 
+/**
+ * Home (UX-24, UX-01): what needs attention, the setup checklist while there
+ * is setup left, then the workspace's recent activity.
+ */
 export function OverviewPage() {
-  const usage = useQuery(usageQuery(undefined, 100));
+  const ws = useWorkspace();
+  const perms = usePermissions();
+  const facts = useSetupFacts(ws.id);
+  const canUsage = perms.canSomewhere('usage.read');
+  return (
+    <>
+      <PageHeader
+        title="Home"
+        description={
+          ws.workspace
+            ? `What needs your attention in ${ws.workspace.name}, and what is left to set up.`
+            : 'What needs your attention, and what is left to set up.'
+        }
+      />
+      <Attention workspaceId={ws.id} />
+      <SetupChecklist facts={facts} workspaceId={ws.id} />
+      {canUsage && <Activity workspaceId={ws.id} />}
+    </>
+  );
+}
+
+function Activity({ workspaceId }: { workspaceId: string | undefined }) {
+  const usage = useQuery(usageQuery(workspaceId, 100));
   const tenants = useQuery(tenantsQuery());
   const names = useMemo(
     () => new Map((tenants.data ?? []).map((t) => [t.id, t.name])),
@@ -29,14 +61,9 @@ export function OverviewPage() {
 
   return (
     <>
-      <PageHeader
-        title="Overview"
-        description="Traffic, cache efficiency and spend across all tenants."
-      />
-
       <section aria-labelledby="totals-h" className="mb-6">
-        <h2 id="totals-h" className="sr-only">
-          Totals
+        <h2 id="totals-h" className="mb-2 text-[13px] font-semibold">
+          Recent activity
         </h2>
         {usage.isError ? (
           <ErrorState error={usage.error} onRetry={() => void usage.refetch()} className="m-0" />
@@ -59,19 +86,19 @@ export function OverviewPage() {
               }
             />
             <StatTile
-              label="Cache hits"
+              label="Answers reused"
               value={usage.isPending ? '…' : formatInt(totals?.cache_hits)}
               detail={hitRate != null ? `${formatPercent(hitRate)} hit rate` : undefined}
             />
             <StatTile
               label="Tokens saved"
               value={usage.isPending ? '…' : formatCompact(totals?.tokens_saved)}
-              detail="Cache + prompt-cache steering"
+              detail="By reusing answers and prompts"
             />
             <StatTile
               label="Cost"
               value={usage.isPending ? '…' : formatUsd(totals?.cost_usd)}
-              detail="Provider list price, BYOK"
+              detail="At the providers' list prices"
             />
           </dl>
         )}
@@ -80,7 +107,7 @@ export function OverviewPage() {
       <Card>
         <CardHeader
           title="Recent requests"
-          description={`Latest ${RECENT} events`}
+          description={`The latest ${RECENT} model calls`}
           actions={
             <Link to="/usage" className="text-[12.5px] text-accent hover:underline">
               View all usage
@@ -94,7 +121,13 @@ export function OverviewPage() {
         ) : usage.data.events.length === 0 ? (
           <EmptyState
             title="No requests yet"
-            description="Point an OpenAI SDK at the data plane (see Settings) and requests will show up here."
+            description="Nothing has been sent through Caliban yet. Follow the setup steps above, or copy a snippet and run it."
+            action={
+              <Link to="/settings" className="font-medium text-accent hover:underline">
+                Copy a snippet
+              </Link>
+            }
+            learnMore={doc('start/gateway-quickstart', 'point-your-app')}
           />
         ) : (
           <UsageTable events={usage.data.events.slice(0, RECENT)} tenantNames={names} compact />

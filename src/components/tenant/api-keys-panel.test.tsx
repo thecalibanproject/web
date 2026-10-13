@@ -27,17 +27,24 @@ describe('ApiKeysPanel', () => {
     const user = userEvent.setup();
     renderWithClient(<ApiKeysPanel tenantId="t1" />);
 
-    expect(await screen.findByText('No API keys')).toBeInTheDocument();
+    expect(await screen.findByText('No app keys yet')).toBeInTheDocument();
     await user.type(screen.getByLabelText('Key name'), 'billing-prod');
-    await user.click(screen.getByRole('button', { name: /mint key/i }));
+    await user.click(screen.getByRole('button', { name: /create key/i }));
 
-    const notice = await screen.findByRole('region', { name: 'New API key' });
+    const notice = await screen.findByRole('region', { name: 'New app key' });
     expect(within(notice).getByTestId('plaintext-key')).toHaveTextContent('cal_abcd_SUPERSECRET');
     expect(within(notice).getByRole('button', { name: /copy key/i })).toBeInTheDocument();
-    expect(calls.find((c) => c.method === 'POST')?.body).toEqual({ name: 'billing-prod' });
+    // No assistant in the workspace yet: the narrowest default, model calls only (UX-28).
+    expect(calls.find((c) => c.method === 'POST')?.body).toEqual({
+      name: 'billing-prod',
+      nodes: [],
+    });
+    expect(
+      within(notice).getByRole('link', { name: 'Use this key: copy a snippet' }),
+    ).toHaveAttribute('href', '#/settings');
 
     // The list refetches and shows metadata only.
-    const table = await screen.findByRole('table', { name: 'API keys' });
+    const table = await screen.findByRole('table', { name: 'App keys' });
     expect(within(table).getByText('billing-prod')).toBeInTheDocument();
     expect(within(table).queryByText(/SUPERSECRET/)).not.toBeInTheDocument();
 
@@ -64,14 +71,14 @@ describe('ApiKeysPanel', () => {
     });
     const user = userEvent.setup();
     renderWithClient(<ApiKeysPanel tenantId="t1" />);
-    const table = await screen.findByRole('table', { name: 'API keys' });
-    expect(within(table).getByText('Eval key')).toBeInTheDocument();
+    const table = await screen.findByRole('table', { name: 'App keys' });
+    expect(within(table).getByText('Test key')).toBeInTheDocument();
     expect(within(table).queryByRole('button', { name: /Revoke/ })).not.toBeInTheDocument();
 
-    await user.click(within(table).getByRole('button', { name: 'Rotate the eval key eval' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Rotate the eval key?' });
-    expect(dialog).toHaveTextContent('Evals in flight lose their key');
-    await user.click(within(dialog).getByRole('button', { name: 'Rotate eval key' }));
+    await user.click(within(table).getByRole('button', { name: 'Rotate the test key eval' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Rotate the test key?' });
+    expect(dialog).toHaveTextContent('Tests already running lose their key');
+    await user.click(within(dialog).getByRole('button', { name: 'Rotate test key' }));
     await within(table).findByText(/cal_ev02/);
     expect(calls.some((c) => c.path.endsWith('/eval-key/rotate'))).toBe(true);
   });
@@ -105,11 +112,10 @@ describe('ApiKeysPanel', () => {
     renderWithClient(<ApiKeysPanel tenantId="t1" />);
 
     await user.click(await screen.findByRole('button', { name: 'Revoke billing-prod' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Revoke API key?' });
+    const dialog = await screen.findByRole('dialog', { name: 'Revoke this app key?' });
     expect(dialog).toHaveTextContent('billing-prod');
-    expect(dialog).toHaveTextContent(/stops working immediately in standalone mode/);
-    expect(dialog).toHaveTextContent(/within one snapshot poll interval \(10 s by default\)/);
-    expect(dialog).toHaveTextContent(/split-mode routers/);
+    expect(dialog).toHaveTextContent(/stops working within seconds/);
+    expect(dialog).toHaveTextContent(/at most about 10 s/);
     expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
 
     await user.click(within(dialog).getByRole('button', { name: 'Revoke key' }));
@@ -143,10 +149,10 @@ describe('ApiKeysPanel', () => {
     renderWithClient(<ApiKeysPanel tenantId="t1" />);
 
     await user.click(await screen.findByRole('button', { name: 'Revoke old' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Revoke API key?' });
+    const dialog = await screen.findByRole('dialog', { name: 'Revoke this app key?' });
     await user.click(within(dialog).getByRole('button', { name: 'Revoke key' }));
 
-    expect(await screen.findByText('No API keys')).toBeInTheDocument();
+    expect(await screen.findByText('No app keys yet')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
@@ -212,7 +218,7 @@ describe('ApiKeysPanel', () => {
       }),
     });
     renderWithClient(<ApiKeysPanel tenantId="t1" />);
-    expect(await screen.findByText('This tenant was deleted')).toBeInTheDocument();
+    expect(await screen.findByText('This workspace was deleted')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
@@ -249,89 +255,122 @@ describe('ApiKeysPanel', () => {
       });
     }
 
-    it('mints a key limited to some nodes and datasource scopes', async () => {
-      const calls = mockMint();
+    it('starts with only the assistants you tick, and mints with picked data', async () => {
+      const calls = mockApi({
+        'GET /api/v1/tenants/t1/api-keys': () => ({ body: [] }),
+        'GET /api/v1/nodes': () => ({
+          body: [node('triage', 1), node('triage', 2), node('intake', 1)],
+        }),
+        'GET /api/v1/tenants/t1/rag/collections': () => ({
+          body: [
+            {
+              id: 'c1',
+              tenant_id: 't1',
+              name: 'handbook',
+              embedding_model: 'e',
+              settings: {},
+              created_at: '2026-10-02T10:00:00Z',
+              created_by: 'ada',
+            },
+          ],
+        }),
+        'GET /api/v1/datasources': () => ({
+          body: [{ id: 'd1', tenant_id: 't1', kind: 'mongodb', name: 'shop', status: 'ready' }],
+        }),
+        'POST /api/v1/tenants/t1/api-keys': (c) => ({
+          status: 201,
+          body: {
+            id: 'k1',
+            name: 'runner',
+            prefix: 'cal_abcd',
+            key: 'cal_abcd_x',
+            created_at: '2026-10-02T10:00:00Z',
+            ...(c.body as object),
+          },
+        }),
+      });
       const user = userEvent.setup();
       renderWithClient(<ApiKeysPanel tenantId="t1" />);
-      await screen.findByText('No API keys');
+      await screen.findByText('No app keys yet');
       await user.type(screen.getByLabelText('Key name'), 'runner');
-      expect(
-        screen.getByText(/Runs every published node; datasource scopes: the nodes' own scopes/),
-      ).toBeInTheDocument();
-
-      await user.click(screen.getByText('Node access'));
-      await user.click(screen.getByRole('radio', { name: 'Only these nodes' }));
-      // Not yet: an allowlist needs a node.
-      expect(screen.getByRole('button', { name: /mint key/i })).toBeDisabled();
-      const nodes = await screen.findByRole('group', { name: 'Nodes' });
+      const nodes = await screen.findByRole('group', { name: 'Assistants' });
+      expect(screen.getByRole('radio', { name: 'Only these assistants' })).toBeChecked();
+      // Not yet: the allowlist needs an assistant.
+      expect(screen.getByRole('button', { name: /create key/i })).toBeDisabled();
       expect(
         within(nodes)
           .getAllByRole('checkbox')
           .map((c) => c.closest('label')?.textContent),
       ).toEqual(['intake', 'triage']);
       await user.click(within(nodes).getByRole('checkbox', { name: 'triage' }));
-      await user.type(screen.getByLabelText('Other node names'), 'billing');
-      await user.type(
-        screen.getByLabelText('Datasource scopes'),
-        'shop.orders:read, shop.customers:read',
-      );
+      const data = await screen.findByRole('group', { name: 'Data' });
+      await user.click(within(data).getByRole('checkbox', { name: 'Document library handbook' }));
+      await user.click(within(data).getByRole('checkbox', { name: 'Data connection shop' }));
       expect(
-        screen.getByText(/Runs triage, billing; datasource scopes: shop\.orders:read/),
+        screen.getByText('This key can run triage, reading rag.handbook:read, shop.*:read.'),
       ).toBeInTheDocument();
-      await user.click(screen.getByRole('button', { name: /mint key/i }));
+      await user.click(screen.getByRole('button', { name: /create key/i }));
 
-      await screen.findByRole('region', { name: 'New API key' });
+      await screen.findByRole('region', { name: 'New app key' });
       expect(calls.find((c) => c.method === 'POST')?.body).toEqual({
         name: 'runner',
-        nodes: ['triage', 'billing'],
-        datasource_scopes: ['shop.orders:read', 'shop.customers:read'],
+        nodes: ['triage'],
+        datasource_scopes: ['rag.handbook:read', 'shop.*:read'],
       });
-      // The form is back to the defaults for the next key.
-      expect(screen.getByText(/Runs every published node/)).toBeInTheDocument();
     });
 
-    it('mints a key that runs no nodes', async () => {
+    it('mints a key for every published assistant when asked', async () => {
       const calls = mockMint();
       const user = userEvent.setup();
       renderWithClient(<ApiKeysPanel tenantId="t1" />);
-      await screen.findByText('No API keys');
-      await user.click(screen.getByText('Node access'));
-      await user.click(screen.getByRole('radio', { name: 'No nodes' }));
-      await user.click(screen.getByRole('button', { name: /mint key/i }));
-      await screen.findByRole('region', { name: 'New API key' });
+      await screen.findByRole('group', { name: 'Assistants' });
+      await user.click(screen.getByRole('radio', { name: 'Every published assistant' }));
+      await user.click(screen.getByRole('button', { name: /create key/i }));
+      await screen.findByRole('region', { name: 'New app key' });
+      expect(calls.find((c) => c.method === 'POST')?.body).toEqual({});
+    });
+
+    it('mints a key that makes model calls only', async () => {
+      const calls = mockMint();
+      const user = userEvent.setup();
+      renderWithClient(<ApiKeysPanel tenantId="t1" />);
+      await screen.findByRole('group', { name: 'Assistants' });
+      await user.click(screen.getByRole('radio', { name: 'Model calls only' }));
+      await user.click(screen.getByRole('button', { name: /create key/i }));
+      await screen.findByRole('region', { name: 'New app key' });
       expect(calls.find((c) => c.method === 'POST')?.body).toEqual({ nodes: [] });
     });
 
-    it('refuses a datasource scope that is not <datasource>.<object>:read', async () => {
+    it('keeps other data under Advanced and refuses a scope that is not :read', async () => {
       const calls = mockMint();
       const user = userEvent.setup();
       renderWithClient(<ApiKeysPanel tenantId="t1" />);
-      await screen.findByText('No API keys');
-      await user.click(screen.getByText('Node access'));
-      const scopes = screen.getByLabelText('Datasource scopes');
+      await screen.findByText('No app keys yet');
+      await user.click(screen.getByRole('radio', { name: 'Model calls only' }));
+      await user.click(screen.getByText('Advanced'));
+      const scopes = screen.getByLabelText('Other data it may read');
       await user.type(scopes, 'shop.orders:write');
       expect(scopes).toHaveAttribute('aria-invalid', 'true');
       expect(scopes).toHaveAccessibleDescription(/Not valid: shop\.orders:write/);
-      expect(screen.getByRole('button', { name: /mint key/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /create key/i })).toBeDisabled();
       expect(calls.some((c) => c.method === 'POST')).toBe(false);
     });
 
-    it('without nodes.run, explains the key will run no nodes and sends no allowlist', async () => {
+    it('without nodes.run, explains the key will make model calls only and sends no allowlist', async () => {
       const me = meWith([{ role: 'developer', tenant_id: 't1' }]);
       me.permissions.tenants.t1 = ['api_keys.read', 'api_keys.write'];
       const calls = mockMint();
       const user = userEvent.setup();
       renderWithClient(<ApiKeysPanel tenantId="t1" />, { principal: { mode: 'session', me } });
-      await screen.findByText('No API keys');
-      expect(screen.getByText(/Runs no nodes/)).toBeInTheDocument();
-      await user.click(screen.getByText('Node access'));
-      expect(screen.getByRole('radio', { name: 'No nodes' })).toBeChecked();
-      expect(screen.getByRole('radio', { name: 'Every published node' })).toBeDisabled();
+      await screen.findByText('No app keys yet');
+      expect(screen.getByText(/This key can make model calls only/)).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Model calls only' })).toBeChecked();
+      expect(screen.getByRole('radio', { name: 'Every published assistant' })).toBeDisabled();
       expect(
-        screen.getByRole('group', { name: 'Nodes this key may run' }),
-      ).toHaveAccessibleDescription(/needs nodes\.run/);
-      await user.click(screen.getByRole('button', { name: /mint key/i }));
-      await screen.findByRole('region', { name: 'New API key' });
+        screen.getByRole('group', { name: 'Assistants this key may run' }),
+      ).toHaveAccessibleDescription(/cannot let keys run assistants/);
+      await user.click(screen.getByRole('button', { name: /create key/i }));
+      await screen.findByRole('region', { name: 'New app key' });
       expect(calls.find((c) => c.method === 'POST')?.body).toEqual({});
     });
 
@@ -365,13 +404,13 @@ describe('ApiKeysPanel', () => {
         }),
       });
       renderWithClient(<ApiKeysPanel tenantId="t1" />);
-      const table = await screen.findByRole('table', { name: 'API keys' });
+      const table = await screen.findByRole('table', { name: 'App keys' });
       const row = (name: string) => within(table).getByText(name).closest('tr')!;
-      expect(row('all')).toHaveTextContent('All published');
-      expect(row('all')).toHaveTextContent("Nodes' scopes");
+      expect(row('all')).toHaveTextContent('Every published');
+      expect(row('all')).toHaveTextContent("Each assistant's own");
       expect(within(row('some')).getByText('triage')).toBeInTheDocument();
       expect(row('some')).toHaveTextContent('shop.orders:read');
-      expect(within(row('none')).getByText('None')).toBeInTheDocument();
+      expect(within(row('none')).getByText('Model calls only')).toBeInTheDocument();
     });
   });
 });
