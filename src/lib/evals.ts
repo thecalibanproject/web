@@ -21,6 +21,15 @@ export const EVAL_STATUS_TONE: Record<EvalStatus, Tone> = {
   cancelled: 'neutral',
 };
 
+/** A test run's state in plain words: "succeeded" read as "the tests passed", which it does not mean. */
+export const EVAL_STATUS_LABEL: Record<EvalStatus, string> = {
+  pending: 'Waiting to start',
+  running: 'Running',
+  succeeded: 'Finished',
+  failed: 'Could not finish',
+  cancelled: 'Cancelled',
+};
+
 export const EVAL_SUITE_LABEL: Record<Eval['suite'], string> = {
   golden: 'Quality tests',
   injection: 'Safety tests',
@@ -224,7 +233,9 @@ export const CHECK_LABEL: Record<string, string> = {
   regex: 'Must match a pattern',
   json_schema: 'Must have these fields',
   llm_judge: 'Grader',
-  tool_call: 'Must call an action',
+  // The same type checks both "must call" and "must not call": the per-try
+  // verdict does not say which, so the label names the check, not the rule.
+  tool_call: 'Action check',
 };
 
 export function checkLabel(type: string): string {

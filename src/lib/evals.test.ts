@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Node } from '@/api/types';
 import {
+  checkLabel,
+  EVAL_STATUS_LABEL,
   defaultEvalVersion,
   evidenceEvals,
   parseGoldenCases,
@@ -109,5 +111,16 @@ describe('defaultEvalVersion', () => {
     expect(defaultEvalVersion([v(1, 'published', true), v(2, 'published')])).toBe(1);
     expect(defaultEvalVersion([v(1, 'published'), v(2, 'published'), v(3, 'draft')])).toBe(2);
     expect(defaultEvalVersion([v(1, 'draft')])).toBe(1);
+  });
+});
+
+describe('labels', () => {
+  it('never reads a finished run as passed', () => {
+    expect(EVAL_STATUS_LABEL.succeeded).toBe('Finished');
+    expect(EVAL_STATUS_LABEL.failed).toBe('Could not finish');
+  });
+
+  it('names an action check without saying which way it goes (must call, or must not)', () => {
+    expect(checkLabel('tool_call')).toBe('Action check');
   });
 });
