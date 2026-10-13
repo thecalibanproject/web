@@ -106,6 +106,7 @@ function WaitingCard({
             question={item.question}
             contentVisible={contentVisible}
             run={run.data}
+            step={item.step}
           />
         ) : contentVisible ? (
           <p dir="auto" className="text-[13px] break-words whitespace-pre-wrap">

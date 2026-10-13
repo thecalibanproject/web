@@ -124,7 +124,8 @@ function scalars(v: unknown, out: string[] = []): string[] {
 }
 
 export type Provenance =
-  | { kind: 'on-file'; step: string }
+  /** `step` is the step id (for links and experts); `name` its step name, shown to people. */
+  | { kind: 'on-file'; step: string; name: string }
   | { kind: 'customer-only' }
   | { kind: 'not-found' }
   /** Too short or too common to say anything (a boolean, "1"). */
@@ -153,7 +154,8 @@ export function provenance(
   const earlier = until >= 0 ? steps.slice(0, until) : steps;
   for (const s of earlier) {
     if (!isLookup(s) || s.output === undefined) continue;
-    if (scalars(s.output).some((x) => normalise(x) === v)) return { kind: 'on-file', step: s.id };
+    if (scalars(s.output).some((x) => normalise(x) === v))
+      return { kind: 'on-file', step: s.id, name: s.vertex };
   }
   const message = scalars(run.input).map(normalise).join(' ');
   if (message.includes(v)) return { kind: 'customer-only' };
@@ -163,7 +165,7 @@ export function provenance(
 export function provenanceText(p: Provenance): string | null {
   switch (p.kind) {
     case 'on-file':
-      return `Matches the account on file (step ${p.step})`;
+      return `Matches the account on file (from the ${p.name} step)`;
     case 'customer-only':
       return "Only in the customer's message";
     case 'not-found':

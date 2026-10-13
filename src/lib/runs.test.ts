@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RunStep } from '@/api/types';
-import { budgetRows, sinceIso, statusParam, timeline } from './runs';
+import { budgetRows, sinceIso, statusParam, stepName, timeline } from './runs';
 
 describe('statusParam and sinceIso', () => {
   it('expands "not ended" to every status of a run that has not ended', () => {
@@ -50,5 +50,13 @@ describe('budgetRows', () => {
       { label: 'Spend', used: 0.01, limit: null, unit: 'usd' },
       { label: 'Execution time', used: 1200, limit: null, unit: 'ms' },
     ]);
+  });
+});
+
+describe('stepName', () => {
+  it('reads a step id as the name people know', () => {
+    expect(stepName('refund#0@approve')).toBe('refund');
+    expect(stepName('lookup#2')).toBe('lookup');
+    expect(stepName('clarify')).toBe('clarify');
   });
 });

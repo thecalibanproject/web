@@ -132,7 +132,8 @@ describe('RunsPage', () => {
     const rows = within(table).getAllByRole('row');
     expect(rows[1]).toHaveTextContent('run_3');
     expect(rows[1]).toHaveTextContent('Waiting for a person');
-    expect(rows[1]).toHaveTextContent('write#0@approve');
+    expect(rows[1]).toHaveTextContent('at the write step');
+    expect(rows[1]).not.toHaveTextContent('write#0@approve');
     expect(rows[1]).toHaveTextContent('not ended');
     expect(rows[2]).toHaveTextContent('run_2');
     expect(rows[2]).toHaveTextContent('v1');
@@ -355,7 +356,12 @@ describe('RunDetailPage', () => {
       }),
     });
     expect(screen.getByText('Waiting for your approval')).toBeInTheDocument();
-    expect(await screen.findByText('mcp://crm/update_ticket#sha256:abc')).toBeInTheDocument();
+    expect(screen.getByText(/At the write step\. Your decision is recorded/)).toBeInTheDocument();
+    // The pinned reference and the step id sit under Technical details, not in the basic copy.
+    const ref = await screen.findByText('mcp://crm/update_ticket#sha256:abc');
+    const technical = ref.closest('details');
+    expect(technical).toHaveTextContent('Technical details');
+    expect(technical).toHaveTextContent('write#0@approve');
     expect(screen.getByText(/It changes something in another system/)).toBeInTheDocument();
     const approve = screen.getByRole('button', {
       name: 'Approve update_ticket on crm for conversation run_7',

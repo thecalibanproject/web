@@ -89,8 +89,9 @@ describe('provenance', () => {
 
   it('finds a value in the account on file, from an earlier lookup', () => {
     const p = provenance('FR76 1273 9000 0100 0123 4567 890', run);
-    expect(p).toEqual({ kind: 'on-file', step: 'accounts#0' });
-    expect(provenanceText(p)).toBe('Matches the account on file (step accounts#0)');
+    expect(p).toEqual({ kind: 'on-file', step: 'accounts#0', name: 'accounts' });
+    // The step's name, never its id.
+    expect(provenanceText(p)).toBe('Matches the account on file (from the accounts step)');
   });
 
   it("flags an IBAN that only the customer's message holds, with or without spaces", () => {

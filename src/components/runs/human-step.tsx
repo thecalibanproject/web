@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/cn';
 import { deniedReason } from '@/lib/permissions';
 import { Checkbox, ConfirmDialog, Field, FormError, GatedButton, Input, Textarea } from '../ui';
+import { Advanced } from '../help/advanced';
 import { TaintLabels } from './run-badges';
 
 const HIDDEN =
@@ -104,11 +105,14 @@ export function ApprovalDetails({
   question,
   contentVisible,
   run,
+  step,
 }: {
   approval: Approval | null | undefined;
   question: string | null | undefined;
   contentVisible: boolean;
   run?: Pick<ConsoleRun, 'input' | 'steps'> | null;
+  /** The step id, shown under Technical details. */
+  step?: string;
 }) {
   if (!approval) {
     if (!contentVisible) return <p className="text-[12.5px] text-fg-muted">{HIDDEN}</p>;
@@ -126,11 +130,6 @@ export function ApprovalDetails({
       <p className="text-[13px]">
         <span className="font-medium">{t.tool}</span>
         {t.system && <span className="text-fg-muted"> on {t.system}</span>}
-        {approval.tool && (
-          <code className="ml-2 font-mono text-[11.5px] text-fg-subtle" title={approval.tool}>
-            {approval.tool}
-          </code>
-        )}
       </p>
       <p>
         <span className="text-fg-muted">Why it needs you: </span>
@@ -152,6 +151,29 @@ export function ApprovalDetails({
           </p>
         )}
       </div>
+      {(approval.tool || step) && (
+        // The pinned reference and the step id are for experts and support.
+        <Advanced title="Technical details">
+          <dl className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-[max-content_minmax(0,1fr)]">
+            {approval.tool && (
+              <>
+                <dt className="text-fg-muted">Action reference</dt>
+                <dd className="min-w-0">
+                  <code className="font-mono text-[11.5px] break-all">{approval.tool}</code>
+                </dd>
+              </>
+            )}
+            {step && (
+              <>
+                <dt className="text-fg-muted">Step</dt>
+                <dd>
+                  <code className="font-mono text-[11.5px]">{step}</code>
+                </dd>
+              </>
+            )}
+          </dl>
+        </Advanced>
+      )}
     </div>
   );
 }

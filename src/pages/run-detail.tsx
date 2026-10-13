@@ -49,6 +49,7 @@ import {
   testRunOf,
   timeline,
   type BudgetRow,
+  stepName,
 } from '@/lib/runs';
 
 const route = getRouteApi('/_app/runs/$tenantId/$runId');
@@ -528,10 +529,7 @@ function Waiting({ tenantId, run }: { tenantId: string; run: ConsoleRun }) {
       <CardHeader
         title={kind === 'approval' ? 'Waiting for your approval' : 'Waiting for an answer'}
         description={
-          <>
-            Step <code className="font-mono">{awaiting.step}</code>. Your decision is recorded under
-            your name.
-          </>
+          <>At the {stepName(awaiting.step)} step. Your decision is recorded under your name.</>
         }
       />
       <div className="flex flex-col gap-3 p-4">
@@ -541,6 +539,7 @@ function Waiting({ tenantId, run }: { tenantId: string; run: ConsoleRun }) {
             question={awaiting.question}
             contentVisible={run.content_visible}
             run={run}
+            step={awaiting.step}
           />
         ) : run.content_visible ? (
           <p dir="auto" className="text-[13px] break-words whitespace-pre-wrap">

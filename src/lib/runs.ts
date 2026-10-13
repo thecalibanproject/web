@@ -246,3 +246,11 @@ export const STEP_KIND_LABEL: Record<string, string> = {
   subnode: 'Sub-assistant',
   code: 'Code',
 };
+
+/**
+ * The name of a step from its id, for people: `refund#0@approve` is the
+ * refund step (the id, with its index and suffix, stays for experts).
+ */
+export function stepName(stepId: string): string {
+  return stepId.split('#')[0]!.split('@')[0]!;
+}

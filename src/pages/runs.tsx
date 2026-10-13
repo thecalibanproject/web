@@ -33,6 +33,7 @@ import {
   RUN_STATUS_LABEL,
   startedBy,
   type RunSince,
+  stepName,
 } from '@/lib/runs';
 import { useWorkspace } from '@/lib/workspace';
 
@@ -255,9 +256,9 @@ export function RunsPage() {
                           <RunStatusBadge status={r.status} />
                           {isTestRun(r.origin) && <Badge tone="info">Test run</Badge>}
                           {r.awaiting_step && (
-                            <code className="font-mono text-[11.5px] text-fg-muted">
-                              {r.awaiting_step}
-                            </code>
+                            <span className="text-[12px] text-fg-muted">
+                              at the {stepName(r.awaiting_step)} step
+                            </span>
                           )}
                         </span>
                       </TD>
