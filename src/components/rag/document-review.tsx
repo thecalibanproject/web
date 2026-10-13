@@ -33,22 +33,22 @@ function Findings({
 }) {
   return (
     <section
-      aria-label="Scan findings"
+      aria-label="What the checks found"
       className="rounded-md border border-danger/50 bg-danger-soft p-3 text-[12.5px]"
     >
       <h4 className="flex items-center gap-1.5 text-[13px] font-semibold text-danger">
         <IconAlert size={15} className="shrink-0" />
-        The ingest checks flagged {findings.length} finding{findings.length === 1 ? '' : 's'}
+        The checks found {findings.length} problem{findings.length === 1 ? '' : 's'}
       </h4>
       <p className="mt-1 text-fg-muted">
         {quarantined
-          ? 'This version is quarantined: rag_search does not see it. '
+          ? 'This version is held for review: assistants cannot search it. '
           : trusted && !acknowledged
-            ? 'The source is trusted, so these findings were recorded without quarantining it. '
+            ? 'It is from your team, so these problems were recorded without holding it back. '
             : ''}
-        The document text stays sealed, so a finding names the chunk it is in and the headings above
-        it, not the text: check that part of the original before releasing it.
-        {acknowledged && ' An approver acknowledged these findings.'}
+        The document text stays encrypted, so each problem names the passage it is in and the
+        headings above it, not the text: check that part of the original before releasing it.
+        {acknowledged && ' An approver has read these problems and released it.'}
       </p>
       <ul className="mt-2.5 flex flex-col gap-2">
         {findings.map((f, i) => (
@@ -86,8 +86,7 @@ function Release({
   if (release.isSuccess) {
     return (
       <p role="status" className="text-[12.5px] text-ok">
-        Released. Version {doc.version} is indexed again with its findings acknowledged, and
-        searched once it is ready.
+        Released. Version {doc.version} is prepared again, and searched once it is ready.
       </p>
     );
   }
@@ -97,20 +96,18 @@ function Release({
       className="flex flex-col gap-3 rounded-md border border-border p-3 text-[12.5px]"
     >
       <p className="text-fg-muted">
-        Releasing indexes this version again with its findings acknowledged; it is searched once
-        ready. The release is recorded in the audit log with the findings. Passages from it still
-        carry the <code className="font-mono">retrieved</code> taint label, so a write they inspire
-        needs an allowlist entry or a human approval.
+        Releasing prepares this version again; it is searched once ready. The release is recorded in
+        the audit log with the problems found. Passages from it still count as untrusted data, so an
+        action they lead to still needs a person to approve it.
       </p>
       {doc.trust === 'untrusted' && (
         <p className="text-fg-muted">
-          Its checks then get a fresh vetting window of {deadline} from the release: if they have
-          not passed by then (a backlog of workers, say), the version fails instead of being
-          searched.
+          Its checks then get {deadline} from the release: if they have not passed by then, the
+          version fails instead of being searched.
         </p>
       )}
       <Checkbox
-        label="I have read these findings and release this document"
+        label="I have read these problems and release this document"
         checked={ack}
         disabled={Boolean(denied)}
         onChange={(e) => {
@@ -147,9 +144,9 @@ function Version({
 }) {
   const quarantined = doc.status === 'quarantined';
   const rows: Array<[string, ReactNode]> = [
-    ['Trust', <TrustBadge key="t" trust={doc.trust} />],
+    ['Written by', <TrustBadge key="t" trust={doc.trust} />],
     [
-      'Vetting deadline',
+      'Time left for checks',
       <span key="v" className="inline-flex flex-wrap items-center gap-2">
         <VettingBadge vetting={vettingOf(doc, collection)} />
         {doc.vet_deadline_at && doc.status !== 'quarantined' && (
@@ -159,13 +156,13 @@ function Version({
     ],
     ['Format', contentTypeLabel(doc.content_type)],
     ['Size', formatBytes(doc.bytes)],
-    ['Chunks', formatInt(doc.chunks)],
+    ['Passages', formatInt(doc.chunks)],
     ['Tokens (estimated)', formatInt(doc.tokens)],
-    ['Personal data', `${formatInt(doc.pii_entities)} pseudonymised before embedding`],
+    ['Personal data', `${formatInt(doc.pii_entities)} items hidden before indexing`],
     ['Source', doc.source || EMPTY],
     ['Valid from', formatDateTime(doc.valid_from)],
     ['Valid until', formatDateTime(doc.valid_to)],
-    ['Ingested', `${formatDateTime(doc.created_at)} by ${doc.created_by}`],
+    ['Added', `${formatDateTime(doc.created_at)} by ${doc.created_by}`],
     ['Indexed', formatDateTime(doc.indexed_at)],
     ['Attempts', formatInt(doc.attempts)],
   ];
@@ -182,7 +179,7 @@ function Version({
         <Badge>v{doc.version}</Badge>
         <DocumentStatusBadge status={doc.status} />
         {live && (
-          <Badge tone="accent" title="The version rag_search serves.">
+          <Badge tone="accent" title="The version searches use.">
             Searched
           </Badge>
         )}
@@ -204,7 +201,7 @@ function Version({
         doc.status === 'ready' && (
           <p className="flex items-start gap-2 rounded-md bg-ok-soft px-3 py-2 text-[12.5px] text-fg">
             <IconCheck size={14} className="mt-0.5 shrink-0 text-ok" />
-            The ingest checks found nothing.
+            The checks found nothing.
           </p>
         )
       )}
@@ -242,9 +239,9 @@ export function DocumentReview({
     <div className="flex flex-col gap-4 text-[13px]">
       <p className="text-[12.5px] text-fg-muted">
         {live != null
-          ? `rag_search serves version ${live}.`
-          : 'No version is ready: rag_search does not see this document.'}{' '}
-        The content is sealed under the tenant&apos;s key and never shown.
+          ? `Searches use version ${live}.`
+          : 'No version is ready: assistants cannot search this document yet.'}{' '}
+        The content is encrypted with the workspace&apos;s key and never shown.
       </p>
       {versions.map((v) => (
         <Version

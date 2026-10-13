@@ -1,13 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi } from '@tanstack/react-router';
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { usePermissions } from '@/api/auth';
-import { ragCollectionsQuery, tenantsQuery, useDeleteRagCollection } from '@/api/queries';
+import { ragCollectionsQuery, useDeleteRagCollection } from '@/api/queries';
 import type { RagCollection } from '@/api/types';
 import { CollectionDocuments } from '@/components/rag/collection-documents';
 import { CreateCollectionForm } from '@/components/rag/create-collection-form';
 import { DocumentCountBadges, TrustBadge } from '@/components/rag/rag-badges';
-import { TenantSelect } from '@/components/tenant-select';
+import { TermTip } from '@/components/help/toggletip';
 import {
   Button,
   Card,
@@ -26,46 +26,32 @@ import {
   TR,
 } from '@/components/ui';
 import { IconPlus, IconTrash } from '@/components/ui/icons';
+import { doc } from '@/lib/docs';
 import { isNotFound } from '@/lib/errors';
 import { EMPTY, formatDateTime } from '@/lib/format';
 import { deniedReason } from '@/lib/permissions';
-import { formatSeconds, settingsOf } from '@/lib/rag';
+import { settingsOf } from '@/lib/rag';
+import { useScopedTenant } from '@/lib/workspace';
 
 const route = getRouteApi('/_app/rag');
 
 export function RagPage() {
   const search = route.useSearch();
   const navigate = route.useNavigate();
-  const perms = usePermissions();
-  const tenants = useQuery(tenantsQuery());
-  const readable = perms.tenantsWith('rag.read');
-  const firstReadable = tenants.data?.find(
-    (t) => readable === 'all' || readable.includes(t.id),
-  )?.id;
-  const tenantId = search.tenant ?? firstReadable;
+  const tenantId = useScopedTenant(search.tenant);
 
   const setSearch = (patch: Partial<typeof search>) =>
     void navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
 
-  const toolbar = (
-    <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
-      <label className="flex items-center gap-2 text-[12.5px] text-fg-muted">
-        Tenant
-        <TenantSelect
-          value={tenantId}
-          permission="rag.read"
-          className="w-52"
-          onChange={(t) => setSearch({ tenant: t, collection: undefined, doc: undefined })}
-        />
-      </label>
-    </div>
-  );
-
   return (
     <>
       <PageHeader
-        title="Retrieval"
-        description="Document collections a tenant's nodes search with builtin://rag_search. A document is searched only once a worker has indexed it and its checks passed; flagged documents stay quarantined until someone who may approve releases them."
+        title={
+          <span className="inline-flex items-center gap-1">
+            Knowledge <TermTip term="knowledge" />
+          </span>
+        }
+        description="Document libraries your assistants can search and cite. A document is searched once it is prepared and its safety checks passed; documents a check flags are held for review."
         actions={
           tenantId && (
             <NewCollectionButton
@@ -77,7 +63,6 @@ export function RagPage() {
       />
       {tenantId ? (
         <CollectionList
-          toolbar={toolbar}
           tenantId={tenantId}
           selected={search.collection}
           docId={search.doc}
@@ -86,17 +71,11 @@ export function RagPage() {
         />
       ) : (
         <Card>
-          {toolbar}
-          {tenants.isPending ? (
-            <LoadingState rows={2} />
-          ) : tenants.isError ? (
-            <ErrorState error={tenants.error} onRetry={() => void tenants.refetch()} />
-          ) : (
-            <EmptyState
-              title="No tenant to show"
-              description="Document collections belong to a tenant. Your roles do not cover a tenant with retrieval yet."
-            />
-          )}
+          <EmptyState
+            title="No workspace yet"
+            description="Document libraries belong to a workspace. Create a workspace first."
+            learnMore={doc('guides/workspaces', 'create')}
+          />
         </Card>
       )}
     </>
@@ -120,13 +99,13 @@ function NewCollectionButton({
         deniedReason={denied}
         onClick={() => setOpen(true)}
       >
-        New collection
+        New library
       </GatedButton>
       <Drawer
         open={open}
         onClose={() => setOpen(false)}
-        title="New collection"
-        description="Its vectors live in a vector index collection of their own, separate from every other collection."
+        title="New document library"
+        description="A library's search index is kept apart from every other library's."
       >
         {open && (
           <CreateCollectionForm
@@ -144,14 +123,12 @@ function NewCollectionButton({
 }
 
 function CollectionList({
-  toolbar,
   tenantId,
   selected,
   docId,
   onSelect,
   onDoc,
 }: {
-  toolbar: ReactNode;
   tenantId: string;
   selected: string | undefined;
   docId: string | undefined;
@@ -172,31 +149,29 @@ function CollectionList({
   return (
     <>
       <Card>
-        {toolbar}
         {collections.isPending ? (
           <LoadingState rows={3} />
         ) : collections.isError ? (
           isNotFound(collections.error) ? (
-            <EmptyState title="Tenant not found" description="It may have been deleted." />
+            <EmptyState title="Workspace not found" description="It may have been deleted." />
           ) : (
             <ErrorState error={collections.error} onRetry={() => void collections.refetch()} />
           )
         ) : collections.data.length === 0 ? (
           <EmptyState
-            title="No collections"
-            description="Create a collection with an embedding model, ingest documents into it, then name it in a node's scopes as rag.<collection>:read."
+            title="No document libraries yet"
+            description="Create a library, upload your documents, then let an assistant search it."
+            action={<NewCollectionButton tenantId={tenantId} onCreated={(c) => onSelect(c)} />}
+            learnMore={doc('guides/knowledge', 'create-a-library')}
           />
         ) : (
-          <Table label="Collections">
+          <Table label="Document libraries">
             <THead>
               <tr>
                 <TH>Name</TH>
                 <TH>Description</TH>
                 <TH>Documents</TH>
-                <TH>Embedding model</TH>
-                <TH>Rerank model</TH>
-                <TH>Default trust</TH>
-                <TH>Vetting deadline</TH>
+                <TH>New documents</TH>
                 <TH>Created</TH>
                 <TH>
                   <span className="sr-only">Actions</span>
@@ -219,25 +194,22 @@ function CollectionList({
                         {c.name}
                       </button>
                     </TD>
-                    <TD className="max-w-64 truncate text-fg-muted" title={c.description}>
+                    <TD
+                      dir="auto"
+                      className="max-w-64 truncate text-fg-muted"
+                      title={c.description}
+                    >
                       {c.description || EMPTY}
                     </TD>
                     <TD>
                       <DocumentCountBadges counts={c.document_counts} />
                     </TD>
-                    <TD className="font-mono text-[12px]">{c.embedding_model}</TD>
-                    <TD className="font-mono text-[12px] text-fg-muted">
-                      {c.rerank_model ?? EMPTY}
-                    </TD>
                     <TD>
                       <TrustBadge trust={settings.default_trust} />
                     </TD>
                     <TD className="whitespace-nowrap text-fg-muted">
-                      {formatSeconds(settings.vet_deadline_secs)}
-                    </TD>
-                    <TD className="whitespace-nowrap text-fg-muted">
                       {formatDateTime(c.created_at)}
-                      <span className="block max-w-48 truncate text-[11.5px] text-fg-subtle">
+                      <span className="block max-w-48 truncate text-[11.5px] text-fg-muted">
                         {c.created_by}
                       </span>
                     </TD>
@@ -283,8 +255,8 @@ function CollectionList({
 
       <ConfirmDialog
         open={deleting !== null}
-        title="Delete collection?"
-        confirmLabel="Delete collection"
+        title="Delete this library?"
+        confirmLabel="Delete library"
         loading={del.isPending}
         error={del.error}
         onCancel={closeDelete}
@@ -301,11 +273,11 @@ function CollectionList({
       >
         <p>
           Delete <code className="font-mono font-medium">{deleting?.name}</code> and every document
-          in it? They stop being searched at once, and workers then drop the vectors.
+          in it? They stop being searched at once, and their search index is wiped.
         </p>
         <p className="text-fg-muted">
-          A collection that a published node version names in its scopes cannot be deleted: retire
-          those versions first.
+          A library that a published assistant version searches cannot be deleted: retire those
+          versions first.
         </p>
       </ConfirmDialog>
     </>

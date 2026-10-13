@@ -36,6 +36,9 @@ import {
   TR,
 } from '../ui';
 import { IconAlert, IconPlus, IconTrash } from '../ui/icons';
+import { doc } from '@/lib/docs';
+import { LearnMore } from '../help/learn-more';
+import { BulkUpload } from './bulk-upload';
 import { DocumentReview } from './document-review';
 import { IngestForm } from './ingest-form';
 import { DocFindingsBadge, DocumentStatusBadge, TrustBadge, VettingBadge } from './rag-badges';
@@ -48,7 +51,7 @@ function UsedBy({ tenantId, collection }: { tenantId: string; collection: string
   return (
     <p className="text-[12.5px] text-fg-muted">
       {users.length === 0 ? (
-        'No published node version names it in its scopes.'
+        'No published assistant searches it yet.'
       ) : (
         <>
           Searched by{' '}
@@ -95,6 +98,7 @@ export function CollectionDocuments({
   const docs = useInfiniteQuery(ragDocumentsQuery(tenantId, name, status));
   const del = useDeleteRagDocument(tenantId, name);
   const [ingesting, setIngesting] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const perms = usePermissions();
@@ -109,12 +113,12 @@ export function CollectionDocuments({
     del.reset();
   };
 
-  const ingested = (doc: RagDocument & { unchanged?: boolean }) => {
+  const ingested = (d: RagDocument & { unchanged?: boolean }) => {
     setIngesting(false);
     setNotice(
-      doc.unchanged
-        ? `${doc.doc_id} is unchanged: version ${doc.version} already has this content and these settings.`
-        : `${doc.doc_id} version ${doc.version} is pending. It is searched once a worker has indexed it and its checks passed.`,
+      d.unchanged
+        ? `${d.doc_id} is unchanged: version ${d.version} already has this content and these settings.`
+        : `${d.doc_id} version ${d.version} is waiting. It is searched once it is prepared and its checks passed.`,
     );
   };
 
@@ -126,29 +130,46 @@ export function CollectionDocuments({
             Documents of <code className="font-mono">{name}</code>
           </>
         }
-        description={`Embedded with ${collection.embedding_model}${
-          collection.rerank_model ? `, reranked with ${collection.rerank_model}` : ''
-        }. Default trust: ${TRUST_LABEL[settings.default_trust]}. Vetting deadline: ${formatSeconds(
+        description={`New documents are marked ${TRUST_LABEL[settings.default_trust]}. Checks must pass within ${formatSeconds(
           settings.vet_deadline_secs,
-        )}. Chunks of at most ${formatInt(settings.chunk_tokens)} tokens.`}
+        )}.`}
         actions={
-          <GatedButton
-            size="sm"
-            variant="primary"
-            icon={<IconPlus size={14} />}
-            deniedReason={cannotWrite}
-            onClick={() => {
-              setNotice(null);
-              setIngesting(true);
-            }}
-          >
-            Ingest document
-          </GatedButton>
+          <span className="inline-flex items-center gap-2">
+            <GatedButton
+              size="sm"
+              deniedReason={cannotWrite}
+              onClick={() => {
+                setNotice(null);
+                setIngesting(true);
+              }}
+            >
+              Add one document
+            </GatedButton>
+            <GatedButton
+              size="sm"
+              variant="primary"
+              icon={<IconPlus size={14} />}
+              deniedReason={cannotWrite}
+              onClick={() => {
+                setNotice(null);
+                setUploading(true);
+              }}
+            >
+              Upload documents
+            </GatedButton>
+          </span>
         }
       />
       <div className="flex flex-col gap-2 border-b border-border px-4 py-2.5">
         <p className="flex flex-wrap items-center gap-1.5 text-[12.5px] text-fg-muted">
-          Nodes search it with the scope <code className="font-mono text-fg">{scope}</code>
+          Search model <code className="font-mono text-fg">{collection.embedding_model}</code>
+          {collection.rerank_model && (
+            <>
+              , reranked with <code className="font-mono text-fg">{collection.rerank_model}</code>
+            </>
+          )}
+          , passages of at most {formatInt(settings.chunk_tokens)} tokens. Access name{' '}
+          <code className="font-mono text-fg">{scope}</code>
           <CopyButton value={scope} label={`Copy ${scope}`} compact />
         </p>
         <UsedBy tenantId={tenantId} collection={name} />
@@ -164,8 +185,9 @@ export function CollectionDocuments({
           className="mx-4 mt-3 flex items-start gap-2 rounded-md bg-warn-soft px-3 py-2 text-[12.5px] text-fg"
         >
           <IconAlert size={14} className="mt-0.5 shrink-0 text-warn" />
-          {quarantined} document{quarantined === 1 ? ' is' : 's are'} quarantined. Review the
-          findings; someone with rag.approve can release a document or it can be deleted.
+          {quarantined} document{quarantined === 1 ? ' is' : 's are'} held for review. Read what the
+          checks found: someone allowed to approve documents can release it, or it can be deleted.{' '}
+          <LearnMore doc={doc('guides/knowledge', 'held-back-documents')} />
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2 px-4 py-2.5">
@@ -191,12 +213,24 @@ export function CollectionDocuments({
         <ErrorState error={docs.error} onRetry={() => void docs.refetch()} />
       ) : rows.length === 0 ? (
         <EmptyState
-          title={status ? `No ${STATUS_LABEL[status].toLowerCase()} documents` : 'No documents yet'}
+          title={status ? `No documents ${STATUS_LABEL[status].toLowerCase()}` : 'No documents yet'}
           description={
             status
               ? 'No document whose newest version is in this state.'
-              : 'Ingest Markdown, HTML or plain text. Each document is indexed by a worker and searched once its checks pass.'
+              : 'Upload Markdown, HTML or plain text files: each one is searched once it is prepared and its checks pass.'
           }
+          action={
+            !status && (
+              <GatedButton
+                variant="primary"
+                deniedReason={cannotWrite}
+                onClick={() => setUploading(true)}
+              >
+                Upload documents
+              </GatedButton>
+            )
+          }
+          learnMore={status ? undefined : doc('guides/knowledge', 'upload-documents')}
         />
       ) : (
         <>
@@ -208,9 +242,9 @@ export function CollectionDocuments({
                 <TH>Trust</TH>
                 <TH>Size</TH>
                 <TH>Personal data</TH>
-                <TH>Findings</TH>
-                <TH>Vetting deadline</TH>
-                <TH>Ingested</TH>
+                <TH>Checks</TH>
+                <TH>Time left for checks</TH>
+                <TH>Added</TH>
                 <TH>
                   <span className="sr-only">Actions</span>
                 </TH>
@@ -229,7 +263,7 @@ export function CollectionDocuments({
                       >
                         {d.doc_id}
                       </button>
-                      <span className="block text-[11.5px] text-fg-subtle">
+                      <span dir="auto" className="block text-[11.5px] text-fg-muted">
                         v{d.version}
                         {d.source && ` · ${d.source}`}
                       </span>
@@ -240,7 +274,7 @@ export function CollectionDocuments({
                         {live != null && live !== d.version && (
                           <Badge
                             tone="accent"
-                            title={`rag_search serves version ${live} until this one is ready.`}
+                            title={`Searches use version ${live} until this one is ready.`}
                           >
                             Searching v{live}
                           </Badge>
@@ -259,7 +293,7 @@ export function CollectionDocuments({
                       )}
                     </TD>
                     <TD className="text-fg-muted">
-                      {d.pii_entities > 0 ? `${formatInt(d.pii_entities)} pseudonymised` : 'None'}
+                      {d.pii_entities > 0 ? `${formatInt(d.pii_entities)} items hidden` : 'None'}
                     </TD>
                     <TD>
                       <DocFindingsBadge findings={d.findings} />
@@ -317,8 +351,8 @@ export function CollectionDocuments({
       <Drawer
         open={ingesting}
         onClose={() => setIngesting(false)}
-        title={`Ingest into ${name}`}
-        description="The content is sealed under the tenant's key at once and never shown again."
+        title={`Add a document to ${name}`}
+        description="The content is encrypted with the workspace's key at once and never shown again."
       >
         {ingesting && (
           <IngestForm
@@ -326,6 +360,21 @@ export function CollectionDocuments({
             collection={collection}
             onCancel={() => setIngesting(false)}
             onIngested={ingested}
+          />
+        )}
+      </Drawer>
+      <Drawer
+        open={uploading}
+        onClose={() => setUploading(false)}
+        title={`Upload documents to ${name}`}
+        description="Several files at once. The content is encrypted with the workspace's key at once and never shown again."
+      >
+        {uploading && (
+          <BulkUpload
+            tenantId={tenantId}
+            collection={collection}
+            onClose={() => setUploading(false)}
+            onUploaded={setNotice}
           />
         )}
       </Drawer>
@@ -359,8 +408,7 @@ export function CollectionDocuments({
       >
         <p>
           Delete every version of <code className="font-mono font-medium">{deleting}</code>? It
-          stops being searched at once, its sealed content is wiped, and workers then delete its
-          vectors.
+          stops being searched at once, and its stored content and search index are wiped.
         </p>
       </ConfirmDialog>
     </Card>

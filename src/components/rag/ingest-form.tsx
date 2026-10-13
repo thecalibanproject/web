@@ -117,7 +117,7 @@ export function IngestForm({
   };
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4" aria-label="Ingest document">
+    <form onSubmit={onSubmit} className="flex flex-col gap-4" aria-label="Add a document">
       <div role="radiogroup" aria-label="Content" className="flex gap-4 text-[13px]">
         {(['paste', 'upload'] as const).map((m) => (
           <label key={m} className="inline-flex items-center gap-1.5">
@@ -172,6 +172,7 @@ export function IngestForm({
               aria-describedby={describedBy}
               aria-invalid={invalid}
               value={content}
+              dir="auto"
               onChange={(e) => {
                 ingest.reset();
                 setContent(e.target.value);
@@ -188,7 +189,7 @@ export function IngestForm({
           label="Document id"
           required
           error={docId ? idError : null}
-          hint="Ingesting the same id again adds a version. Stored in clear: no personal data."
+          hint="Adding the same id again adds a new version. Stored unencrypted: no personal data."
         >
           {({ id, describedBy, invalid }) => (
             <Input
@@ -219,12 +220,13 @@ export function IngestForm({
           )}
         </Field>
       </div>
-      <Field label="Title" hint="Shown in citations. Sealed with the content.">
+      <Field label="Title" hint="Shown in citations. Encrypted with the content.">
         {({ id, describedBy }) => (
           <Input
             id={id}
             aria-describedby={describedBy}
             maxLength={500}
+            dir="auto"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
@@ -232,7 +234,7 @@ export function IngestForm({
       </Field>
       <Field
         label="Source"
-        hint="Where it came from, such as a URL or a path. Stored in clear: no personal data."
+        hint="Where it came from, such as a URL or a path. Stored unencrypted: no personal data."
       >
         {({ id, describedBy }) => (
           <Input
@@ -244,7 +246,7 @@ export function IngestForm({
           />
         )}
       </Field>
-      <Field label="Trust" hint={TRUST_HINT[trust || defaultTrust]}>
+      <Field label="Who wrote it" hint={TRUST_HINT[trust || defaultTrust]}>
         {({ id, describedBy }) => (
           <Select
             id={id}
@@ -252,7 +254,7 @@ export function IngestForm({
             value={trust}
             onChange={(e) => setTrust(e.target.value as RagTrust | '')}
           >
-            <option value="">Collection default ({TRUST_LABEL[defaultTrust]})</option>
+            <option value="">Library default ({TRUST_LABEL[defaultTrust]})</option>
             {RAG_TRUSTS.map((t) => (
               <option key={t} value={t}>
                 {TRUST_LABEL[t]}
@@ -297,7 +299,7 @@ export function IngestForm({
           Cancel
         </Button>
         <Button type="submit" variant="primary" loading={ingest.isPending} disabled={!ready}>
-          Ingest document
+          Add document
         </Button>
       </div>
     </form>
