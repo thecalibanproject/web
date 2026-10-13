@@ -4,6 +4,7 @@ import { usePermissions } from '@/api/auth';
 import { providersQuery, useDeleteProvider } from '@/api/queries';
 import type { SharedProvider } from '@/api/types';
 import { TrustTierBadge } from '@/components/badges';
+import { doc } from '@/lib/docs';
 import {
   Badge,
   Button,
@@ -44,7 +45,7 @@ export function ServersPanel() {
     <Card>
       <CardHeader
         title="Model servers"
-        description="Shared on-prem inference pools (vLLM, SGLang, llama.cpp, Ollama) that serve open models to every allowed tenant."
+        description="Servers on your network that run open models (for example vLLM or Ollama), shared by the workspaces you allow."
         actions={
           canWrite && (
             <Button
@@ -64,8 +65,20 @@ export function ServersPanel() {
         <ErrorState error={servers.error} onRetry={() => void servers.refetch()} />
       ) : servers.data.length === 0 ? (
         <EmptyState
-          title="No model servers"
-          description="Register an OpenAI-compatible server such as vLLM serving Qwen3, then discover its models into the catalogue."
+          title="No model servers yet"
+          description="Add the server your open models run on; Caliban then finds the models it serves."
+          action={
+            canWrite && (
+              <Button
+                variant="primary"
+                icon={<IconPlus size={14} />}
+                onClick={() => setAdding(true)}
+              >
+                Add server
+              </Button>
+            )
+          }
+          learnMore={doc('guides/models', 'add-a-model-server')}
         />
       ) : (
         <Table label="Model servers">
@@ -74,10 +87,10 @@ export function ServersPanel() {
               <TH>Server</TH>
               <TH>Kind</TH>
               <TH>Health</TH>
-              <TH>Trust tier</TH>
-              <TH>Cache salt</TH>
+              <TH>Where it runs</TH>
+              <TH>Cache isolation</TH>
               <TH>API key</TH>
-              <TH>Tenants</TH>
+              <TH>Workspaces</TH>
               <TH>
                 <span className="sr-only">Actions</span>
               </TH>
@@ -104,8 +117,11 @@ export function ServersPanel() {
                 </TD>
                 <TD>
                   {s.cache_salt ? (
-                    <Badge tone="ok" title="Per-tenant cache_salt isolates the vLLM prefix cache.">
-                      per tenant
+                    <Badge
+                      tone="ok"
+                      title="cache_salt: the vLLM prefix cache is isolated per workspace."
+                    >
+                      Per workspace
                     </Badge>
                   ) : (
                     <span className="text-fg-subtle">off</span>
@@ -113,7 +129,7 @@ export function ServersPanel() {
                 </TD>
                 <TD className="text-fg-muted">{s.has_api_key ? 'set' : 'none'}</TD>
                 <TD className="max-w-48 truncate text-fg-muted" title={s.tenants.join(', ')}>
-                  {s.tenants.length === 0 ? 'All tenants' : s.tenants.join(', ')}
+                  {s.tenants.length === 0 ? 'All workspaces' : s.tenants.join(', ')}
                 </TD>
                 <TD className="text-right whitespace-nowrap">
                   {canWrite && (
@@ -147,9 +163,17 @@ export function ServersPanel() {
         open={adding}
         onClose={() => setAdding(false)}
         title="Add model server"
-        description="A shared OpenAI-compatible endpoint. The control plane probes it for health every 15 seconds while this page is open."
+        description="A server with an OpenAI-compatible address. Caliban checks it can reach it every 15 seconds while this page is open."
       >
-        {adding && <ServerForm onDone={() => setAdding(false)} />}
+        {adding && (
+          <ServerForm
+            onDone={(created) => {
+              setAdding(false);
+              // Right after adding a server, find its models (UX-21).
+              if (created) setDiscovering(created);
+            }}
+          />
+        )}
       </Drawer>
 
       <DiscoveryDialog server={discovering} onClose={() => setDiscovering(null)} />
@@ -166,8 +190,8 @@ export function ServersPanel() {
         }}
       >
         <p>
-          Remove <code className="font-mono font-medium">{deleting?.id}</code>? The server refuses
-          while catalogue models still use it; delete those models first.
+          Remove <code className="font-mono font-medium">{deleting?.id}</code>? This is refused
+          while models still use it: delete those models first.
         </p>
       </ConfirmDialog>
     </Card>

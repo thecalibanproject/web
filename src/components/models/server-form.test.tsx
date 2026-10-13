@@ -22,14 +22,16 @@ describe('ServerForm (shared model server)', () => {
     renderWithClient(<ServerForm onDone={onDone} />);
 
     expect(screen.getByLabelText(/^Kind/)).toHaveValue('openai_compatible');
-    expect(screen.getByLabelText(/^Trust tier/)).toHaveValue('t0_sovereign');
+    expect(screen.getByLabelText(/^Where it runs/)).toHaveValue('t0_sovereign');
     expect(screen.getByLabelText(/^Base URL/)).toHaveAttribute(
       'placeholder',
       'http://qwen3-30b:8000/v1',
     );
+    // Expert settings sit under Advanced, with safe defaults.
+    expect(screen.getByText('Advanced').closest('details')).not.toHaveAttribute('open');
     expect(screen.getByRole('checkbox', { name: 'Cache salt' })).not.toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Cache salt' })).toHaveAccessibleDescription(
-      'Isolate prefix cache per tenant (vLLM)',
+      'Isolates the vLLM prefix cache per workspace.',
     );
     expect(screen.getByLabelText(/^API key/)).toHaveAttribute('type', 'password');
 
@@ -55,9 +57,10 @@ describe('ServerForm (shared model server)', () => {
     expect(screen.getByLabelText(/^Server ID/)).not.toHaveAttribute('aria-invalid', 'true');
     await user.clear(screen.getByLabelText(/^Base URL/));
     await user.type(screen.getByLabelText(/^Base URL/), 'http://qwen3-30b:8000/v1/');
+    await user.click(screen.getByText('Advanced'));
     await user.click(screen.getByRole('checkbox', { name: 'Cache salt' }));
     await user.type(screen.getByLabelText(/^API key/), 'sk-vllm-secret');
-    await user.type(screen.getByLabelText(/^Tenant allow-list/), 'acme, globex acme');
+    await user.type(screen.getByLabelText(/^Only these workspaces/), 'acme, globex acme');
     await user.click(screen.getByRole('button', { name: 'Add server' }));
 
     await waitFor(() => expect(onDone).toHaveBeenCalled());

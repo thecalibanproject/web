@@ -1,12 +1,4 @@
-import type {
-  CacheStatus,
-  CacheTier,
-  Datasource,
-  ModelCapabilities,
-  ModelKind,
-  OntologyElement,
-  TrustTier,
-} from '@/api/types';
+import type { CacheStatus, CacheTier, ModelCapabilities, ModelKind, TrustTier } from '@/api/types';
 import { EMPTY, formatPercent } from '@/lib/format';
 import {
   CACHE_TIER_LABEL,
@@ -32,77 +24,31 @@ export function TrustTierBadge({ tier }: { tier: TrustTier }) {
   );
 }
 
-/**
- * `pending` when created, `introspecting` while a job runs, then `ready` or
- * `failed`. `connected` and `error` are reserved (not set by this release).
- */
-export type DatasourceStatus = Datasource['status'];
-
-const DS_TONE: Record<DatasourceStatus, Tone> = {
-  pending: 'neutral',
-  connected: 'ok',
-  ready: 'ok',
-  error: 'danger',
-  failed: 'danger',
-  introspecting: 'info',
-};
-
-export function DatasourceStatusBadge({ status }: { status: DatasourceStatus }) {
-  return (
-    <Badge tone={DS_TONE[status] ?? 'neutral'} dot>
-      {status}
-    </Badge>
-  );
-}
-
-const PROV_LABEL: Record<OntologyElement['provenance'], string> = {
-  introspect: 'Introspected',
-  profile: 'Profiled',
-  query_log: 'Query log',
-  llm: 'LLM-proposed',
-  human: 'Human',
-};
-
-const PROV_HINT: Record<OntologyElement['provenance'], string> = {
-  introspect: 'Read from the source schema.',
-  profile: 'Inferred from data profiling.',
-  query_log: 'Mined from the source query log.',
-  llm: 'Proposed by a model. Check carefully.',
-  human: 'Authored by a person.',
-};
-
-export function ProvenanceBadge({ provenance }: { provenance: OntologyElement['provenance'] }) {
-  return (
-    <Badge
-      tone={provenance === 'llm' ? 'accent' : provenance === 'human' ? 'ok' : 'neutral'}
-      title={PROV_HINT[provenance]}
-    >
-      {PROV_LABEL[provenance]}
-    </Badge>
-  );
-}
-
-const STATUS_TONE: Record<OntologyElement['status'], Tone> = {
-  proposed: 'warn',
-  approved: 'ok',
-  rejected: 'danger',
-  stale: 'neutral',
-  deprecated: 'neutral',
-};
-
-export function ElementStatusBadge({ status }: { status: OntologyElement['status'] }) {
-  return <Badge tone={STATUS_TONE[status]}>{status}</Badge>;
-}
-
 const CACHE_TONE: Record<CacheStatus, Tone> = { hit: 'ok', miss: 'neutral', bypass: 'warn' };
 
+const CACHE_LABEL: Record<CacheStatus, string> = {
+  hit: 'Reused',
+  miss: 'New answer',
+  bypass: 'Not cached',
+};
+
+const CACHE_HINT: Record<CacheStatus, string> = {
+  hit: 'Cache hit: an earlier answer was reused, no model was called.',
+  miss: 'Cache miss: the cache applied but had no answer, so a model answered.',
+  bypass: 'Bypass: no cache applies to this request.',
+};
+
 export function CacheBadge({ cache }: { cache: CacheStatus }) {
-  return <Badge tone={CACHE_TONE[cache]}>{cache}</Badge>;
+  return (
+    <Badge tone={CACHE_TONE[cache]} title={CACHE_HINT[cache]}>
+      {CACHE_LABEL[cache]}
+    </Badge>
+  );
 }
 
 const CACHE_TIER_HINT: Record<CacheTier, string> = {
   exact: 'Answered from a byte-identical (pseudonymized) earlier request.',
-  semantic: 'Answered from an earlier, semantically similar request of the same tenant.',
+  semantic: 'Answered from an earlier, similar request of the same workspace.',
 };
 
 export function CacheTierBadge({ tier }: { tier: CacheTier }) {
@@ -147,12 +93,12 @@ export function CapabilityBadges({ capabilities: c }: { capabilities: ModelCapab
   const control = c.reasoning_control ?? 'none';
   const items: Array<{ key: string; label: string; title: string }> = [];
   if (c.tools)
-    items.push({ key: 'tools', label: 'tools', title: 'Supports tool / function calling.' });
-  if (c.vision) items.push({ key: 'vision', label: 'vision', title: 'Accepts image inputs.' });
+    items.push({ key: 'tools', label: 'Tools', title: 'Can call tools (function calling).' });
+  if (c.vision) items.push({ key: 'vision', label: 'Images', title: 'Accepts image inputs.' });
   if (reasoning !== 'none') {
     items.push({
       key: 'reasoning',
-      label: reasoning === 'hybrid' ? 'reasoning · hybrid' : 'reasoning',
+      label: reasoning === 'hybrid' ? 'Thinking (optional)' : 'Thinking',
       title:
         (reasoning === 'hybrid'
           ? 'Thinking can be switched on or off per request (caliban.reasoning).'

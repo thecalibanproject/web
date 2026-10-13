@@ -276,7 +276,9 @@ describe('Role-gated console', () => {
     expect(within(nav()).getByRole('link', { name: 'People and roles' })).toBeInTheDocument();
 
     await user.click(within(nav()).getByRole('link', { name: 'Models' }));
-    expect(await screen.findByText('No models registered')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add server' })).not.toBeInTheDocument();
+    await user.click(await screen.findByRole('tab', { name: 'Models' }));
+    expect(await screen.findByText('No models yet')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add model' })).not.toBeInTheDocument();
   });
 
