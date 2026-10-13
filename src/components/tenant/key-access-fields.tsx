@@ -1,21 +1,32 @@
 import { useQuery } from '@tanstack/react-query';
 import { useId, useMemo, useState } from 'react';
 import { usePermissions } from '@/api/auth';
-import { nodesQuery } from '@/api/queries';
+import { datasourcesQuery, nodesQuery, ragCollectionsQuery } from '@/api/queries';
 import { accessError, splitList, type KeyAccess } from '@/lib/apiKeys';
+import { doc } from '@/lib/docs';
+import { Advanced } from '../help/advanced';
+import { Toggletip } from '../help/toggletip';
 import { Checkbox, Field, Input } from '../ui';
 
 const NODE_MODES: Array<{ value: KeyAccess['nodes']; label: string; hint: string }> = [
-  { value: 'all', label: 'Every published node', hint: 'No allowlist: new nodes are included.' },
-  { value: 'only', label: 'Only these nodes', hint: 'An allowlist of node names.' },
-  { value: 'none', label: 'No nodes', hint: 'The key only makes model calls.' },
+  {
+    value: 'only',
+    label: 'Only these assistants',
+    hint: 'Recommended: the key runs the assistants you tick, nothing else.',
+  },
+  { value: 'none', label: 'Model calls only', hint: 'The key runs no assistant.' },
+  {
+    value: 'all',
+    label: 'Every published assistant',
+    hint: 'Including assistants added later.',
+  },
 ];
 
 /**
- * Which nodes an API key may run (its node allowlist) and which datasource
- * scopes the built-in query tool may read in its runs. Controlled, so the same
+ * Which assistants an app key may run and which data its conversations may
+ * read, picked from what the workspace has (UX-28). Controlled, so the same
  * fields can edit an existing key once the control plane accepts changes.
- * Granting node access needs nodes.run on the tenant.
+ * Granting assistants needs nodes.run on the workspace.
  */
 export function KeyAccessFields({
   tenantId,
@@ -38,18 +49,38 @@ export function KeyAccessFields({
     () => [...new Set((nodes.data ?? []).map((n) => n.name))].sort(),
     [nodes.data],
   );
-  const [otherText, setOtherText] = useState(() =>
-    value.names.filter((n) => !known.includes(n)).join(', '),
+  const rag = useQuery({
+    ...ragCollectionsQuery(tenantId),
+    enabled: perms.can('rag.read', tenantId),
+  });
+  const sources = useQuery({
+    ...datasourcesQuery(tenantId),
+    enabled: perms.can('datasources.read', tenantId),
+  });
+  const offered = useMemo(
+    () => [
+      ...(rag.data ?? []).map((c) => ({
+        scope: `rag.${c.name}:read`,
+        label: `Document library ${c.name}`,
+      })),
+      ...(sources.data ?? []).map((d) => ({
+        scope: `${d.name}.*:read`,
+        label: `Data connection ${d.name}`,
+      })),
+    ],
+    [rag.data, sources.data],
   );
-  const [scopeText, setScopeText] = useState(() => value.scopes.join(', '));
+  const offeredScopes = offered.map((o) => o.scope);
+  const [otherText, setOtherText] = useState(() =>
+    value.scopes.filter((s) => !offeredScopes.includes(s)).join(', '),
+  );
   const group = useId();
   const errorId = useId();
   const error = accessError(value);
   const locked = disabled || !canGrant;
-
-  const setNames = (picked: string[], other: string) =>
-    onChange({ ...value, names: [...new Set([...picked, ...splitList(other)])] });
-  const picked = value.names.filter((n) => known.includes(n));
+  const pickedScopes = value.scopes.filter((s) => offeredScopes.includes(s));
+  const setScopes = (picked: string[], other: string) =>
+    onChange({ ...value, scopes: [...new Set([...picked, ...splitList(other)])] });
 
   return (
     <div className="flex flex-col gap-4">
@@ -58,14 +89,16 @@ export function KeyAccessFields({
         disabled={locked}
         aria-describedby={!canGrant ? `${group}-denied` : undefined}
       >
-        <legend className="mb-1 text-[12.5px] font-medium text-fg">Nodes this key may run</legend>
+        <legend className="mb-1 text-[12.5px] font-medium text-fg">
+          Assistants this key may run
+        </legend>
         {!canGrant && (
           <p id={`${group}-denied`} className="text-[12px] text-fg-muted">
-            Your role cannot grant node access on this tenant (needs nodes.run): the key will run no
-            nodes.
+            Your role cannot let keys run assistants in this workspace: the key will make model
+            calls only.
           </p>
         )}
-        <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
           {NODE_MODES.map((m) => (
             <label
               key={m.value}
@@ -83,22 +116,32 @@ export function KeyAccessFields({
               {m.label}
             </label>
           ))}
+          <Toggletip label="key access" doc={doc('guides/api-keys', 'create')}>
+            An application calling with this key can only run the assistants allowed here. Model
+            calls through automatic routing work either way.
+          </Toggletip>
         </div>
         {canGrant && value.nodes === 'only' && (
           <div className="flex flex-col gap-2 rounded-md border border-border p-3">
             {known.length > 0 ? (
-              <div className="flex flex-wrap gap-x-4 gap-y-1.5" role="group" aria-label="Nodes">
+              <div
+                className="flex flex-wrap gap-x-4 gap-y-1.5"
+                role="group"
+                aria-label="Assistants"
+              >
                 {known.map((name) => (
                   <Checkbox
                     key={name}
-                    label={<span className="font-mono text-[12.5px]">{name}</span>}
-                    checked={picked.includes(name)}
+                    label={name}
+                    checked={value.names.includes(name)}
                     disabled={disabled}
                     onChange={(e) =>
-                      setNames(
-                        e.target.checked ? [...picked, name] : picked.filter((n) => n !== name),
-                        otherText,
-                      )
+                      onChange({
+                        ...value,
+                        names: e.target.checked
+                          ? [...value.names, name]
+                          : value.names.filter((n) => n !== name),
+                      })
                     }
                   />
                 ))}
@@ -106,54 +149,72 @@ export function KeyAccessFields({
             ) : (
               <p className="text-[12px] text-fg-muted">
                 {nodes.isPending && nodes.fetchStatus !== 'idle'
-                  ? "Loading the tenant's nodes…"
-                  : 'No nodes listed for this tenant yet. Type the names below.'}
+                  ? "Loading the workspace's assistants…"
+                  : 'This workspace has no assistant yet. Choose model calls only, or create an assistant first.'}
               </p>
             )}
-            <Field
-              label={known.length > 0 ? 'Other node names' : 'Node names'}
-              hint="Comma separated. A node does not need to exist yet."
-            >
-              {({ id, describedBy }) => (
-                <Input
-                  id={id}
-                  aria-describedby={describedBy}
-                  value={otherText}
-                  disabled={disabled}
-                  spellCheck={false}
-                  placeholder="triage, intake"
-                  className="font-mono"
-                  onChange={(e) => {
-                    setOtherText(e.target.value);
-                    setNames(picked, e.target.value);
-                  }}
-                />
-              )}
-            </Field>
           </div>
         )}
       </fieldset>
-      <Field
-        label="Datasource scopes"
-        hint="What the built-in datasource query tool may read, and which document collections rag_search may search (rag.<collection>:read), in this key's runs, on top of each node's own scopes. Comma separated, such as shop.orders:read or rag.handbook:read. Empty: every scope of the nodes it runs."
-      >
-        {({ id, describedBy }) => (
-          <Input
-            id={id}
-            aria-describedby={[describedBy, error ? errorId : undefined].filter(Boolean).join(' ')}
-            aria-invalid={Boolean(error) && value.scopes.length > 0}
-            value={scopeText}
-            disabled={disabled}
-            spellCheck={false}
-            placeholder="shop.orders:read"
-            className="font-mono"
-            onChange={(e) => {
-              setScopeText(e.target.value);
-              onChange({ ...value, scopes: splitList(e.target.value) });
-            }}
-          />
-        )}
-      </Field>
+      <fieldset className="flex flex-col gap-2" disabled={disabled}>
+        <legend className="mb-1 text-[12.5px] font-medium text-fg">
+          Data its conversations may read
+        </legend>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+          {offered.length > 0 ? (
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5" role="group" aria-label="Data">
+              {offered.map((o) => (
+                <Checkbox
+                  key={o.scope}
+                  label={o.label}
+                  checked={pickedScopes.includes(o.scope)}
+                  onChange={(e) =>
+                    setScopes(
+                      e.target.checked
+                        ? [...pickedScopes, o.scope]
+                        : pickedScopes.filter((s) => s !== o.scope),
+                      otherText,
+                    )
+                  }
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="text-[12px] text-fg-muted">
+              No document library or data connection in this workspace yet.
+            </p>
+          )}
+          <Toggletip label="data access" doc={doc('guides/api-keys', 'scopes')}>
+            On top of what each assistant may read. Nothing ticked: each assistant&apos;s own data
+            access applies. Also called datasource scopes.
+          </Toggletip>
+        </div>
+      </fieldset>
+      <Advanced summary={otherText.trim() ? otherText : 'No other data'}>
+        <Field
+          label="Other data it may read"
+          hint="Comma separated, as <connection>.<collection>:read or rag.<library>:read, such as shop.orders:read."
+        >
+          {({ id, describedBy }) => (
+            <Input
+              id={id}
+              aria-describedby={[describedBy, error ? errorId : undefined]
+                .filter(Boolean)
+                .join(' ')}
+              aria-invalid={Boolean(error) && value.scopes.length > 0}
+              value={otherText}
+              disabled={disabled}
+              spellCheck={false}
+              placeholder="shop.orders:read"
+              className="font-mono"
+              onChange={(e) => {
+                setOtherText(e.target.value);
+                setScopes(pickedScopes, e.target.value);
+              }}
+            />
+          )}
+        </Field>
+      </Advanced>
       {error && (
         <p id={errorId} className="text-[12px] text-danger">
           {error}
