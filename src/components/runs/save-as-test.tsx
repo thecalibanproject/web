@@ -36,6 +36,8 @@ export function SaveAsTest({
   const [note, setNote] = useState('');
   const [label, setLabel] = useState<MastLabel | ''>('');
   const [saved, setSaved] = useState<CapturedGoldenCase | null>(null);
+  // Shown after a Save with something missing: the button stays enabled (AGENTS.md, Forms).
+  const [tried, setTried] = useState(false);
   const name = useId();
 
   const notFinished = isRunActive(status);
@@ -44,7 +46,10 @@ export function SaveAsTest({
   const ready = verdict === 'good' || (verdict === 'bad' && note.trim().length > 0);
 
   const save = () => {
-    if (!verdict || !ready) return;
+    if (!verdict || !ready) {
+      setTried(true);
+      return;
+    }
     capture.mutate(
       {
         runId,
@@ -72,6 +77,7 @@ export function SaveAsTest({
           setVerdict(notGood ? 'bad' : null);
           setNote('');
           setLabel('');
+          setTried(false);
           setOpen(true);
         }}
       >
@@ -95,7 +101,6 @@ export function SaveAsTest({
         title="Save this conversation as a test"
         confirmLabel="Save test case"
         confirmVariant="primary"
-        confirmDisabled={!ready}
         loading={capture.isPending}
         error={
           capture.error ? new Error(captureErrorMessage(capture.error, verdict ?? 'bad')) : null
@@ -136,6 +141,11 @@ export function SaveAsTest({
             />
             This answer was wrong
           </label>
+          {tried && !verdict && (
+            <p role="alert" className="text-[12px] text-danger">
+              Choose whether the answer was right or wrong.
+            </p>
+          )}
         </fieldset>
         {verdict === 'bad' && (
           <>
@@ -143,12 +153,16 @@ export function SaveAsTest({
               label="What should it have done?"
               required
               hint="A grader model checks future answers against this."
+              error={
+                tried && !note.trim() ? 'Say what it should have done: the grader needs it.' : null
+              }
             >
-              {({ id, describedBy }) => (
+              {({ id, describedBy, invalid }) => (
                 <Textarea
                   id={id}
                   dir="auto"
                   aria-describedby={describedBy}
+                  aria-invalid={invalid}
                   value={note}
                   maxLength={MAX_NOTE}
                   onChange={(e) => setNote(e.target.value)}

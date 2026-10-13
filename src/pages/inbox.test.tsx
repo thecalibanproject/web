@@ -197,11 +197,17 @@ describe('InboxPage (Approvals)', () => {
     await user.click(screen.getByRole('button', { name: REJECT_A }));
     const dialog = await screen.findByRole('dialog', { name: 'Reject update_ticket on crm?' });
     const reject = within(dialog).getByRole('button', { name: 'Reject' });
-    expect(reject).toBeDisabled();
+    expect(reject).toBeEnabled();
     expect(dialog).toHaveTextContent('kept with the conversation');
+    await user.click(reject);
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Choose a reason');
 
     await user.click(within(dialog).getByLabelText('Other'));
-    expect(reject).toBeDisabled();
+    await user.click(reject);
+    expect(within(dialog).getByLabelText(/Your reason/)).toHaveAccessibleDescription(
+      /Write your reason/,
+    );
+    expect(answerBody(calls, 'run_a')).toBeUndefined();
     await user.click(within(dialog).getByLabelText('The request looks suspicious'));
     await user.type(within(dialog).getByLabelText(/Anything to add/), 'IBAN differs');
     await user.click(reject);

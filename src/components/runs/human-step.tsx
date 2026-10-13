@@ -174,6 +174,8 @@ function RejectDialog({
 }) {
   const [choice, setChoice] = useState('');
   const [text, setText] = useState('');
+  // Reject stays enabled; a missing reason is said after the click (AGENTS.md, Forms).
+  const [tried, setTried] = useState(false);
   const name = useId();
   const needsText = choice === 'Other';
   const ready = Boolean(choice) && (!needsText || text.trim().length > 0);
@@ -183,12 +185,12 @@ function RejectDialog({
       open={open}
       title={`Reject ${what}?`}
       confirmLabel="Reject"
-      confirmDisabled={!ready}
       loading={loading}
       error={error}
       onCancel={onCancel}
       onConfirm={() => {
         if (ready) onReject(reason);
+        else setTried(true);
       }}
     >
       <fieldset className="flex flex-col gap-1.5">
@@ -206,11 +208,22 @@ function RejectDialog({
             {r}
           </label>
         ))}
+        {tried && !choice && (
+          <p role="alert" className="text-[12px] text-danger">
+            Choose a reason: it goes back to the assistant.
+          </p>
+        )}
       </fieldset>
-      <Field label={needsText ? 'Your reason' : 'Anything to add (optional)'} required={needsText}>
-        {({ id }) => (
+      <Field
+        label={needsText ? 'Your reason' : 'Anything to add (optional)'}
+        required={needsText}
+        error={tried && needsText && !text.trim() ? 'Write your reason.' : null}
+      >
+        {({ id, describedBy, invalid }) => (
           <Input
             id={id}
+            aria-describedby={describedBy}
+            aria-invalid={invalid}
             dir="auto"
             value={text}
             onChange={(e) => setText(e.target.value)}

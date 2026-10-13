@@ -37,6 +37,7 @@ import { EMPTY, formatDateTime, formatInt, formatMs, formatUsd } from '@/lib/for
 import { shortHash } from '@/lib/nodes';
 import { deniedReason } from '@/lib/permissions';
 import {
+  ANSWER_ACTION_LABEL,
   ANSWER_ACTION_TONE,
   ANSWER_RULE_LABEL,
   budgetRows,
@@ -370,7 +371,8 @@ function AnswerGuard({ check }: { check: AnswerCheck }) {
       <CardHeader
         title={
           <span className="flex items-center gap-2">
-            Answer check <Badge tone={ANSWER_ACTION_TONE[action]}>{action}</Badge>
+            Answer check{' '}
+            <Badge tone={ANSWER_ACTION_TONE[action]}>{ANSWER_ACTION_LABEL[action]}</Badge>
           </span>
         }
         description={

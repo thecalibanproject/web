@@ -266,7 +266,7 @@ describe('RunDetailPage', () => {
     const guard = screen
       .getByText('Answer check')
       .closest('section, div.rounded-lg') as HTMLElement;
-    expect(guard).toHaveTextContent('redacted');
+    expect(guard).toHaveTextContent('Parts removed');
     expect(guard).toHaveTextContent(/were removed from the answer/);
     const rows = within(screen.getByRole('table', { name: 'Answer check findings' })).getAllByRole(
       'row',
@@ -469,7 +469,12 @@ describe('Save as test', () => {
     await user.click(screen.getByRole('button', { name: 'Save as test' }));
     const dialog = await screen.findByRole('dialog', { name: 'Save this conversation as a test' });
     const save = within(dialog).getByRole('button', { name: 'Save test case' });
-    expect(save).toBeDisabled();
+    expect(save).toBeEnabled();
+    await user.click(save);
+    expect(within(dialog).getByRole('alert')).toHaveTextContent(
+      'Choose whether the answer was right or wrong.',
+    );
+    expect(calls.some((c) => c.method === 'POST' && c.path === C)).toBe(false);
     await user.click(within(dialog).getByLabelText('This answer was right'));
     await user.click(save);
     await waitFor(() =>
@@ -494,7 +499,11 @@ describe('Save as test', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Save this conversation as a test' });
     await user.click(within(dialog).getByLabelText('This answer was wrong'));
     const save = within(dialog).getByRole('button', { name: 'Save test case' });
-    expect(save).toBeDisabled();
+    await user.click(save);
+    expect(within(dialog).getByLabelText(/What should it have done/)).toHaveAccessibleDescription(
+      /Say what it should have done/,
+    );
+    expect(calls.some((c) => c.method === 'POST' && c.path === C)).toBe(false);
     await user.type(
       within(dialog).getByLabelText(/What should it have done/),
       'Send to cardiology',

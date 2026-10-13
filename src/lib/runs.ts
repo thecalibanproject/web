@@ -172,6 +172,13 @@ export const ANSWER_RULE_LABEL: Record<AnswerRule, string> = {
   instruction_echo: 'Echo of an injected instruction',
 };
 
+/** What the answer check did, in words (the badge never shows the raw value). */
+export const ANSWER_ACTION_LABEL: Record<NonNullable<AnswerCheck['action']>, string> = {
+  passed: 'Passed',
+  redacted: 'Parts removed',
+  refused: 'Answer refused',
+};
+
 export const ANSWER_ACTION_TONE: Record<NonNullable<AnswerCheck['action']>, Tone> = {
   passed: 'ok',
   redacted: 'warn',
