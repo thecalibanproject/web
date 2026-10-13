@@ -58,16 +58,6 @@ const DATA_MODULES: Record<string, Set<string> | 'all-values'> = {
  * empty: remove a file here when its copy is migrated.
  */
 const PENDING = new Set<string>([
-  'components/auto-margin-card.tsx',
-  'components/models/catalogue-panel.tsx',
-  'components/models/model-form.tsx',
-  'components/models/server-form.tsx',
-  'components/models/servers-panel.tsx',
-  'components/node-cost-card.tsx',
-  'components/nodes/node-behavior.tsx',
-  'components/nodes/node-scopes.tsx',
-  'components/purpose-cost-card.tsx',
-  'components/route-counts-card.tsx',
   'components/tenant-select.tsx',
   'components/tenant/api-keys-panel.tsx',
   'components/tenant/delete-tenant-section.tsx',
@@ -78,18 +68,8 @@ const PENDING = new Set<string>([
   'components/tenant/provider-keys-panel.tsx',
   'components/tenant/tenant-deleted-state.tsx',
   'components/tenant/tenant-settings-section.tsx',
-  'components/tools/register-server-form.tsx',
-  'components/tools/server-tools.tsx',
-  'components/tools/tool-review.tsx',
-  'components/usage-table.tsx',
-  'pages/audit.tsx',
-  'pages/models.tsx',
-  'pages/settings.tsx',
   'pages/tenant-detail.tsx',
   'pages/tenants.tsx',
-  'pages/tools.tsx',
-  'pages/usage.tsx',
-  'pages/users.tsx',
 ]);
 
 function walk(dir: string, out: string[] = []): string[] {
