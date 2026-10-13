@@ -14,7 +14,7 @@ import { Button, EmptyState, Select } from '../ui';
 import { IconChevronRight, IconInbox, IconLogout, LogoMark } from '../ui/icons';
 import { CommandPalette } from './command-palette';
 import { ADMIN_NAV, DAILY_NAV, type NavItem } from './nav';
-import { ThemeToggle } from './theme-toggle';
+import { MotionToggle, ThemeToggle } from './theme-toggle';
 
 const ADMIN_OPEN_KEY = 'caliban.nav.admin';
 
@@ -273,6 +273,7 @@ export function AppShell() {
             </div>
           )}
           <ThemeToggle />
+          <MotionToggle />
           <button
             type="button"
             onClick={signOut}

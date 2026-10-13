@@ -86,6 +86,36 @@ describe('App shell', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/tenants'));
   });
 
+  it('opens a conversation by its id from the palette', async () => {
+    mock();
+    const { router } = await renderApp('/');
+    await screen.findByRole('combobox', { name: 'Workspace' });
+    await userEvent.click(screen.getByRole('button', { name: /Search or jump to/ }));
+    await userEvent.type(
+      await screen.findByRole('combobox', { name: /Search pages/ }),
+      'run_01abc123',
+    );
+    const first = within(screen.getByRole('listbox', { name: 'Results' })).getAllByRole(
+      'option',
+    )[0];
+    expect(first).toHaveTextContent('Open conversation run_01abc123');
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(router.state.location.pathname).toBe('/runs/t1/run_01abc123'));
+  });
+
+  it('has a reduce motion switch that applies at once and is remembered', async () => {
+    mock();
+    await renderApp('/');
+    const toggle = await screen.findByRole('switch', { name: 'Reduce motion' });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(document.documentElement).toHaveAttribute('data-motion', 'reduce');
+    expect(window.localStorage.getItem('caliban.motion')).toBe('reduce');
+    await userEvent.click(toggle);
+    expect(document.documentElement).not.toHaveAttribute('data-motion');
+  });
+
   it('has a help panel for the page, in the same place on every page', async () => {
     mock();
     await renderApp('/');

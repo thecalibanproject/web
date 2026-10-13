@@ -4,7 +4,7 @@ import { usePermissions } from '@/api/auth';
 import { cn } from '@/lib/cn';
 import { docsHref } from '@/lib/docs';
 import { GLOSSARY, type GlossaryId } from '@/lib/glossary';
-import { rankCommands, type PaletteCommand } from '@/lib/palette';
+import { rankCommands, type PaletteCommand, type RankedCommand } from '@/lib/palette';
 import { setWorkspace, useWorkspace } from '@/lib/workspace';
 import { Drawer } from '../ui';
 import { IconSearch } from '../ui/icons';
@@ -155,7 +155,27 @@ function Palette({ onDone }: { onDone: () => void }) {
     return [...pages, ...actions, ...workspaces, ...terms];
   }, [navigate, perms, ws.list, ws.id]);
 
-  const results = rankCommands(commands, query, 14);
+  // A conversation id typed or pasted opens it in the current workspace.
+  const runId = /^run_[A-Za-z0-9]{6,}$/.test(query.trim()) ? query.trim() : null;
+  const openRun: PaletteCommand[] =
+    runId && ws.id
+      ? [
+          {
+            id: `run:${runId}`,
+            label: `Open conversation ${runId}`,
+            group: 'Actions',
+            run: () =>
+              void navigate({
+                to: '/runs/$tenantId/$runId',
+                params: { tenantId: ws.id!, runId },
+              }),
+          },
+        ]
+      : [];
+  const results: RankedCommand[] = [
+    ...openRun.map((command) => ({ command })),
+    ...rankCommands(commands, query, 14),
+  ];
   const current = Math.min(active, Math.max(0, results.length - 1));
   const optionId = (i: number) => `${listId}-opt-${i}`;
 
