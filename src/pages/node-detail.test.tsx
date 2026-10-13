@@ -397,12 +397,12 @@ describe('NodeDetailPage', () => {
       const card = screen.getByRole('region', { name: 'Data access' });
       expect(card).toHaveTextContent('What v1 may read');
       const handbook = within(card).getByRole('link', {
-        name: 'rag.handbook:read: open collection handbook in Retrieval',
+        name: 'rag.handbook:read: open library handbook in Knowledge',
       });
       expect(handbook).toHaveAttribute('href', '/rag?tenant=t1&collection=handbook');
       expect(
         within(card).getByRole('link', {
-          name: 'rag.*:read: open every collection of the tenant in Retrieval',
+          name: 'rag.*:read: open every document library of the workspace in Knowledge',
         }),
       ).toHaveAttribute('href', '/rag?tenant=t1');
       expect(card).toHaveTextContent('searches handbook');
@@ -422,10 +422,10 @@ describe('NodeDetailPage', () => {
       await user.click(screen.getByRole('button', { name: 'View settings of v1' }));
       const drawer = await screen.findByRole('dialog', { name: 'triage v1' });
       const access = within(drawer).getByRole('region', { name: 'Data access' });
-      const list = within(access).getByRole('list', { name: 'Document collections' });
+      const list = within(access).getByRole('list', { name: 'Document libraries' });
       expect(list).toHaveTextContent('rag.handbook:read');
       expect(within(list).queryByRole('link')).not.toBeInTheDocument();
-      expect(access).toHaveTextContent('rag_search not used');
+      expect(access).toHaveTextContent('Document search is off');
     });
 
     it('has no data access card for a version without scopes', async () => {
@@ -459,32 +459,36 @@ describe('NodeDetailPage', () => {
       await openAs(null, [workflow, v2]);
       const card = screen.getByRole('region', { name: 'Answers and models' });
       expect(card).toHaveTextContent('Answers and models of v1');
-      expect(card).toHaveTextContent('what the node reads can steer what it tells the user');
-      expect(card).toHaveTextContent('mask on every model call, sovereign models included');
+      expect(card).toHaveTextContent('what the assistant reads can steer what it tells people');
       expect(card).toHaveTextContent(
-        'Irreversible: tool results are masked as they enter the run, so the caller sees [PHONE] too. A node that must quote contacts from a catalogue should use reversible.',
+        'Hide everywhere on every model call, models on your own servers included',
       );
-      const rows = within(within(card).getByRole('table', { name: 'Model vertices' })).getAllByRole(
+      expect(card).toHaveTextContent(
+        'Hidden for good: what tools return is hidden as it comes in, so the person asking sees [PHONE] too.',
+      );
+      const rows = within(within(card).getByRole('table', { name: 'Model steps' })).getAllByRole(
         'row',
       );
       expect(rows).toHaveLength(3);
-      expect(rows[1]).toHaveTextContent(/^classifyrouteroffConstrained decoding$/);
-      expect(rows[2]).toHaveTextContent(/^recommendllmlow \(node default\)In the prompt$/);
+      expect(rows[1]).toHaveTextContent(/^classifyrouteroffEnforced by the model server$/);
+      expect(rows[2]).toHaveTextContent(
+        /^recommendllmlow \(assistant default\)Asked in the instructions$/,
+      );
     });
 
     it('shows the default answer guard of an agent, in its spec too', async () => {
       const user = userEvent.setup();
       await openAs(null);
       const card = screen.getByRole('region', { name: 'Answers and models' });
-      expect(card).toHaveTextContent('redact(default)');
+      expect(card).toHaveTextContent('Remove suspicious parts(default)');
       expect(within(card).queryByRole('table')).not.toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'View settings of v1' }));
       const drawer = await screen.findByRole('dialog', { name: 'triage v1' });
       expect(within(drawer).getByRole('region', { name: 'Answers and models' })).toHaveTextContent(
-        "the tenant's PII settings apply",
+        "the workspace's setting applies",
       );
       expect(card).toHaveTextContent(
-        'In reversible mode tool results enter the run as they are and the caller gets the real values',
+        'When it restores data in the answer, people get the real values',
       );
     });
   });
