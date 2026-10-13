@@ -52,7 +52,7 @@ export function CommandPalette() {
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
         aria-keyshortcuts="Control+K Meta+K"
-        className="inline-flex h-8 min-w-0 items-center gap-2 rounded-md border border-border-strong bg-surface px-2.5 text-[13px] text-fg-muted hover:bg-surface-2 hover:text-fg sm:w-60"
+        className="inline-flex h-8 min-w-0 items-center gap-2 rounded-md border border-border-strong bg-surface px-2.5 text-[13px] text-fg-muted hover:bg-surface-2 hover:text-fg sm:w-64"
       >
         <IconSearch size={14} className="shrink-0" />
         <span className="hidden truncate sm:inline">Search or jump to</span>
