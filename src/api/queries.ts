@@ -901,6 +901,28 @@ export function useReviewElement(tenantId: string) {
 }
 
 /**
+ * Reviews many elements as one ontology version (`ontology.review`): bulk
+ * approve or reject from the review queue. Refused with a breaking-change
+ * `409` like a single review.
+ */
+export function useReviewBatch(tenantId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: {
+      decisions: Array<{ id: string; decision: ReviewDecision }>;
+      note?: string;
+    }) =>
+      unwrap(
+        api.POST('/api/v1/tenants/{tenantId}/ontology/review', {
+          params: { path: { tenantId } },
+          body: { decisions: args.decisions, ...(args.note ? { note: args.note } : {}) },
+        }),
+      ),
+    onSettled: () => qc.invalidateQueries({ queryKey: qk.ontology(tenantId) }),
+  });
+}
+
+/**
  * Writes elements made outside Caliban as proposals, in one ontology version
  * (`ontology.review`). Proposing over an approved element withdraws it, so it
  * can be refused with a breaking-change `409` like a review.
