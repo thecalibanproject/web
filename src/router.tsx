@@ -135,7 +135,11 @@ const ontologyRoute = createRoute({
 const nodesRoute = createRoute({
   getParentRoute: () => appRoute,
   path: 'nodes',
-  validateSearch: tenantSearch,
+  validateSearch: (s: Record<string, unknown>): { tenant?: string; new?: 1 } => ({
+    tenant: str(s.tenant),
+    // Opens "New assistant" (the command palette's action).
+    new: s.new === 1 || s.new === '1' ? 1 : undefined,
+  }),
   component: lazyRouteComponent(() => import('@/pages/nodes'), 'NodesPage'),
 });
 
@@ -332,6 +336,9 @@ export function createAppRouter(queryClient: QueryClient, history = createHashHi
     defaultPreload: 'intent',
     defaultPreloadStaleTime: 0,
     scrollRestoration: true,
+    // Route changes cross-fade where the View Transition API exists (index.css
+    // holds the timing and the reduced-motion rule); ignored elsewhere.
+    defaultViewTransition: true,
   });
 }
 

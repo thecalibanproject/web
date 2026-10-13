@@ -185,9 +185,9 @@ describe('RunsPage', () => {
     mockRuns(ssoRoutes(meWith([{ role: 'billing', tenant_id: 't1' }])));
     await renderApp('/', { token: null });
     const nav = await screen.findByRole('navigation', { name: 'Primary' });
-    await within(nav).findByRole('link', { name: 'Settings' });
-    expect(within(nav).queryByRole('link', { name: 'Runs' })).not.toBeInTheDocument();
-    expect(within(nav).queryByRole('link', { name: 'Inbox' })).not.toBeInTheDocument();
+    await within(nav).findByRole('link', { name: 'Home' });
+    expect(within(nav).queryByRole('link', { name: 'Conversations' })).not.toBeInTheDocument();
+    expect(within(nav).queryByRole('link', { name: 'Approvals' })).not.toBeInTheDocument();
   });
 });
 

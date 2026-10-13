@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach, beforeAll } from 'vitest';
 import { clearToken, setCsrfToken, takeSessionExpired } from '@/lib/auth';
+import { resetWorkspaceForTests } from '@/lib/workspace';
 import { runTeardowns } from './teardowns';
 
 // jsdom parses its default stylesheet the first time anything calls
@@ -22,4 +23,5 @@ afterEach(() => {
   takeSessionExpired();
   window.sessionStorage.clear();
   window.localStorage.clear();
+  resetWorkspaceForTests();
 });

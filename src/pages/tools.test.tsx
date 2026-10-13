@@ -434,7 +434,7 @@ describe('ToolsPage', () => {
     });
     await renderApp('/', { token: null });
     const nav = await screen.findByRole('navigation', { name: 'Primary' });
-    expect(within(nav).queryByRole('link', { name: 'Tools' })).not.toBeInTheDocument();
-    expect(within(nav).queryByRole('link', { name: 'Nodes' })).not.toBeInTheDocument();
+    expect(within(nav).queryByRole('link', { name: 'Connected systems' })).not.toBeInTheDocument();
+    expect(within(nav).queryByRole('link', { name: 'Assistants' })).not.toBeInTheDocument();
   });
 });

@@ -175,7 +175,7 @@ describe('Console session (single sign-on)', () => {
     await renderApp('/', { token: null });
 
     expect(await screen.findByText('You are signed in, but have no role yet')).toBeInTheDocument();
-    expect(within(nav()).queryByRole('link', { name: 'Tenants' })).not.toBeInTheDocument();
+    expect(within(nav()).queryByRole('link', { name: 'Workspaces' })).not.toBeInTheDocument();
   });
 });
 
@@ -186,7 +186,7 @@ describe('Token mode', () => {
 
     expect(await screen.findByRole('table', { name: 'Tenants' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'New tenant' })).toBeInTheDocument();
-    expect(within(nav()).getByRole('link', { name: 'Audit' })).toBeInTheDocument();
+    expect(within(nav()).getByRole('link', { name: 'Audit log' })).toBeInTheDocument();
     const list = calls.find((c) => c.path === '/api/v1/tenants')!;
     expect(list.headers.get('Authorization')).toBe('Bearer test-admin-token');
   });
@@ -220,8 +220,8 @@ describe('Role-gated console', () => {
     expect(within(limits).queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Danger zone' })).not.toBeInTheDocument();
 
-    expect(within(nav()).queryByRole('link', { name: 'Audit' })).not.toBeInTheDocument();
-    expect(within(nav()).queryByRole('link', { name: 'Users and roles' })).not.toBeInTheDocument();
+    expect(within(nav()).queryByRole('link', { name: 'Audit log' })).not.toBeInTheDocument();
+    expect(within(nav()).queryByRole('link', { name: 'People and roles' })).not.toBeInTheDocument();
   });
 
   it('a tenant admin manages the tenant but cannot delete it', async () => {
@@ -255,10 +255,10 @@ describe('Role-gated console', () => {
 
     expect(await screen.findByRole('heading', { name: 'Acme' })).toBeInTheDocument();
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
-    for (const page of ['Datasources', 'Ontology', 'Nodes', 'Audit']) {
+    for (const page of ['Data connections', 'Data dictionary', 'Assistants', 'Audit log']) {
       expect(within(nav()).queryByRole('link', { name: page })).not.toBeInTheDocument();
     }
-    expect(within(nav()).getByRole('link', { name: 'Usage' })).toBeInTheDocument();
+    expect(within(nav()).getByRole('link', { name: 'Usage and costs' })).toBeInTheDocument();
   });
 
   it('an auditor reads everything and changes nothing', async () => {
@@ -272,8 +272,8 @@ describe('Role-gated console', () => {
 
     expect(await screen.findByRole('table', { name: 'Tenants' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'New tenant' })).not.toBeInTheDocument();
-    expect(within(nav()).getByRole('link', { name: 'Audit' })).toBeInTheDocument();
-    expect(within(nav()).getByRole('link', { name: 'Users and roles' })).toBeInTheDocument();
+    expect(within(nav()).getByRole('link', { name: 'Audit log' })).toBeInTheDocument();
+    expect(within(nav()).getByRole('link', { name: 'People and roles' })).toBeInTheDocument();
 
     await user.click(within(nav()).getByRole('link', { name: 'Models' }));
     expect(await screen.findByText('No models registered')).toBeInTheDocument();

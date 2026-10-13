@@ -554,7 +554,7 @@ describe('RagPage', () => {
     });
     await renderApp('/', { token: null });
     const nav = await screen.findByRole('navigation', { name: 'Primary' });
-    expect(within(nav).queryByRole('link', { name: 'Retrieval' })).not.toBeInTheDocument();
+    expect(within(nav).queryByRole('link', { name: 'Knowledge' })).not.toBeInTheDocument();
   });
 
   it('is in the menu for a viewer', async () => {
@@ -565,6 +565,6 @@ describe('RagPage', () => {
     });
     await renderApp('/', { token: null });
     const nav = await screen.findByRole('navigation', { name: 'Primary' });
-    expect(within(nav).getByRole('link', { name: 'Retrieval' })).toHaveAttribute('href', '/rag');
+    expect(within(nav).getByRole('link', { name: 'Knowledge' })).toHaveAttribute('href', '/rag');
   });
 });

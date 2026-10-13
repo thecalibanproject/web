@@ -1,75 +1,22 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link, Outlet } from '@tanstack/react-router';
-import type { ComponentType, SVGProps } from 'react';
+import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
+import { useEffect, useState } from 'react';
 import { useAuthState, useAuthStateRefresh, usePermissions, useSignOut } from '@/api/auth';
 import { healthQuery } from '@/api/queries';
-import type { Permission } from '@/api/types';
+import { useWaitingAcrossWorkspaces } from '@/lib/approvals';
 import { cn } from '@/lib/cn';
 import { displayName, type Principal } from '@/lib/permissions';
+import { readStorage, writeStorage } from '@/lib/storage';
+import { setWorkspace, useWorkspace } from '@/lib/workspace';
+import { PageHelpButton } from '../help/page-help';
 import { PrincipalRoles } from '../roles';
-import { Button, EmptyState } from '../ui';
-import {
-  IconAudit,
-  IconDatasources,
-  IconInbox,
-  IconLogout,
-  IconModels,
-  IconNodes,
-  IconOntology,
-  IconOverview,
-  IconRetrieval,
-  IconRuns,
-  IconSettings,
-  IconTenants,
-  IconTools,
-  IconUsage,
-  IconUsers,
-  LogoMark,
-} from '../ui/icons';
+import { Button, EmptyState, Select } from '../ui';
+import { IconChevronRight, IconInbox, IconLogout, LogoMark } from '../ui/icons';
+import { CommandPalette } from './command-palette';
+import { ADMIN_NAV, DAILY_NAV, type NavItem } from './nav';
 import { ThemeToggle } from './theme-toggle';
 
-type NavTo =
-  | '/'
-  | '/tenants'
-  | '/models'
-  | '/datasources'
-  | '/ontology'
-  | '/nodes'
-  | '/runs'
-  | '/inbox'
-  | '/tools'
-  | '/rag'
-  | '/usage'
-  | '/audit'
-  | '/users'
-  | '/settings';
-
-/**
- * `perm`: shown to users who hold it deployment-wide or on some tenant. The
- * control plane still checks every request; this only keeps the menu to
- * pages the user can open.
- */
-const NAV: Array<{
-  to: NavTo;
-  label: string;
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
-  perm?: Permission;
-}> = [
-  { to: '/', label: 'Overview', icon: IconOverview, perm: 'usage.read' },
-  { to: '/tenants', label: 'Tenants', icon: IconTenants, perm: 'tenant.read' },
-  { to: '/models', label: 'Models', icon: IconModels, perm: 'catalog.read' },
-  { to: '/datasources', label: 'Datasources', icon: IconDatasources, perm: 'datasources.read' },
-  { to: '/ontology', label: 'Ontology', icon: IconOntology, perm: 'ontology.read' },
-  { to: '/nodes', label: 'Nodes', icon: IconNodes, perm: 'nodes.read' },
-  { to: '/runs', label: 'Runs', icon: IconRuns, perm: 'runs.read' },
-  { to: '/inbox', label: 'Inbox', icon: IconInbox, perm: 'runs.read' },
-  { to: '/tools', label: 'Tools', icon: IconTools, perm: 'tools.read' },
-  { to: '/rag', label: 'Retrieval', icon: IconRetrieval, perm: 'rag.read' },
-  { to: '/usage', label: 'Usage', icon: IconUsage, perm: 'usage.read' },
-  { to: '/audit', label: 'Audit', icon: IconAudit, perm: 'audit.read' },
-  { to: '/users', label: 'Users and roles', icon: IconUsers, perm: 'rbac.read' },
-  { to: '/settings', label: 'Settings', icon: IconSettings },
-];
+const ADMIN_OPEN_KEY = 'caliban.nav.admin';
 
 function HealthPill() {
   const { data, isError, isPending } = useQuery(healthQuery());
@@ -89,7 +36,7 @@ function HealthPill() {
     >
       <span className={cn('size-2 shrink-0 rounded-full', tone)} aria-hidden="true" />
       <span className="truncate">
-        Control plane: <span className="text-fg">{state}</span>
+        Status: <span className="text-fg">{state}</span>
         {data && <span className="text-fg-subtle"> · v{data.version}</span>}
       </span>
     </div>
@@ -125,13 +72,174 @@ function NoAccess({ onSignOut }: { onSignOut: () => void }) {
   );
 }
 
+function NavLink({ item, badge }: { item: NavItem; badge?: number }) {
+  const Icon = item.icon;
+  return (
+    <li>
+      <Link
+        to={item.to}
+        activeOptions={{ exact: item.to === '/' }}
+        title={item.label}
+        className="flex h-8 items-center gap-2.5 rounded-md px-2 text-[13px] whitespace-nowrap text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg data-[status=active]:bg-accent-soft data-[status=active]:font-medium data-[status=active]:text-fg"
+      >
+        <Icon width={16} height={16} className="shrink-0" />
+        <span className="md:sr-only lg:not-sr-only">{item.label}</span>
+        {badge ? (
+          <span className="ml-auto rounded-full bg-warn px-1.5 text-[11px] leading-[18px] font-semibold text-surface tabular-nums md:absolute md:ml-0 md:translate-x-3 md:-translate-y-2 lg:static lg:ml-auto lg:translate-x-0 lg:translate-y-0">
+            {badge}
+            <span className="sr-only"> waiting</span>
+          </span>
+        ) : null}
+      </Link>
+    </li>
+  );
+}
+
+/**
+ * Daily work first, then a collapsible Administration group (UX-02). It
+ * starts open for deployment-wide roles (who install, configure or audit),
+ * and closed for workspace roles; the choice is remembered per browser.
+ */
+function SideNav({ waiting }: { waiting: number }) {
+  const perms = usePermissions();
+  const visible = (n: NavItem) => !n.perm || perms.canSomewhere(n.perm);
+  const daily = DAILY_NAV.filter(visible);
+  const admin = ADMIN_NAV.filter(visible);
+  const [adminOpen, setAdminOpen] = useState(() => {
+    const stored = readStorage('local', ADMIN_OPEN_KEY);
+    // Open for deployment-wide roles (owner, admin, auditor), closed for workspace roles.
+    return stored === null
+      ? perms.canSomewhere('catalog.write') || perms.canSomewhere('audit.read')
+      : stored === '1';
+  });
+  const toggle = () => {
+    setAdminOpen((o) => {
+      writeStorage('local', ADMIN_OPEN_KEY, o ? '0' : '1');
+      return !o;
+    });
+  };
+  return (
+    <nav
+      aria-label="Primary"
+      className="flex overflow-x-auto md:block md:flex-1 md:overflow-y-auto"
+    >
+      <p className="hidden px-4 pt-1 pb-1 text-[11px] font-semibold tracking-wide text-fg-muted uppercase lg:block">
+        Daily work
+      </p>
+      <ul className="flex gap-0.5 px-2 pb-2 md:flex-col md:pb-0">
+        {daily.map((n) => (
+          <NavLink key={n.to} item={n} badge={n.to === '/inbox' ? waiting : undefined} />
+        ))}
+      </ul>
+      {admin.length > 0 && (
+        <div className="flex items-start md:mt-3 md:block">
+          <button
+            type="button"
+            aria-expanded={adminOpen}
+            aria-controls="nav-admin"
+            onClick={toggle}
+            className="flex h-8 shrink-0 items-center gap-1.5 px-2 text-[11px] font-semibold tracking-wide whitespace-nowrap text-fg-muted uppercase hover:text-fg md:w-full md:justify-center lg:justify-start lg:px-4"
+          >
+            <IconChevronRight
+              size={12}
+              className={cn(
+                'transition-transform duration-(--duration-fast)',
+                adminOpen && 'rotate-90',
+              )}
+            />
+            <span className="md:sr-only lg:not-sr-only">Administration</span>
+          </button>
+          {adminOpen && (
+            <ul id="nav-admin" className="flex gap-0.5 px-2 pb-2 md:flex-col md:pb-0">
+              {admin.map((n) => (
+                <NavLink key={n.to} item={n} />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </nav>
+  );
+}
+
+/**
+ * The workspace switcher (UX-03): one choice for every page, kept across
+ * visits. With a single workspace it is just its name. A `?tenant=` in the
+ * URL (an old deep link, or a page's own override) switches it.
+ */
+function WorkspaceSwitcher() {
+  const ws = useWorkspace();
+  const navigate = useNavigate();
+  const searchTenant = useRouterState({
+    select: (s) => (s.location.search as { tenant?: unknown }).tenant,
+  });
+
+  useEffect(() => {
+    if (typeof searchTenant === 'string' && ws.list.some((t) => t.id === searchTenant)) {
+      setWorkspace(searchTenant);
+    }
+  }, [searchTenant, ws.list]);
+
+  if (ws.isPending || ws.list.length === 0) return null;
+  if (ws.list.length === 1) {
+    return (
+      <p className="truncate text-[13px] font-medium text-fg" title="Workspace">
+        <span className="sr-only">Workspace: </span>
+        {ws.workspace?.name}
+      </p>
+    );
+  }
+  return (
+    <label className="flex min-w-0 items-center gap-2 text-[12.5px] text-fg-muted">
+      <span className="hidden sm:inline">Workspace</span>
+      <span className="sr-only sm:hidden">Workspace</span>
+      <Select
+        value={ws.id ?? ''}
+        className="w-44 sm:w-52"
+        onChange={(e) => {
+          setWorkspace(e.target.value);
+          // A page following a `?tenant=` link follows the switcher from now on.
+          if (typeof searchTenant === 'string') {
+            void navigate({
+              to: '.',
+              search: (prev: Record<string, unknown>) => ({ ...prev, tenant: undefined }),
+              replace: true,
+            } as never);
+          }
+        }}
+      >
+        {ws.list.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+          </option>
+        ))}
+      </Select>
+    </label>
+  );
+}
+
+function ApprovalsBadge({ waiting }: { waiting: number }) {
+  if (!waiting) return null;
+  return (
+    <Link
+      to="/inbox"
+      className="inline-flex h-8 items-center gap-1.5 rounded-md bg-warn-soft px-2 text-[12.5px] font-medium text-warn hover:underline"
+    >
+      <IconInbox size={14} />
+      <span className="tabular-nums">{waiting}</span>
+      <span className="hidden sm:inline">waiting for you</span>
+      <span className="sr-only sm:hidden">approvals and questions waiting</span>
+    </Link>
+  );
+}
+
 export function AppShell() {
   useAuthStateRefresh();
   const auth = useAuthState();
   const perms = usePermissions();
   const { signOut, pending } = useSignOut();
   const principal = auth?.principal;
-  const nav = NAV.filter((n) => !n.perm || perms.canSomewhere(n.perm));
+  const waiting = useWaitingAcrossWorkspaces(!perms.hasNoRole).items.length;
 
   return (
     <div className="flex min-h-dvh flex-col md:flex-row">
@@ -154,27 +262,8 @@ export function AppShell() {
           <span className="text-[14px] font-semibold tracking-tight md:hidden lg:inline">
             Caliban
           </span>
-          <span className="rounded bg-surface-3 px-1.5 py-0.5 text-[10.5px] font-medium text-fg-muted md:hidden lg:inline">
-            admin
-          </span>
         </div>
-        <nav aria-label="Primary" className="overflow-x-auto md:flex-1 md:overflow-y-auto">
-          <ul className="flex gap-0.5 px-2 pb-2 md:flex-col md:pb-0">
-            {nav.map(({ to, label, icon: Icon }) => (
-              <li key={to}>
-                <Link
-                  to={to}
-                  activeOptions={{ exact: to === '/' }}
-                  title={label}
-                  className="flex h-8 items-center gap-2.5 rounded-md px-2 text-[13px] whitespace-nowrap text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg data-[status=active]:bg-accent-soft data-[status=active]:font-medium data-[status=active]:text-fg"
-                >
-                  <Icon width={16} height={16} className="shrink-0" />
-                  <span className="md:sr-only lg:not-sr-only">{label}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
+        <SideNav waiting={waiting} />
         <div className="hidden flex-col gap-1 border-t border-border p-2 md:flex">
           <div className="hidden lg:block">
             <HealthPill />
@@ -198,11 +287,31 @@ export function AppShell() {
         </div>
       </aside>
 
-      <main id="main" tabIndex={-1} className="min-w-0 flex-1 focus:outline-none">
-        <div className="mx-auto w-full max-w-[1400px] px-4 py-5 md:px-6 lg:px-8 lg:py-7">
-          {perms.hasNoRole ? <NoAccess onSignOut={signOut} /> : <Outlet />}
-        </div>
-      </main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-12 z-10 flex h-12 items-center gap-2 border-b border-border bg-surface/95 px-4 backdrop-blur md:top-0 md:px-6 lg:px-8">
+          {!perms.hasNoRole && <WorkspaceSwitcher />}
+          <div className="ml-auto flex items-center gap-2">
+            {!perms.hasNoRole && <ApprovalsBadge waiting={waiting} />}
+            {!perms.hasNoRole && <CommandPalette />}
+            <PageHelpButton />
+            {/* Phones hide the sidebar footer: sign out stays reachable (UX-15). */}
+            <button
+              type="button"
+              onClick={signOut}
+              disabled={pending}
+              aria-label="Sign out of Caliban"
+              className="inline-flex size-8 items-center justify-center rounded-md text-fg-muted hover:bg-surface-2 hover:text-fg md:hidden"
+            >
+              <IconLogout />
+            </button>
+          </div>
+        </header>
+        <main id="main" tabIndex={-1} className="min-w-0 flex-1 focus:outline-none">
+          <div className="mx-auto w-full max-w-[1400px] px-4 py-5 md:px-6 lg:px-8 lg:py-7">
+            {perms.hasNoRole ? <NoAccess onSignOut={signOut} /> : <Outlet />}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
