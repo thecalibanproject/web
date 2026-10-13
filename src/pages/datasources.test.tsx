@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import type { Datasource } from '@/api/types';
+import { expectNoAxeViolations } from '@/test/a11y';
 import { mockApi, renderApp } from '@/test/utils';
 
 const tenants = [{ id: 't1', name: 'Acme', created_at: '2026-10-01T10:00:00Z' }];
@@ -30,16 +31,17 @@ describe('DatasourcesPage', () => {
     await renderApp('/datasources');
 
     await user.click(await screen.findByRole('button', { name: 'Delete sales_dw' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Delete datasource?' });
+    const dialog = await screen.findByRole('dialog', { name: 'Delete this data connection?' });
     expect(dialog).toHaveTextContent('sales_dw');
-    expect(dialog).toHaveTextContent('Acme');
+    expect(dialog).toHaveTextContent('this workspace');
     expect(dialog).toHaveTextContent(/connection settings are wiped/);
     expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
 
-    await user.click(within(dialog).getByRole('button', { name: 'Delete datasource' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Delete connection' }));
 
-    await waitFor(() => expect(screen.queryByText('sales_dw')).not.toBeInTheDocument());
-    expect(screen.getByText('crm')).toBeInTheDocument();
+    const table = screen.getByRole('table', { name: 'Data connections' });
+    await waitFor(() => expect(within(table).queryByText('sales_dw')).not.toBeInTheDocument());
+    expect(within(table).getByText('crm')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(calls.filter((c) => c.method === 'DELETE').map((c) => c.path)).toEqual([
       '/api/v1/tenants/t1/datasources/ds1',
@@ -105,25 +107,41 @@ describe('DatasourcesPage', () => {
     const row = (name: string) => rows.find((r) => within(r).queryByText(name))!;
     await waitFor(() =>
       expect(row('sales_dw')).toHaveTextContent(
-        '12 collections, 40 proposed, 3 skipped in version 7',
+        '12 collections read, 40 entries suggested, 3 already reviewed in the data dictionary (version 7)',
       ),
     );
-    expect(within(row('sales_dw')).getByRole('link', { name: 'version 7' })).toHaveAttribute(
-      'href',
-      '/ontology?tenant=t1',
-    );
-    expect(within(row('sales_dw')).getByText('ready')).toBeInTheDocument();
+    expect(
+      within(row('sales_dw')).getByRole('link', { name: 'the data dictionary (version 7)' }),
+    ).toHaveAttribute('href', '/ontology?tenant=t1');
+    expect(within(row('sales_dw')).getByText('Ready')).toBeInTheDocument();
     expect(row('crm')).toHaveTextContent('the principal can write: use a read-only user');
-    expect(within(row('crm')).getAllByText('failed')).toHaveLength(2);
+    expect(within(row('crm')).getByText('Failed')).toBeInTheDocument();
+    expect(within(row('crm')).getByText('Scan failed')).toBeInTheDocument();
     // A failed job (a stale one included) may be started again.
-    expect(within(row('crm')).getByRole('button', { name: 'Introspect crm' })).toBeEnabled();
-    // Never introspected (404): nothing to show.
-    expect(row('legacy')).toHaveTextContent('n/a');
+    expect(within(row('crm')).getByRole('button', { name: 'Scan crm' })).toBeEnabled();
+    // Never scanned (404).
+    expect(row('legacy')).toHaveTextContent('Not scanned yet');
 
-    await user.click(within(row('legacy')).getByRole('button', { name: 'Introspect legacy' }));
-    await waitFor(() => expect(within(row('legacy')).getByText('running')).toBeInTheDocument());
+    await user.click(within(row('legacy')).getByRole('button', { name: 'Scan legacy' }));
+    await waitFor(() => expect(within(row('legacy')).getByText('Scanning')).toBeInTheDocument());
     expect(calls.filter((c) => c.method === 'POST').map((c) => c.path)).toEqual([
       '/api/v1/datasources/ds3/introspect',
     ]);
+  });
+
+  it('follows the header workspace, teaches when empty, and has no axe violations', async () => {
+    const calls = mockApi({
+      'GET /api/v1/tenants': () => ({ body: tenants }),
+      'GET /api/v1/datasources': () => ({ body: [] }),
+    });
+    await renderApp('/datasources');
+    expect(await screen.findByText('No data connections yet')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Learn more/ })).toHaveAttribute(
+      'href',
+      '/docs/guides/data-connections/#connect-mongodb',
+    );
+    const reads = calls.filter((c) => c.path === '/api/v1/datasources');
+    expect(reads.every((c) => c.query.get('tenant_id') === 't1')).toBe(true);
+    await expectNoAxeViolations();
   });
 });

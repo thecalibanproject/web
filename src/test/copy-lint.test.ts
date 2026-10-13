@@ -87,7 +87,6 @@ const PENDING = new Set<string>([
   'components/usage-table.tsx',
   'lib/labels.ts',
   'pages/audit.tsx',
-  'pages/datasources.tsx',
   'pages/inbox.tsx',
   'pages/models.tsx',
   'pages/rag.tsx',
