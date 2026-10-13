@@ -311,9 +311,12 @@ describe('Role-gated console', () => {
 
     expect(await screen.findByText('triage')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'New node' }));
-    const form = await screen.findByRole('form', { name: 'Create node' });
-    const options = within(within(form).getByLabelText(/Tenant/)).getAllByRole('option');
+    await user.click(screen.getByRole('button', { name: 'New assistant' }));
+    const start = await screen.findByRole('form', { name: 'Start from' });
+    await user.click(within(start).getByRole('radio', { name: /Blank assistant/ }));
+    await user.click(within(start).getByRole('button', { name: 'Next' }));
+    const form = await screen.findByRole('form', { name: 'Create assistant' });
+    const options = within(within(form).getByLabelText(/Workspace/)).getAllByRole('option');
     expect(options.map((o) => o.textContent)).toEqual(['Select a tenant…', 'Acme']);
   });
 });

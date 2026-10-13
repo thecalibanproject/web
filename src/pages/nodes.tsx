@@ -1,11 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { usePermissions } from '@/api/auth';
 import { nodesQuery, tenantsQuery } from '@/api/queries';
+import { NewAssistant } from '@/components/nodes/new-assistant';
 import { NodeStateBadge } from '@/components/nodes/node-badges';
-import { NodeEditor } from '@/components/nodes/node-editor';
-import { TenantFilter } from '@/components/tenant-select';
 import {
   Badge,
   Card,
@@ -23,65 +22,76 @@ import {
   TR,
 } from '@/components/ui';
 import { IconPlus } from '@/components/ui/icons';
+import { doc } from '@/lib/docs';
 import { formatDateTime } from '@/lib/format';
 import { summarizeNodes } from '@/lib/nodes';
+import { useScopedTenant } from '@/lib/workspace';
 
 const route = getRouteApi('/_app/nodes');
 
-const NO_WRITE = 'Your role cannot create nodes on any tenant (needs nodes.write).';
+const NO_WRITE = 'Your role cannot create assistants in any workspace (needs nodes.write).';
 
 export function NodesPage() {
-  const { tenant } = route.useSearch();
+  const search = route.useSearch();
   const navigate = route.useNavigate();
-  const nodes = useQuery(nodesQuery(tenant));
+  const tenantId = useScopedTenant(search.tenant);
+  const nodes = useQuery({ ...nodesQuery(tenantId), enabled: Boolean(tenantId) });
   const tenants = useQuery(tenantsQuery());
   const names = useMemo(
     () => new Map((tenants.data ?? []).map((t) => [t.id, t.name])),
     [tenants.data],
   );
   const rows = useMemo(() => summarizeNodes(nodes.data ?? []), [nodes.data]);
-  const [creating, setCreating] = useState(false);
+  const creating = search.new === 1;
+  const setCreating = (open: boolean) =>
+    void navigate({ search: (prev) => ({ ...prev, new: open ? 1 : undefined }) });
   const perms = usePermissions();
   const cannotCreate = perms.canSomewhere('nodes.write') ? null : NO_WRITE;
 
-  const newNode = (
+  const newAssistant = (
     <GatedButton
       variant="primary"
       icon={<IconPlus size={14} />}
       deniedReason={cannotCreate}
       onClick={() => setCreating(true)}
     >
-      New node
+      New assistant
     </GatedButton>
   );
 
   return (
     <>
       <PageHeader
-        title="Nodes"
-        description="Versioned, budgeted AI sub-apps. Publish a version to run it; the live version is what a run that names no version runs."
-        actions={newNode}
+        title="Assistants"
+        description="Each assistant answers one kind of request with your data and tools, within limits. Only its live version answers."
+        actions={newAssistant}
       />
       <Card>
-        <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
-          <TenantFilter value={tenant} onChange={(t) => void navigate({ search: { tenant: t } })} />
-        </div>
-        {nodes.isPending ? (
+        {!tenantId && tenants.isPending ? (
+          <LoadingState />
+        ) : !tenantId ? (
+          <EmptyState
+            title="No workspace yet"
+            description="Assistants live in a workspace. Create one first."
+            learnMore={doc('guides/workspaces', 'create')}
+          />
+        ) : nodes.isPending ? (
           <LoadingState />
         ) : nodes.isError ? (
           <ErrorState error={nodes.error} onRetry={() => void nodes.refetch()} />
         ) : rows.length === 0 ? (
           <EmptyState
-            title="No nodes"
-            description="Create a node from a JSON spec. It is checked against node.schema.json as you type, and again by the control plane."
-            action={newNode}
+            title="No assistants yet"
+            description="Start from a template, such as a support desk or questions on your documents, and adjust it to your data."
+            action={newAssistant}
+            learnMore={doc('guides/assistants', 'create-from-template')}
           />
         ) : (
-          <Table label="Nodes">
+          <Table label="Assistants">
             <THead>
               <tr>
                 <TH>Name</TH>
-                <TH>Tenant</TH>
+                <TH>Workspace</TH>
                 <TH>Live version</TH>
                 <TH>Latest version</TH>
                 <TH className="text-right">Versions</TH>
@@ -111,7 +121,7 @@ export function NodesPage() {
                         v{n.live.version}
                       </Badge>
                     ) : (
-                      <span className="text-fg-subtle">None</span>
+                      <span className="text-fg-muted">None</span>
                     )}
                   </TD>
                   <TD>
@@ -132,18 +142,18 @@ export function NodesPage() {
       <Drawer
         open={creating}
         onClose={() => setCreating(false)}
-        title="New node"
-        description="Creates version 1 as a draft. Publish it from the node's page to make it runnable."
+        title="New assistant"
+        description="Created as a draft, version 1. Nothing answers requests until a version is live."
       >
         {creating && (
-          <NodeEditor
-            defaultTenant={tenant}
+          <NewAssistant
+            tenantId={tenantId}
             onCancel={() => setCreating(false)}
             onCreated={(n) => {
-              setCreating(false);
               void navigate({
                 to: '/nodes/$tenantId/$nodeName',
                 params: { tenantId: n.tenant_id, nodeName: n.name },
+                search: {},
               });
             }}
           />
