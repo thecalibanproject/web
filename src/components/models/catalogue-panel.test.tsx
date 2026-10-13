@@ -46,7 +46,7 @@ describe('CataloguePanel', () => {
     expect(within(row).getByText('tools')).toBeInTheDocument();
     expect(within(row).getByText('reasoning · hybrid')).toBeInTheDocument();
     expect(within(row).queryByText('vision')).not.toBeInTheDocument();
-    expect(within(row).getByText('T0 Sovereign')).toBeInTheDocument();
+    expect(within(row).getByText('On your servers (T0)')).toBeInTheDocument();
     const embedRow = within(table).getByText('local/bge-m3').closest('tr')!;
     expect(within(embedRow).getByText('Embedding')).toBeInTheDocument();
   });

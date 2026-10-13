@@ -55,7 +55,7 @@ describe('summarizeAudit', () => {
         trust_tier: 't3_public',
         last4: 'wxyz',
       }),
-    ).toBe('OpenAI, T3 Public, key ending wxyz');
+    ).toBe('OpenAI, Public provider (T3), key ending wxyz');
   });
 
   it('summarizes the other actions the control plane records', () => {

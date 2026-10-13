@@ -153,8 +153,8 @@ describe('UsagePage', () => {
     await renderApp('/usage');
     const table = await screen.findByRole('table', { name: 'Routing per day' });
     const rows = within(table).getAllByRole('row');
-    expect(rows[1]).toHaveTextContent('2026-10-09AcmechitchatRuleslow_confidence7');
-    expect(rows[2]).toHaveTextContent('2026-10-08AcmesqlkNNnone3');
+    expect(rows[1]).toHaveTextContent('2026-10-09AcmechitchatBy a rulelow_confidence7');
+    expect(rows[2]).toHaveTextContent('2026-10-08AcmesqlBy example sentencesnone3');
 
     await user.type(screen.getByPlaceholderText('Run id'), 'run_1');
     await user.click(screen.getByRole('button', { name: 'Apply' }));

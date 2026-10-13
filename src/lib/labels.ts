@@ -13,17 +13,17 @@ import type {
 } from '@/api/types';
 
 export const TRUST_TIER_LABEL: Record<TrustTier, string> = {
-  t0_sovereign: 'T0 Sovereign',
-  t1_attested: 'T1 Attested',
-  t2_contracted: 'T2 Contracted',
-  t3_public: 'T3 Public',
+  t0_sovereign: 'On your servers (T0)',
+  t1_attested: 'Verified enclave (T1)',
+  t2_contracted: 'Provider under contract (T2)',
+  t3_public: 'Public provider (T3)',
 };
 
 export const TRUST_TIER_HINT: Record<TrustTier, string> = {
-  t0_sovereign: 'Runs inside your trust boundary (on-prem / your VPC).',
-  t1_attested: 'Confidential compute with remote attestation.',
-  t2_contracted: 'Third party under contract (DPA, zero data retention).',
-  t3_public: 'Public API, no contractual data guarantees.',
+  t0_sovereign: 'Runs on your own servers or in your private cloud.',
+  t1_attested: 'Runs in a confidential enclave that proves what it runs.',
+  t2_contracted: 'An outside provider under a data contract (no retention).',
+  t3_public: 'A public provider with no contract about your data.',
 };
 
 export const PROVIDER_LABEL: Record<ProviderKind, string> = {
@@ -80,14 +80,14 @@ export const REASONING_CONTROL_LABEL: Record<ReasoningControl, string> = {
 export const PII_MODE_OPTIONS = ['reversible', 'mask', 'off'] as const satisfies readonly PiiMode[];
 
 export const PII_MODE_LABEL: Record<PiiMode, string> = {
-  reversible: 'Reversible pseudonymization',
-  mask: 'Mask (irreversible)',
-  off: 'Off',
+  reversible: 'Hide from the model, restore in the answer',
+  mask: 'Hide everywhere',
+  off: 'Do not hide',
 };
 
 export const SURROGATE_SCOPE_LABEL: Record<SurrogateScope, string> = {
-  tenant: 'Tenant',
-  session: 'Session',
+  tenant: 'Same placeholder across the workspace',
+  session: 'New placeholders for each conversation',
 };
 
 export const CACHE_TIER_LABEL: Record<CacheTier, string> = {
@@ -96,28 +96,30 @@ export const CACHE_TIER_LABEL: Record<CacheTier, string> = {
 };
 
 export const ROUTE_STAGE_LABEL: Record<RouteStage, string> = {
-  rules: 'Rules',
-  knn: 'kNN',
-  keyword: 'Keyword',
+  rules: 'By a rule',
+  knn: 'By example sentences',
+  keyword: 'By keywords',
 };
 
 export const ROLE_LABEL: Record<Role, string> = {
   owner: 'Owner',
   admin: 'Admin',
   auditor: 'Auditor',
-  tenant_admin: 'Tenant admin',
+  tenant_admin: 'Workspace admin',
   developer: 'Developer',
   viewer: 'Viewer',
   billing: 'Billing',
 };
 
-/** Same wording as the control plane's `GET /api/v1/roles`. */
+/** Plain wording of the control plane's `GET /api/v1/roles` (workspace for tenant). */
 export const ROLE_DESCRIPTION: Record<Role, string> = {
   owner: 'Everything, including granting and revoking the owner role.',
   admin: 'Everything except granting or revoking the owner role.',
   auditor: 'Read-only access to everything, including the audit log.',
-  tenant_admin: 'Manages one tenant: settings, API keys, BYOK keys, routes, datasources, nodes.',
-  developer: 'API keys, routes, nodes and ontology review of one tenant; reads the rest.',
-  viewer: 'Read-only access to one tenant.',
-  billing: 'Usage and spend of one tenant.',
+  tenant_admin:
+    'Manages one workspace: settings, app keys, provider accounts, routing, data connections and assistants.',
+  developer:
+    'App keys, routing, assistants and the data dictionary review of one workspace; reads the rest.',
+  viewer: 'Read-only access to one workspace.',
+  billing: 'Usage and spend of one workspace.',
 };

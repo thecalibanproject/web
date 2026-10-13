@@ -180,7 +180,8 @@ export const BANNED_IN_BASIC_COPY: readonly RegExp[] = [
   /\btaint(ed)?\b/i,
   /pass\^k/i,
   /pass@1/i,
-  /\bvert(ex|ices)\b/i,
+  // Google's "Vertex AI" is a product name, not the engine's term.
+  /\bvert(ex(?! AI)|ices)\b/i,
   /\bsurrogate\b/i,
   /\bontology\b/i,
   /\btenants?\b/i,
