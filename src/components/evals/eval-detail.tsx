@@ -99,7 +99,7 @@ function GoldenMetrics({ s }: { s: GoldenSummary }) {
                 .sort((a, b) => Number(a.all_passed) - Number(b.all_passed) || a.passed - b.passed)
                 .map((c) => (
                   <TR key={c.case}>
-                    <TD className="font-mono text-[12px]">{c.case}</TD>
+                    <TD className="font-mono text-[12px] whitespace-nowrap">{c.case}</TD>
                     <TD className="text-right tabular-nums">
                       {c.passed} of {c.trials}
                     </TD>
@@ -281,7 +281,7 @@ function Trials({ e, tenantId }: { e: Eval; tenantId: string }) {
           return (
             <Fragment key={key}>
               <TR>
-                <TD className="font-mono text-[12px]">{t.case}</TD>
+                <TD className="font-mono text-[12px] whitespace-nowrap">{t.case}</TD>
                 <TD className="text-right tabular-nums">{t.trial}</TD>
                 <TD>
                   <TrialStatusBadge status={t.status} injection={injection} />

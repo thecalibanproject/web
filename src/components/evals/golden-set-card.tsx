@@ -219,7 +219,7 @@ export function GoldenSetCard({
               <TBody>
                 {(set.cases ?? []).map((c) => (
                   <TR key={c.id}>
-                    <TD className="font-mono text-[12px]">{c.id}</TD>
+                    <TD className="font-mono text-[12px] whitespace-nowrap">{c.id}</TD>
                     <TD className="max-w-80 truncate text-[12.5px] text-fg-muted" dir="auto">
                       {preview(c.input)}
                     </TD>
