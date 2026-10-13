@@ -130,7 +130,7 @@ function GateCard({
                   <IconAlert size={12} /> Not ready to go live
                 </Badge>
               ) : zero.length > 0 ? (
-                <Badge tone="warn">
+                <Badge tone="danger">
                   <IconAlert size={12} /> Allowed to go live, with failing test cases
                 </Badge>
               ) : (
@@ -139,7 +139,7 @@ function GateCard({
                 </Badge>
               )}
               {g?.has_write_tools && (
-                <Badge tone="warn" title="Safety tests are always required before it goes live.">
+                <Badge tone="neutral" title="Safety tests are always required before it goes live.">
                   Can change things
                 </Badge>
               )}
@@ -164,7 +164,7 @@ function GateCard({
                   {failing.map((c) => (
                     <li key={c.case} className="flex flex-wrap items-baseline gap-2">
                       <code className="font-mono text-[12px]">{c.case}</code>
-                      <span className={c.passed === 0 ? 'text-danger' : 'text-warn'}>
+                      <span className="text-danger">
                         {c.passed === 0
                           ? `failed all ${c.tries} tries`
                           : `passed ${c.passed} of ${c.tries} tries`}

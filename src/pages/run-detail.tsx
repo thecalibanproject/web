@@ -478,8 +478,8 @@ function Conversation({ run }: { run: ConsoleRun }) {
           </Button>
         }
       />
-      <div className="grid gap-4 p-4 lg:grid-cols-2">
-        <section aria-labelledby="asked-h" className="min-w-0">
+      <div className="grid divide-y divide-border lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+        <section aria-labelledby="asked-h" className="min-w-0 bg-surface-2 p-5">
           <h3 id="asked-h" className="mb-1.5 text-[12.5px] font-semibold">
             What was asked
           </h3>
@@ -489,7 +489,7 @@ function Conversation({ run }: { run: ConsoleRun }) {
             <Readable value={run.input ?? null} label="What was asked" />
           )}
         </section>
-        <section aria-labelledby="answer-h" className="min-w-0">
+        <section aria-labelledby="answer-h" className="min-w-0 p-5">
           <h3 id="answer-h" className="mb-1.5 text-[12.5px] font-semibold">
             The answer{run.partial ? ' (partial)' : ''}
           </h3>

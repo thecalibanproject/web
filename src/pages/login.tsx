@@ -141,11 +141,11 @@ export function LoginPage() {
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-bg px-4">
-      <div className="w-full max-w-sm">
+      <div className="w-full max-w-sm border-t-4 border-accent pt-6">
         <div className="mb-6 flex items-center gap-2.5">
           <LogoMark size={28} />
           <div>
-            <h1 className="text-[16px] font-semibold tracking-tight">Caliban console</h1>
+            <h1 className="text-[24px] font-semibold tracking-tight">Caliban console</h1>
             <p className="text-[12.5px] text-fg-muted">Sign in to the control plane</p>
           </div>
         </div>

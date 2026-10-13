@@ -1,48 +1,60 @@
 @import 'tailwindcss';
 
-/*
- * Caliban console design tokens.
- * Colours live in CSS variables so light/dark is a variable swap, not a class
- * rewrite. Order of precedence:
- *   1. [data-theme="light" | "dark"] on <html> (explicit user choice)
- *   2. prefers-color-scheme (system)
- * No remote fonts: system UI and monospace stacks only.
- */
+@font-face {
+  font-family: 'Atkinson';
+  src: url('/fonts/AtkinsonNext.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'B612';
+  src: url('/fonts/B612-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('/fonts/PlexMono-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'B612 Mono';
+  src: url('/fonts/B612Mono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 
 :root {
   color-scheme: light;
-  --bg: oklch(0.985 0.002 260);
-  --surface: oklch(1 0 0);
-  --surface-2: oklch(0.97 0.003 260);
-  --surface-3: oklch(0.945 0.004 260);
-  --border: oklch(0.91 0.005 260);
-  --border-strong: oklch(0.62 0.01 260);
-  --fg: oklch(0.22 0.01 260);
-  --fg-muted: oklch(0.47 0.012 260);
-  --fg-subtle: oklch(0.52 0.01 260);
-  --accent: oklch(0.49 0.2 264);
-  --accent-hover: oklch(0.44 0.2 264);
-  --accent-fg: oklch(0.99 0 0);
-  --accent-soft: oklch(0.95 0.03 264);
-  --ring: oklch(0.6 0.16 270);
-
-  --ok: oklch(0.52 0.12 155);
-  --ok-soft: oklch(0.95 0.04 155);
-  --warn: oklch(0.5 0.12 70);
-  --warn-soft: oklch(0.96 0.05 85);
-  --danger: oklch(0.53 0.19 25);
-  --danger-soft: oklch(0.96 0.03 25);
-  --info: oklch(0.52 0.11 230);
-  --info-soft: oklch(0.95 0.03 230);
-
-  --shadow: 0 1px 2px oklch(0 0 0 / 0.05), 0 4px 16px oklch(0 0 0 / 0.04);
-  --overlay: oklch(0.2 0.01 260 / 0.35);
-
-  /*
-   * Motion tokens: IBM Carbon "productive" durations and curves (research
-   * note 10, section 8). Feedback and state changes only, never decoration.
-   * Exits use the next shorter duration than the matching entrance.
-   */
+  --bg: #f6f9fd;
+  --surface: #ffffff;
+  --surface-2: #e8f1ff;
+  --surface-3: #dce9f7;
+  --border: #bfd1ea;
+  --border-strong: #6b80a1;
+  --fg: #0a1430;
+  --fg-muted: #26324f;
+  --fg-subtle: #4f5d7c;
+  --accent: #1d4ed8;
+  --accent-hover: #244fc5;
+  --accent-fg: #ffffff;
+  --accent-soft: #e8f1ff;
+  --ring: #1d4ed8;
+  --ok: #1d4ed8;
+  --ok-soft: #e8f1ff;
+  --warn: #8a5a00;
+  --warn-soft: #fff2d5;
+  --danger: #b42335;
+  --danger-soft: #fff0f2;
+  --info: #1d4ed8;
+  --info-soft: #e8f1ff;
+  --shadow: none;
+  --overlay: #040b1c99;
   --duration-instant: 70ms;
   --duration-fast: 110ms;
   --duration-moderate: 240ms;
@@ -55,68 +67,63 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
-    --bg: oklch(0.17 0.005 260);
-    --surface: oklch(0.2 0.006 260);
-    --surface-2: oklch(0.23 0.007 260);
-    --surface-3: oklch(0.27 0.008 260);
-    --border: oklch(0.3 0.008 260);
-    --border-strong: oklch(0.52 0.01 260);
-    --fg: oklch(0.94 0.004 260);
-    --fg-muted: oklch(0.72 0.01 260);
-    --fg-subtle: oklch(0.66 0.01 260);
-    --accent: oklch(0.7 0.14 255);
-    --accent-hover: oklch(0.75 0.13 255);
-    --accent-fg: oklch(0.16 0.03 264);
-    --accent-soft: oklch(0.3 0.07 264);
-    --ring: oklch(0.7 0.14 270);
-    --ok: oklch(0.74 0.13 155);
-    --ok-soft: oklch(0.3 0.05 155);
-    --warn: oklch(0.8 0.13 80);
-    --warn-soft: oklch(0.32 0.06 75);
-    --danger: oklch(0.72 0.16 25);
-    --danger-soft: oklch(0.32 0.07 25);
-    --info: oklch(0.75 0.11 230);
-    --info-soft: oklch(0.3 0.05 230);
-    --shadow: 0 1px 2px oklch(0 0 0 / 0.4), 0 8px 24px oklch(0 0 0 / 0.3);
-    --overlay: oklch(0 0 0 / 0.55);
+    --bg: #040b1c;
+    --surface: #06122a;
+    --surface-2: #0a1a39;
+    --surface-3: #0f2448;
+    --border: #1c3b73;
+    --border-strong: #7f96bd;
+    --fg: #e8f1ff;
+    --fg-muted: #a9bedf;
+    --fg-subtle: #7f96bd;
+    --accent: #7cc4ff;
+    --accent-hover: #a9d8ff;
+    --accent-fg: #040b1c;
+    --accent-soft: #0f2448;
+    --ring: #7cc4ff;
+    --ok: #7cc4ff;
+    --ok-soft: #0f2448;
+    --warn: #f2b544;
+    --warn-soft: #30240d;
+    --danger: #ff929e;
+    --danger-soft: #341723;
+    --info: #7cc4ff;
+    --info-soft: #0f2448;
+    --shadow: none;
+    --overlay: #040b1ccc;
   }
 }
-
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --bg: oklch(0.17 0.005 260);
-  --surface: oklch(0.2 0.006 260);
-  --surface-2: oklch(0.23 0.007 260);
-  --surface-3: oklch(0.27 0.008 260);
-  --border: oklch(0.3 0.008 260);
-  --border-strong: oklch(0.52 0.01 260);
-  --fg: oklch(0.94 0.004 260);
-  --fg-muted: oklch(0.72 0.01 260);
-  --fg-subtle: oklch(0.66 0.01 260);
-  --accent: oklch(0.7 0.14 255);
-  --accent-hover: oklch(0.75 0.13 255);
-  --accent-fg: oklch(0.16 0.03 264);
-  --accent-soft: oklch(0.3 0.07 264);
-  --ring: oklch(0.7 0.14 270);
-  --ok: oklch(0.74 0.13 155);
-  --ok-soft: oklch(0.3 0.05 155);
-  --warn: oklch(0.8 0.13 80);
-  --warn-soft: oklch(0.32 0.06 75);
-  --danger: oklch(0.72 0.16 25);
-  --danger-soft: oklch(0.32 0.07 25);
-  --info: oklch(0.75 0.11 230);
-  --info-soft: oklch(0.3 0.05 230);
-  --shadow: 0 1px 2px oklch(0 0 0 / 0.4), 0 8px 24px oklch(0 0 0 / 0.3);
-  --overlay: oklch(0 0 0 / 0.55);
+  --bg: #040b1c;
+  --surface: #06122a;
+  --surface-2: #0a1a39;
+  --surface-3: #0f2448;
+  --border: #1c3b73;
+  --border-strong: #7f96bd;
+  --fg: #e8f1ff;
+  --fg-muted: #a9bedf;
+  --fg-subtle: #7f96bd;
+  --accent: #7cc4ff;
+  --accent-hover: #a9d8ff;
+  --accent-fg: #040b1c;
+  --accent-soft: #0f2448;
+  --ring: #7cc4ff;
+  --ok: #7cc4ff;
+  --ok-soft: #0f2448;
+  --warn: #f2b544;
+  --warn-soft: #30240d;
+  --danger: #ff929e;
+  --danger-soft: #341723;
+  --info: #7cc4ff;
+  --info-soft: #0f2448;
+  --shadow: none;
+  --overlay: #040b1ccc;
 }
 
 @theme inline {
-  --font-sans:
-    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', 'Liberation Sans',
-    Arial, sans-serif;
-  --font-mono:
-    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', 'DejaVu Sans Mono',
-    monospace;
+  --font-sans: 'Atkinson', Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
 
   --color-bg: var(--bg);
   --color-surface: var(--surface);
@@ -183,7 +190,7 @@
   }
   body {
     @apply bg-bg font-sans text-fg antialiased;
-    font-feature-settings: 'tnum' 0;
+    font-variant-numeric: tabular-nums;
     line-height: 1.45;
   }
   ::selection {
@@ -252,4 +259,97 @@
   :root[data-motion='reduce']::view-transition-new(*) {
     animation: none !important;
   }
+}
+
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4,
+  button,
+  [role='tab'],
+  th {
+    font-family: 'B612', 'Atkinson', sans-serif;
+  }
+  button,
+  [role='tab'],
+  th {
+    font-weight: 700;
+  }
+  input[type='checkbox'] {
+    min-width: 16px;
+    min-height: 16px;
+  }
+}
+
+@layer components {
+  .scope-rail,
+  .scope-code {
+    --bg: #040b1c;
+    --surface: #06122a;
+    --surface-2: #0a1a39;
+    --surface-3: #0f2448;
+    --border: #1c3b73;
+    --border-strong: #7f96bd;
+    --fg: #e8f1ff;
+    --fg-muted: #a9bedf;
+    --fg-subtle: #7f96bd;
+    --accent: #7cc4ff;
+    --accent-soft: #0f2448;
+    --ring: #7cc4ff;
+    --ok: #7cc4ff;
+    --warn: #f2b544;
+    --danger: #ff929e;
+    --info: #7cc4ff;
+    color-scheme: dark;
+  }
+  .scope-rail {
+    background: #040b1c;
+    color: #e8f1ff;
+  }
+  .scope-rail a[data-status='active'] {
+    border-inline-start: 2px solid #7cc4ff;
+    background: #0f2448;
+    color: #7cc4ff;
+  }
+  .scope-code {
+    background: #06122a;
+    color: #e8f1ff;
+  }
+  .readout {
+    font-family: 'B612 Mono', monospace;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.04em;
+  }
+  .flight-table td + td {
+    border-inline-start: 1px solid var(--border);
+  }
+  .flight-table tbody tr > td:first-child {
+    background: var(--surface-2);
+    border-inline-start: 3px solid var(--accent);
+  }
+  .flight-table tbody tr:hover > td {
+    background: var(--surface-2);
+  }
+  .flight-approval {
+    border-inline-start: 4px solid var(--warn);
+  }
+  .flight-approval > :first-child {
+    background: var(--warn-soft);
+  }
+  .flight-question {
+    border-inline-start: 4px solid var(--accent);
+  }
+}
+
+@theme {
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 2px;
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-xl: none;
 }

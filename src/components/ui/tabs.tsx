@@ -55,7 +55,7 @@ export function Tabs<T extends string>({
         aria-label={label}
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        className="flex gap-1 border-b border-border"
+        className="flex overflow-x-auto border-b border-border"
       >
         {tabs.map((t, i) => {
           const selected = t.value === value;
@@ -73,9 +73,9 @@ export function Tabs<T extends string>({
               tabIndex={selected ? 0 : -1}
               onClick={() => onChange(t.value)}
               className={cn(
-                '-mb-px border-b-2 px-3 py-2 text-[13px] font-medium transition-colors',
+                '-mb-px border-b-2 px-3 py-2 text-[13px] whitespace-nowrap font-medium transition-colors',
                 selected
-                  ? 'border-accent text-fg'
+                  ? 'border-accent bg-accent-soft text-accent'
                   : 'border-transparent text-fg-muted hover:text-fg',
               )}
             >

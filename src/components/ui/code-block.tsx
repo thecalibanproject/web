@@ -17,9 +17,9 @@ function highlightJson(code: string): ReactNode[] {
       str !== undefined
         ? colon !== undefined
           ? 'text-accent'
-          : 'text-ok'
+          : 'text-fg'
         : literal !== undefined
-          ? 'text-warn'
+          ? 'text-fg-muted'
           : 'text-info';
     const token = str ?? literal ?? num ?? whole;
     out.push(
@@ -53,7 +53,7 @@ export function CodeBlock({
       // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
       tabIndex={0}
       className={cn(
-        'overflow-x-auto rounded-md border border-border bg-surface-2 p-3 font-mono text-[12px] leading-relaxed text-fg',
+        'scope-code overflow-x-auto rounded-md border border-border bg-surface-2 p-3 font-mono text-[12px] leading-relaxed text-fg',
         className,
       )}
     >

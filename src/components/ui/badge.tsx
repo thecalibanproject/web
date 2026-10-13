@@ -29,12 +29,12 @@ export function Badge({
     <span
       title={title}
       className={cn(
-        'inline-flex h-5 items-center gap-1.5 rounded px-1.5 text-[11.5px] font-medium whitespace-nowrap',
+        'inline-flex h-5 items-center gap-1.5 rounded-sm border border-current px-1.5 text-[11.5px] font-medium whitespace-nowrap',
         tones[tone],
         className,
       )}
     >
-      {dot && <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />}
+      {dot && <span className="size-1.5 bg-current" aria-hidden="true" />}
       {children}
     </span>
   );

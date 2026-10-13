@@ -15,7 +15,7 @@ const TRIAL_TONE: Record<NonNullable<EvalTrial['status']>, Tone> = {
   running: 'info',
   passed: 'ok',
   failed: 'danger',
-  error: 'warn',
+  error: 'danger',
 };
 
 export function TrialStatusBadge({

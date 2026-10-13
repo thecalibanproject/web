@@ -14,24 +14,24 @@ export function RunStatusBadge({ status }: { status: RunStatus }) {
 /** What a label says about where a value came from (also called a taint label). */
 function taintOf(label: string): { tone: Tone; text: string; hint: string } {
   if (label === 'pii')
-    return { tone: 'danger', text: 'Personal data', hint: 'Holds personal data.' };
+    return { tone: 'neutral', text: 'Personal data', hint: 'Holds personal data.' };
   if (label === 'datasource') {
     return { tone: 'info', text: 'Your database', hint: 'Read from your database.' };
   }
   if (label === 'caller') {
     return {
-      tone: 'warn',
+      tone: 'neutral',
       text: "Customer's message",
       hint: "From the customer's message: untrusted data.",
     };
   }
   if (label === 'retrieved') {
-    return { tone: 'warn', text: 'A document', hint: 'From a document: untrusted data.' };
+    return { tone: 'neutral', text: 'A document', hint: 'From a document: untrusted data.' };
   }
   if (label.startsWith('tool:')) {
     const tool = label.slice(5);
     return {
-      tone: 'warn',
+      tone: 'neutral',
       text: `Result of ${tool}`,
       hint: `From the result of ${tool}: untrusted data.`,
     };

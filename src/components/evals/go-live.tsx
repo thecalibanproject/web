@@ -28,7 +28,7 @@ function Marker({ step, n }: { step: GoLiveStep; n: number }) {
     <span
       aria-hidden="true"
       className={cn(
-        'inline-flex size-6 shrink-0 items-center justify-center rounded-full border text-[12px] font-semibold transition-colors duration-(--duration-moderate) ease-(--ease-standard)',
+        'inline-flex size-6 shrink-0 items-center justify-center rounded-sm border text-[12px] font-semibold transition-colors duration-(--duration-moderate) ease-(--ease-standard)',
         step.status === 'done' && 'border-ok bg-ok text-surface',
         step.status === 'current' && 'border-accent bg-accent text-accent-fg',
         step.status === 'running' && 'border-info text-info',

@@ -47,10 +47,10 @@ function Progress({ label, done, total }: { label: string; done: number; total: 
       aria-valuemax={total}
       aria-valuenow={done}
       aria-valuetext={`${done} of ${total} done`}
-      className="h-1.5 w-24 overflow-hidden rounded-full bg-surface-3"
+      className="h-1.5 w-24 overflow-hidden rounded-sm bg-surface-3"
     >
       <div
-        className="h-full origin-left rounded-full bg-ok transition-transform duration-(--duration-slow) ease-(--ease-standard)"
+        className="h-full origin-left rounded-sm bg-ok transition-transform duration-(--duration-slow) ease-(--ease-standard)"
         style={{ transform: `scaleX(${total ? done / total : 0})` }}
       />
     </div>
@@ -62,7 +62,7 @@ function Item({ item }: { item: ChecklistItem }) {
     <li className="flex items-start gap-3 py-2.5">
       <span
         className={cn(
-          'mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full transition-colors duration-(--duration-moderate)',
+          'mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-sm transition-colors duration-(--duration-moderate)',
           item.done ? 'bg-ok text-surface' : 'text-fg-muted',
         )}
       >
@@ -110,7 +110,7 @@ function Phase({
         >
           <span className="min-w-0 flex-1">
             <span className="block text-[13.5px] font-semibold">{phase.title}</span>
-            <span className="block text-[12.5px] font-normal text-fg-muted">
+            <span className="block font-sans text-[12.5px] font-normal text-fg-muted">
               {phaseDone(phase) ? 'All done.' : phase.description}
             </span>
           </span>

@@ -20,7 +20,7 @@ Words: MUST and NEVER are hard rules a reviewer blocks on. SHOULD is the default
 ### Zero egress
 
 - NEVER load anything from the network at run time: no CDNs, no web fonts (Google Fonts or other), no analytics or telemetry, no hosted widgets (tours, chat, feedback), no remote images. The console runs in air-gapped hospitals, banks and law firms.
-- MUST: every dependency is an npm package bundled by Vite into `dist/`. System font stacks only (see `DESIGN.md`).
+- MUST: every dependency is an npm package bundled by Vite into `dist/`. Self-host the brand fonts and their OFL licenses (see `DESIGN.md`).
 - MUST: a new runtime dependency is MIT, Apache-2.0, BSD or ISC, small, and justified in the PR with its gzip size. Prefer none: write the 50 lines.
 - NEVER install agent skills or tools that fetch from the network or phone home. Use this file.
 
