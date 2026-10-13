@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Caliban console redesign</title>
+    <style>
+      @font-face {
+        font-family: Atkinson;
+        src: url('../../public/fonts/AtkinsonNext.woff2');
+        font-display: swap;
+      }
+      @font-face {
+        font-family: B612;
+        src: url('../../public/fonts/B612-Bold.woff2');
+        font-weight: 700;
+        font-display: swap;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #040b1c;
+        color: #e8f1ff;
+        font:
+          16px/1.5 Atkinson,
+          sans-serif;
+      }
+      header {
+        padding: 28px 32px;
+        border-bottom: 1px solid #7f96bd;
+      }
+      h1,
+      h2 {
+        font-family: B612, sans-serif;
+      }
+      h1 {
+        margin: 0;
+        font-size: 28px;
+      }
+      p {
+        margin: 8px 0 0;
+        color: #a9bedf;
+      }
+      .controls {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        margin-top: 24px;
+      }
+      label {
+        display: grid;
+        gap: 6px;
+      }
+      select {
+        padding: 8px 12px;
+        border: 1px solid #7f96bd;
+        border-radius: 2px;
+        background: #0f2448;
+        color: #e8f1ff;
+        font: inherit;
+      }
+      :focus-visible {
+        outline: 2px solid #7cc4ff;
+        outline-offset: 3px;
+      }
+      main {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        padding: 24px 32px 40px;
+      }
+      figure {
+        margin: 0;
+        min-width: 0;
+      }
+      figcaption {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 12px;
+      }
+      a {
+        color: #7cc4ff;
+        text-underline-offset: 3px;
+      }
+      img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border: 1px solid #7f96bd;
+      }
+      .mobile {
+        max-width: 390px;
+        margin-inline: auto;
+      }
+      .count {
+        font-size: 13px;
+      }
+      @media (max-width: 800px) {
+        main {
+          grid-template-columns: 1fr;
+          padding: 20px;
+        }
+        header {
+          padding: 24px 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Caliban console redesign</h1>
+      <p>Sovereign Airspace: scope navigation, ruled flight strips and instrument readouts.</p>
+      <p class="count">
+        33 states, two sizes, two themes. 264 before and after images. Local branch:
+        console-redesign.
+      </p>
+      <div class="controls">
+        <label
+          >Screen
+          <select id="screen"></select
+        ></label>
+        <label
+          >Viewport
+          <select id="viewport">
+            <option value="desktop">Desktop, 1440 x 900</option>
+            <option value="mobile">Phone, 390 x 844</option>
+          </select></label
+        >
+        <label
+          >Theme
+          <select id="theme">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select></label
+        >
+      </div>
+    </header>
+    <main aria-live="polite">
+      <figure id="before-figure">
+        <figcaption><strong>Before</strong><a id="before-link">Open full image</a></figcaption>
+        <img id="before" alt="" />
+      </figure>
+      <figure id="after-figure">
+        <figcaption><strong>After</strong><a id="after-link">Open full image</a></figcaption>
+        <img id="after" alt="" />
+      </figure>
+    </main>
+    <script>
+      const screens = [
+        'login',
+        'home-fresh',
+        'home-busy',
+        'approvals',
+        'approvals-refund',
+        'assistant-overview',
+        'assistant-setup-form',
+        'assistant-setup-form-bottom',
+        'assistant-json',
+        'assistant-tests',
+        'assistant-test-run-failing',
+        'assistant-list',
+        'new-assistant',
+        'conversation-approval',
+        'save-as-test',
+        'conversations',
+        'knowledge',
+        'knowledge-upload',
+        'knowledge-held-back',
+        'data-dictionary',
+        'privacy-basic',
+        'privacy-advanced',
+        'topics',
+        'help-panel',
+        'palette',
+        'empty-assistants',
+        'empty-knowledge',
+        'empty-conversations',
+        'empty-approvals',
+        'usage',
+        'models',
+        'workspaces',
+        'audit',
+      ];
+      const screen = document.getElementById('screen');
+      const viewport = document.getElementById('viewport');
+      const theme = document.getElementById('theme');
+      for (const name of screens) {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name.replaceAll('-', ' ');
+        screen.append(option);
+      }
+      const initial = new URLSearchParams(location.hash.slice(1));
+      screen.value = screens.includes(initial.get('screen')) ? initial.get('screen') : 'home-busy';
+      viewport.value = initial.get('viewport') === 'mobile' ? 'mobile' : 'desktop';
+      theme.value = initial.get('theme') === 'dark' ? 'dark' : 'light';
+      function render() {
+        for (const stage of ['before', 'after']) {
+          const path = `${stage}/${screen.value}--${viewport.value}-${theme.value}.png`;
+          document.getElementById(stage).src = path;
+          document.getElementById(stage).alt =
+            `${stage}: ${screen.selectedOptions[0].textContent}, ${viewport.value}, ${theme.value}`;
+          document.getElementById(`${stage}-link`).href = path;
+          document
+            .getElementById(`${stage}-figure`)
+            .classList.toggle('mobile', viewport.value === 'mobile');
+        }
+        history.replaceState(
+          null,
+          '',
+          `#${new URLSearchParams({ screen: screen.value, viewport: viewport.value, theme: theme.value })}`,
+        );
+      }
+      for (const control of [screen, viewport, theme]) control.addEventListener('change', render);
+      render();
+    </script>
+  </body>
+</html>

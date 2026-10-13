@@ -1,0 +1,934 @@
+[
+  {
+    "shot": "login",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/login--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "home-fresh",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/home-fresh--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "home-busy",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/home-busy--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "approvals",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/approvals--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-overview",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-overview--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-setup-form",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-setup-form--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-setup-form-bottom",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-setup-form-bottom--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-json",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-json--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-tests",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-tests--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-test-run-failing",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-test-run-failing--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-list",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-list--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "new-assistant",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/new-assistant--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "conversation-approval",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/conversation-approval--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "save-as-test",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/save-as-test--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "conversations",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/conversations--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "knowledge",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/knowledge--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "knowledge-upload",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/knowledge-upload--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "knowledge-held-back",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/knowledge-held-back--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "data-dictionary",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/data-dictionary--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "privacy-basic",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/privacy-basic--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "privacy-advanced",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/privacy-advanced--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "topics",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/topics--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "help-panel",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/help-panel--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "palette",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/palette--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "empty-assistants",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/empty-assistants--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "empty-knowledge",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/empty-knowledge--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "empty-conversations",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/empty-conversations--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "empty-approvals",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/empty-approvals--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "usage",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/usage--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "models",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/models--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "workspaces",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/workspaces--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "audit",
+    "variant": "desktop-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/audit--desktop-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "login",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/login--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "home-fresh",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/home-fresh--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "home-busy",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/home-busy--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "approvals",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/approvals--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-overview",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-overview--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-setup-form",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-setup-form--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-setup-form-bottom",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-setup-form-bottom--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-json",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-json--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-tests",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-tests--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-test-run-failing",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-test-run-failing--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-list",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-list--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "new-assistant",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/new-assistant--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "conversation-approval",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/conversation-approval--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "save-as-test",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/save-as-test--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "conversations",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/conversations--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "knowledge",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/knowledge--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "knowledge-upload",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/knowledge-upload--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "knowledge-held-back",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/knowledge-held-back--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "data-dictionary",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/data-dictionary--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "privacy-basic",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/privacy-basic--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "privacy-advanced",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/privacy-advanced--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "topics",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/topics--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "help-panel",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/help-panel--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "palette",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/palette--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "empty-assistants",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/empty-assistants--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "empty-knowledge",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/empty-knowledge--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "empty-conversations",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/empty-conversations--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "empty-approvals",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/empty-approvals--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "usage",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/usage--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "models",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/models--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "workspaces",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/workspaces--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "audit",
+    "variant": "desktop-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/audit--desktop-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "login",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/login--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "home-fresh",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/home-fresh--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "home-busy",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/home-busy--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "approvals",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/approvals--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-overview",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-overview--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-setup-form",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-setup-form--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-setup-form-bottom",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-setup-form-bottom--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-json",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-json--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-tests",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-tests--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-test-run-failing",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-test-run-failing--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-list",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-list--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "new-assistant",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/new-assistant--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "conversation-approval",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/conversation-approval--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "save-as-test",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/save-as-test--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "conversations",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/conversations--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "knowledge",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/knowledge--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "knowledge-upload",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/knowledge-upload--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "knowledge-held-back",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/knowledge-held-back--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "data-dictionary",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/data-dictionary--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "privacy-basic",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/privacy-basic--mobile-light.png",
+    "overflow": 0,
+    "errors": ["pageerror: Transition was aborted because of invalid state. Viewport size changed"]
+  },
+  {
+    "shot": "privacy-advanced",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/privacy-advanced--mobile-light.png",
+    "overflow": 0,
+    "errors": ["pageerror: Transition was aborted because of invalid state. Viewport size changed"]
+  },
+  {
+    "shot": "topics",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/topics--mobile-light.png",
+    "overflow": 0,
+    "errors": ["pageerror: Transition was aborted because of invalid state. Viewport size changed"]
+  },
+  {
+    "shot": "help-panel",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/help-panel--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "palette",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/palette--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "empty-assistants",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/empty-assistants--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "empty-knowledge",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/empty-knowledge--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "empty-conversations",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/empty-conversations--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "empty-approvals",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/empty-approvals--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "usage",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/usage--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "models",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/models--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "workspaces",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/workspaces--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "audit",
+    "variant": "mobile-light",
+    "file": "/home/user/caliban/web/docs/redesign/before/audit--mobile-light.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "login",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/login--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "home-fresh",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/home-fresh--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "home-busy",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/home-busy--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "approvals",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/approvals--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-overview",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-overview--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-setup-form",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-setup-form--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-setup-form-bottom",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-setup-form-bottom--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-json",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-json--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-tests",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-tests--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-test-run-failing",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-test-run-failing--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "assistant-list",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/assistant-list--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "new-assistant",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/new-assistant--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "conversation-approval",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/conversation-approval--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "save-as-test",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/save-as-test--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "conversations",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/conversations--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "knowledge",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/knowledge--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "knowledge-upload",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/knowledge-upload--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "knowledge-held-back",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/knowledge-held-back--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "data-dictionary",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/data-dictionary--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "privacy-basic",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/privacy-basic--mobile-dark.png",
+    "overflow": 0,
+    "errors": ["pageerror: Transition was aborted because of invalid state. Viewport size changed"]
+  },
+  {
+    "shot": "privacy-advanced",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/privacy-advanced--mobile-dark.png",
+    "overflow": 0,
+    "errors": ["pageerror: Transition was aborted because of invalid state. Viewport size changed"]
+  },
+  {
+    "shot": "topics",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/topics--mobile-dark.png",
+    "overflow": 0,
+    "errors": ["pageerror: Transition was aborted because of invalid state. Viewport size changed"]
+  },
+  {
+    "shot": "help-panel",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/help-panel--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "palette",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/palette--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "empty-assistants",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/empty-assistants--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "empty-knowledge",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/empty-knowledge--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "empty-conversations",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/empty-conversations--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "empty-approvals",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/empty-approvals--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "usage",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/usage--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "models",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/models--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "workspaces",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/workspaces--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "audit",
+    "variant": "mobile-dark",
+    "file": "/home/user/caliban/web/docs/redesign/before/audit--mobile-dark.png",
+    "overflow": 0,
+    "errors": []
+  },
+  {
+    "shot": "approvals-refund",
+    "variant": "desktop-light",
+    "file": "docs/redesign/before/approvals-refund--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "approvals-refund",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/before/approvals-refund--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "approvals-refund",
+    "variant": "mobile-light",
+    "file": "docs/redesign/before/approvals-refund--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "approvals-refund",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/before/approvals-refund--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  }
+]
