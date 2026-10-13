@@ -222,7 +222,8 @@ export function InboxPage() {
               {!only && severalWorkspaces ? ' across your workspaces' : ''}
             </p>
           )}
-          <p className="text-[12px] text-fg-muted">
+          {/* Phones have no keyboard: the hint shows from the sm breakpoint. */}
+          <p className="hidden text-[12px] text-fg-muted sm:block">
             Keys: <kbd className="font-mono">J</kbd> and <kbd className="font-mono">K</kbd> move,{' '}
             <kbd className="font-mono">A</kbd> approves, <kbd className="font-mono">R</kbd> rejects
           </p>

@@ -568,7 +568,7 @@ function ReviewQueue({
               >
                 Reject selected ({chosen.length})
               </Button>
-              <p className="ml-auto text-fg-muted" id="queue-keys">
+              <p className="ml-auto hidden text-fg-muted sm:block" id="queue-keys">
                 Keys in the list: <kbd className="font-mono">J</kbd>/
                 <kbd className="font-mono">K</kbd> move, <kbd className="font-mono">A</kbd>{' '}
                 approves, <kbd className="font-mono">R</kbd> rejects.
