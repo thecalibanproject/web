@@ -1,15 +1,14 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { useMemo, useState, type FormEvent } from 'react';
-import { usePermissions } from '@/api/auth';
-import { nodesQuery, runsQuery, tenantsQuery } from '@/api/queries';
+import { nodesQuery, runsQuery } from '@/api/queries';
 import { RUN_STATUSES } from '@/api/types';
 import { RunStatusBadge } from '@/components/runs/run-badges';
-import { TenantSelect } from '@/components/tenant-select';
 import {
   Badge,
   Button,
   Card,
+  Checkbox,
   EmptyState,
   ErrorState,
   Input,
@@ -23,28 +22,29 @@ import {
   THead,
   TR,
 } from '@/components/ui';
+import { doc } from '@/lib/docs';
 import { EMPTY, formatDateTime, formatMs, formatUsd } from '@/lib/format';
 import {
   elapsedMs,
   isRunStatusFilter,
+  isTestRun,
   RUN_SINCE,
   RUN_SINCE_LABEL,
   RUN_STATUS_LABEL,
+  startedBy,
   type RunSince,
 } from '@/lib/runs';
+import { useWorkspace } from '@/lib/workspace';
 
 const route = getRouteApi('/_app/runs');
 
 export function RunsPage() {
   const search = route.useSearch();
   const navigate = route.useNavigate();
-  const perms = usePermissions();
-  const tenants = useQuery(tenantsQuery());
-  const readable = perms.tenantsWith('runs.read');
-  const firstReadable = tenants.data?.find(
-    (t) => readable === 'all' || readable.includes(t.id),
-  )?.id;
-  const tenantId = search.tenant ?? firstReadable;
+  const ws = useWorkspace();
+  // The header's workspace; a ?tenant= deep link wins (and switches the header).
+  const tenantId = search.tenant ?? ws.id;
+  const [hideTests, setHideTests] = useState(true);
   const { node, version, status, since } = search;
 
   const runs = useInfiniteQuery({
@@ -62,7 +62,9 @@ export function RunsPage() {
   const setSearch = (patch: Partial<typeof search>) =>
     void navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
 
-  const rows = useMemo(() => runs.data?.pages.flatMap((p) => p.data) ?? [], [runs.data]);
+  const all = useMemo(() => runs.data?.pages.flatMap((p) => p.data) ?? [], [runs.data]);
+  const rows = hideTests ? all.filter((r) => !isTestRun(r.origin)) : all;
+  const hidden = all.length - rows.length;
 
   const applyVersion = (e: FormEvent) => {
     e.preventDefault();
@@ -75,28 +77,19 @@ export function RunsPage() {
   return (
     <>
       <PageHeader
-        title="Runs"
-        description="Node runs, newest first: status, cost and who started them. Open a run for its step timeline."
+        title="Conversations"
+        description="Every request an assistant handled, newest first: how it ended, what it cost and who started it. Open one to read its steps."
       />
       <Card>
         <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-2.5">
           <label className="flex items-center gap-2 text-[12.5px] text-fg-muted">
-            Tenant
-            <TenantSelect
-              value={tenantId}
-              permission="runs.read"
-              className="w-52"
-              onChange={(t) => setSearch({ tenant: t, node: undefined, version: undefined })}
-            />
-          </label>
-          <label className="flex items-center gap-2 text-[12.5px] text-fg-muted">
-            Node
+            Assistant
             <Select
               value={node ?? ''}
               onChange={(e) => setSearch({ node: e.target.value || undefined })}
               className="w-40"
             >
-              <option value="">All nodes</option>
+              <option value="">All assistants</option>
               {nodeNames.map((n) => (
                 <option key={n} value={n}>
                   {n}
@@ -160,6 +153,11 @@ export function RunsPage() {
               ))}
             </Select>
           </label>
+          <Checkbox
+            label="Hide test runs"
+            checked={hideTests}
+            onChange={(e) => setHideTests(e.target.checked)}
+          />
           {filtered && (
             <Button
               size="sm"
@@ -179,14 +177,15 @@ export function RunsPage() {
           )}
         </div>
         {!tenantId ? (
-          tenants.isPending ? (
+          ws.isPending ? (
             <LoadingState rows={2} />
-          ) : tenants.isError ? (
-            <ErrorState error={tenants.error} onRetry={() => void tenants.refetch()} />
+          ) : ws.isError ? (
+            <ErrorState error={ws.error} onRetry={ws.refetch} />
           ) : (
             <EmptyState
-              title="No tenant to show"
-              description="Runs are kept per tenant. Your roles do not cover a tenant with runs yet."
+              title="No workspace to show"
+              description="Conversations are kept per workspace, and your roles do not cover one yet."
+              learnMore={doc('guides/conversations-and-runs', 'read-a-run')}
             />
           )
         ) : runs.isPending ? (
@@ -195,24 +194,39 @@ export function RunsPage() {
           <ErrorState error={runs.error} onRetry={() => void runs.refetch()} />
         ) : rows.length === 0 ? (
           <EmptyState
-            title={filtered ? 'No runs match' : 'No runs yet'}
+            title={filtered || hidden ? 'No conversations match' : 'No conversations yet'}
             description={
-              filtered
-                ? 'Try another node, version, status or time range.'
-                : 'Runs of published nodes appear here, from the API, MCP or caliban/auto.'
+              hidden
+                ? `${hidden} test run${hidden === 1 ? ' is' : 's are'} hidden. Untick "Hide test runs" to see ${hidden === 1 ? 'it' : 'them'}.`
+                : filtered
+                  ? 'Try another assistant, version, outcome or time range.'
+                  : 'Each request a live assistant answers appears here, from an app or from automatic routing.'
             }
+            action={
+              !filtered && !hidden ? (
+                <Link to="/nodes" className="text-accent hover:underline">
+                  See your assistants
+                </Link>
+              ) : undefined
+            }
+            learnMore={doc('guides/conversations-and-runs', 'read-a-run')}
           />
         ) : (
           <>
-            <Table label="Runs">
+            {hidden > 0 && (
+              <p className="border-b border-border px-4 py-2 text-[12px] text-fg-muted">
+                {hidden} test run{hidden === 1 ? '' : 's'} hidden on this page.
+              </p>
+            )}
+            <Table label="Conversations">
               <THead>
                 <tr>
-                  <TH>Run</TH>
-                  <TH>Node</TH>
-                  <TH>Status</TH>
+                  <TH>Conversation</TH>
+                  <TH>Assistant</TH>
+                  <TH>Outcome</TH>
                   <TH>Started by</TH>
                   <TH className="text-right">Cost</TH>
-                  <TH>Created</TH>
+                  <TH>Started</TH>
                   <TH className="text-right">Duration</TH>
                 </tr>
               </THead>
@@ -239,6 +253,7 @@ export function RunsPage() {
                       <TD className="whitespace-nowrap">
                         <span className="inline-flex items-center gap-1.5">
                           <RunStatusBadge status={r.status} />
+                          {isTestRun(r.origin) && <Badge tone="info">Test run</Badge>}
                           {r.awaiting_step && (
                             <code className="font-mono text-[11.5px] text-fg-muted">
                               {r.awaiting_step}
@@ -247,10 +262,10 @@ export function RunsPage() {
                         </span>
                       </TD>
                       <TD
-                        className="max-w-56 truncate font-mono text-[12px] text-fg-muted"
+                        className="max-w-56 truncate text-[12.5px] text-fg-muted"
                         title={r.origin ? `${r.invoker} (${r.origin})` : r.invoker}
                       >
-                        {r.invoker}
+                        {startedBy(r.invoker, r.origin)}
                       </TD>
                       <TD className="text-right whitespace-nowrap tabular-nums">
                         {formatUsd(r.cost_usd)}
@@ -273,7 +288,7 @@ export function RunsPage() {
                   loading={runs.isFetchingNextPage}
                   onClick={() => void runs.fetchNextPage()}
                 >
-                  Load older runs
+                  Load older conversations
                 </Button>
               </div>
             )}

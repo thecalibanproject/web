@@ -1,15 +1,20 @@
 import type { AnswerCheck, AnswerRule, ConsoleRun, RunStatus, RunStep } from '@/api/types';
+import type { components } from '@/api/schema';
 import { RUN_STATUSES } from '@/api/types';
+
+export type MastLabel = components['schemas']['MastLabel'];
+export type GoldenCaseCapture = components['schemas']['GoldenCaseCapture'];
+export type CapturedGoldenCase = components['schemas']['CapturedGoldenCase'];
 import type { Tone } from '@/components/ui';
 
 export const RUN_STATUS_LABEL: Record<RunStatus, string> = {
   pending: 'Pending',
   running: 'Running',
   sleeping: 'Sleeping',
-  input_required: 'Waiting for a human',
+  input_required: 'Waiting for a person',
   succeeded: 'Succeeded',
   failed: 'Failed',
-  budget_exhausted: 'Budget exhausted',
+  budget_exhausted: 'Budget used up',
   cancelled: 'Cancelled',
 };
 
@@ -138,8 +143,18 @@ export function budgetRows(budget: ConsoleRun['budget']): BudgetRow[] {
       limit: num(b.wall_clock_ms_limit),
       unit: 'ms',
     },
-    { label: 'Subnode depth', used: num(b.depth_used), limit: num(b.depth_limit), unit: 'int' },
-    { label: 'Map fan-out', used: num(b.fanout_used), limit: num(b.fanout_limit), unit: 'int' },
+    {
+      label: 'Levels of sub-assistants',
+      used: num(b.depth_used),
+      limit: num(b.depth_limit),
+      unit: 'int',
+    },
+    {
+      label: 'Tasks in parallel',
+      used: num(b.fanout_used),
+      limit: num(b.fanout_limit),
+      unit: 'int',
+    },
   ];
   return rows.filter((r) => r.used != null || r.limit != null);
 }
@@ -161,4 +176,66 @@ export const ANSWER_ACTION_TONE: Record<NonNullable<AnswerCheck['action']>, Tone
   passed: 'ok',
   redacted: 'warn',
   refused: 'danger',
+};
+
+/**
+ * A trial run of a test: origin `eval:<eval>:<case>` (or the older
+ * `eval:<eval>`). Hidden from the conversation list by default (UX-65).
+ */
+export function isTestRun(origin: string | null | undefined): boolean {
+  return typeof origin === 'string' && origin.startsWith('eval:');
+}
+
+/** The eval and, in the newer form, the case a test run belongs to. */
+export function testRunOf(
+  origin: string | null | undefined,
+): { evalId: string; caseId: string | null } | null {
+  if (!isTestRun(origin)) return null;
+  const [, evalId = '', ...rest] = origin!.split(':');
+  return { evalId, caseId: rest.length ? rest.join(':') : null };
+}
+
+/** Who started a run, in plain words; the raw id stays in the title. */
+export function startedBy(invoker: string | null | undefined, origin?: string | null): string {
+  if (isTestRun(origin)) return 'A test run';
+  if (!invoker) return 'Unknown';
+  if (invoker === 'break_glass') return 'Shared admin token';
+  if (invoker.startsWith('api_key:')) return `An app key (${invoker.slice(8, 14)})`;
+  if (invoker.startsWith('eval:')) return 'A test run';
+  return invoker;
+}
+
+/**
+ * The MAST failure modes (arXiv 2503.13657) a reviewer can pick when saving a
+ * wrong answer as a test, in plain words.
+ */
+export const MAST_LABEL: Record<MastLabel, string> = {
+  disobey_task_specification: 'Did not do what the task asked',
+  disobey_role_specification: 'Acted outside its role',
+  step_repetition: 'Repeated the same step',
+  loss_of_conversation_history: 'Forgot what was said earlier',
+  unaware_of_termination_conditions: 'Did not know when to stop',
+  conversation_reset: 'Started over for no reason',
+  fail_to_ask_for_clarification: 'Should have asked a question first',
+  task_derailment: 'Went off topic',
+  information_withholding: 'Left out information it had',
+  ignored_other_agent_input: 'Ignored what another assistant said',
+  reasoning_action_mismatch: 'Did something other than what it reasoned',
+  premature_termination: 'Stopped too early',
+  no_or_incomplete_verification: 'Did not check its answer',
+  incorrect_verification: 'Checked its answer wrongly',
+};
+
+/** Step kinds in plain words. */
+export const STEP_KIND_LABEL: Record<string, string> = {
+  llm: 'Model',
+  tool: 'Tool or lookup',
+  router: 'Choice',
+  map: 'Parallel tasks',
+  reduce: 'Merge',
+  verify: 'Check',
+  human: 'Person',
+  approval: 'Approval',
+  subnode: 'Sub-assistant',
+  code: 'Code',
 };

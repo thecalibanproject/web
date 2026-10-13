@@ -5,8 +5,10 @@ import { usePermissions } from '@/api/auth';
 import { ApiError } from '@/api/client';
 import { inboxQuery, runQuery, tenantsQuery, useCancelRun } from '@/api/queries';
 import type { AnswerCheck, ConsoleRun } from '@/api/types';
+import { Advanced } from '@/components/help/advanced';
 import { ApprovalDetails, HumanStepActions } from '@/components/runs/human-step';
 import { RunStatusBadge, TaintLabels } from '@/components/runs/run-badges';
+import { SaveAsTest } from '@/components/runs/save-as-test';
 import {
   Badge,
   Button,
@@ -27,6 +29,9 @@ import {
   THead,
   TR,
 } from '@/components/ui';
+import { argRows } from '@/lib/approvalArgs';
+import { waitedFor } from '@/lib/approvals';
+import { doc } from '@/lib/docs';
 import { isNotFound } from '@/lib/errors';
 import { EMPTY, formatDateTime, formatInt, formatMs, formatUsd } from '@/lib/format';
 import { shortHash } from '@/lib/nodes';
@@ -38,6 +43,9 @@ import {
   elapsedMs,
   isRunActive,
   prettyJson,
+  startedBy,
+  STEP_KIND_LABEL,
+  testRunOf,
   timeline,
   type BudgetRow,
 } from '@/lib/runs';
@@ -45,7 +53,7 @@ import {
 const route = getRouteApi('/_app/runs/$tenantId/$runId');
 
 const CONTENT_HIDDEN =
-  'Run content (input, output, step outputs, questions) is hidden: your role sees what happened, not what was said (needs runs.data).';
+  'The content of this conversation (what was asked, the answer, what each step returned) is hidden: your role sees what happened, not what was said (needs runs.data).';
 
 function amount(row: BudgetRow, v: number | null): string {
   if (v == null) return EMPTY;
@@ -70,54 +78,41 @@ function Details({ rows }: { rows: Array<[string, ReactNode]> }) {
 function Summary({ run }: { run: ConsoleRun }) {
   const ms = elapsedMs(run.started_at ?? run.created_at, run.finished_at);
   const usage = run.usage;
+  const test = testRunOf(run.origin);
+  const waitingSince = run.status === 'input_required' ? lastStepEnd(run) : null;
   const rows: Array<[string, ReactNode]> = [
     [
       'Started by',
-      <span key="i" className="font-mono text-[12px]">
-        {run.invoker ?? EMPTY}
+      <span key="i" title={run.invoker}>
+        {startedBy(run.invoker, run.origin)}
+        {test?.caseId && <span className="text-fg-muted"> (test case {test.caseId})</span>}
       </span>,
     ],
-    ...(run.origin
-      ? [
-          [
-            'Origin',
-            <span key="o" className="font-mono text-[12px]">
-              {run.origin}
-            </span>,
-          ] as [string, ReactNode],
-        ]
-      : []),
     [
-      'Version hash',
-      run.hash ? (
-        <span key="h" className="inline-flex items-center gap-1">
-          <code className="font-mono text-[12px]" title={run.hash}>
-            {shortHash(run.hash)}
-          </code>
-          <CopyButton value={run.hash} label="Copy hash" compact />
-        </span>
-      ) : (
-        EMPTY
-      ),
-    ],
-    [
-      'Input labels',
+      'Untrusted input',
       <TaintLabels
         key="l"
         labels={run.input_labels ?? []}
-        empty="none: the caller marked no input as untrusted"
+        empty="none: the app marked no input as untrusted"
       />,
     ],
     ['Created', formatDateTime(run.created_at)],
     ['Started', formatDateTime(run.started_at)],
-    ['Finished', formatDateTime(run.finished_at)],
-    ['Duration', ms != null ? formatMs(ms) : run.finished_at ? EMPTY : 'not ended'],
+    run.finished_at
+      ? ['Finished', formatDateTime(run.finished_at)]
+      : waitingSince
+        ? [
+            'Waiting',
+            `For a person since ${formatDateTime(waitingSince)} (${waitedFor(waitingSince)})`,
+          ]
+        : ['Finished', isRunActive(run.status) ? 'Still going' : EMPTY],
+    ['Duration', ms != null ? formatMs(ms) : run.finished_at ? EMPTY : 'Still going'],
     ['Billed', formatUsd(run.cost_usd)],
     [
       'Model cost',
       <span
         key="m"
-        title="The real cost of the models its calls were routed to. It differs from what is billed only for runs billed as caliban/auto, at the flat price."
+        title="The real cost of the models its calls were routed to. It differs from what is billed only for conversations billed at the flat price of automatic routing (caliban/auto)."
       >
         {formatUsd(run.model_cost_usd)}
       </span>,
@@ -135,9 +130,6 @@ function Summary({ run }: { run: ConsoleRun }) {
         : EMPTY,
     ],
   ];
-  if (run.claims != null && run.claims > 1) {
-    rows.push(['Claims', `${run.claims} (taken over or resumed by another worker)`]);
-  }
   if (run.error)
     rows.push([
       'Error',
@@ -146,20 +138,68 @@ function Summary({ run }: { run: ConsoleRun }) {
       </span>,
     ]);
   if (run.stop_reason) rows.push(['Stop reason', run.stop_reason]);
-  if (run.partial) rows.push(['Output', 'Partial: the run ended on a budget']);
+  if (run.partial) rows.push(['Answer', 'Partial: the conversation ran out of budget']);
   if (run.cancelled_by) rows.push(['Cancelled by', run.cancelled_by]);
   if (run.cancel_requested) rows.push(['Cancel', 'Requested: the run stops at its next step']);
+  const technical: Array<[string, ReactNode]> = [
+    [
+      'Conversation id',
+      <code key="id" className="font-mono text-[12px]">
+        {run.id}
+      </code>,
+    ],
+    [
+      'Invoker',
+      <code key="inv" className="font-mono text-[12px]">
+        {run.invoker ?? EMPTY}
+      </code>,
+    ],
+    ...(run.origin
+      ? [
+          [
+            'Origin',
+            <code key="o" className="font-mono text-[12px]">
+              {run.origin}
+            </code>,
+          ] as [string, ReactNode],
+        ]
+      : []),
+    [
+      'Version fingerprint',
+      run.hash ? (
+        <span key="h" className="inline-flex items-center gap-1">
+          <code className="font-mono text-[12px]" title={run.hash}>
+            {shortHash(run.hash)}
+          </code>
+          <CopyButton value={run.hash} label="Copy hash" compact />
+        </span>
+      ) : (
+        EMPTY
+      ),
+    ],
+    ...(run.claims != null && run.claims > 1
+      ? [
+          ['Claims', `${run.claims} (taken over or resumed by another worker)`] as [
+            string,
+            ReactNode,
+          ],
+        ]
+      : []),
+  ];
   const budget = budgetRows(run.budget);
   return (
     <div className="mb-4 grid gap-4 lg:grid-cols-2">
       <Card>
-        <CardHeader title="Run" />
-        <div className="p-4">
+        <CardHeader title="Summary" />
+        <div className="flex flex-col gap-3 p-4">
           <Details rows={rows} />
+          <Advanced title="Technical details">
+            <Details rows={technical} />
+          </Advanced>
         </div>
       </Card>
       <Card>
-        <CardHeader title="Budget" description="What the run used against its version's budgets." />
+        <CardHeader title="Budget" description="What the conversation used against its limits." />
         {budget.length === 0 ? (
           <EmptyState title="No budget recorded" />
         ) : (
@@ -200,24 +240,28 @@ function Steps({ run }: { run: ConsoleRun }) {
   return (
     <Card className="mb-4">
       <CardHeader
-        title="Steps"
-        description={`Each vertex execution, model call, tool call and approval, in order. ${steps.length} step${steps.length === 1 ? '' : 's'} over ${formatMs(spanMs)}.`}
+        title="How it got there"
+        description={`Each step: model calls, lookups, tool calls and approvals, in order. ${steps.length} step${steps.length === 1 ? '' : 's'} over ${formatMs(spanMs)}.`}
       />
       {steps.length === 0 ? (
-        <EmptyState title="No steps yet" description="The run has not completed a step." />
+        <EmptyState
+          title="No steps yet"
+          description="The conversation has not finished a step."
+          learnMore={doc('guides/conversations-and-runs', 'timeline')}
+        />
       ) : (
         <Table label="Steps">
           <THead>
             <tr>
               <TH>Step</TH>
-              <TH>Vertex</TH>
+              <TH>Name</TH>
               <TH>Kind</TH>
               <TH>Status</TH>
               <TH className="w-[22%]">Timeline</TH>
               <TH className="text-right">Duration</TH>
               <TH className="text-right">Tokens</TH>
               <TH className="text-right">Cost</TH>
-              <TH>Taint labels</TH>
+              <TH>Data from</TH>
               {run.content_visible && (
                 <TH>
                   <span className="sr-only">Output</span>
@@ -232,11 +276,13 @@ function Steps({ run }: { run: ConsoleRun }) {
                   <TD className="font-mono text-[12px] whitespace-nowrap">{s.id}</TD>
                   <TD className="font-mono text-[12px]">{s.vertex}</TD>
                   <TD>
-                    <Badge tone={s.kind === 'approval' ? 'warn' : 'neutral'}>{s.kind}</Badge>
+                    <Badge tone={s.kind === 'approval' ? 'warn' : 'neutral'} title={s.kind}>
+                      {STEP_KIND_LABEL[s.kind] ?? s.kind}
+                    </Badge>
                   </TD>
                   <TD>
                     <Badge tone={s.status === 'completed' ? 'ok' : 'danger'} dot>
-                      {s.status}
+                      {s.status === 'completed' ? 'Done' : 'Failed'}
                     </Badge>
                   </TD>
                   <TD>
@@ -324,21 +370,23 @@ function AnswerGuard({ check }: { check: AnswerCheck }) {
       <CardHeader
         title={
           <span className="flex items-center gap-2">
-            Answer guard <Badge tone={ANSWER_ACTION_TONE[action]}>{action}</Badge>
+            Answer check <Badge tone={ANSWER_ACTION_TONE[action]}>{action}</Badge>
           </span>
         }
         description={
           action === 'redacted'
             ? 'Links, contacts or references that only untrusted text supplied were removed from the answer.'
             : action === 'refused'
-              ? 'The answer carried what only untrusted text supplied, and the node refuses such answers: the run failed.'
+              ? 'The answer carried what only untrusted text supplied, and this assistant refuses such answers: the conversation failed.'
               : 'The answer carried untrusted data and the guard found nothing to remove.'
         }
       />
       <div className="flex flex-col gap-3 p-4 text-[12.5px]">
-        <Details rows={[['Output labels', <TaintLabels key="l" labels={check.labels ?? []} />]]} />
+        <Details
+          rows={[['Answer data from', <TaintLabels key="l" labels={check.labels ?? []} />]]}
+        />
         {findings.length > 0 && (
-          <Table label="Answer guard findings">
+          <Table label="Answer check findings">
             <THead>
               <tr>
                 <TH>Rule</TH>
@@ -364,33 +412,94 @@ function AnswerGuard({ check }: { check: AnswerCheck }) {
   );
 }
 
-function Content({ run }: { run: ConsoleRun }) {
+/** When the last finished step ended: how long a waiting conversation has waited. */
+function lastStepEnd(run: ConsoleRun): string | null {
+  let end = Number.NaN;
+  for (const st of run.steps) {
+    const t = Date.parse(st.started_at) + st.duration_ms;
+    if (Number.isFinite(t) && !(t <= end)) end = t;
+  }
+  return Number.isFinite(end) ? new Date(end).toISOString() : (run.started_at ?? null);
+}
+
+/** A run input or output as readable text: a string as is, fields as a list. */
+function Readable({ value, label }: { value: unknown; label: string }) {
+  if (typeof value === 'string') {
+    return (
+      <p dir="auto" className="text-[13px] break-words whitespace-pre-wrap">
+        {value}
+      </p>
+    );
+  }
+  const rows = argRows(value);
+  return (
+    <dl aria-label={label} className="flex flex-col gap-1.5 text-[13px]">
+      {rows.map((r, i) => (
+        <div
+          key={i}
+          className="grid grid-cols-[minmax(6rem,max-content)_1fr] gap-x-3"
+          style={{ paddingLeft: `${r.depth}rem` }}
+        >
+          <dt className="text-[12.5px] text-fg-muted">{r.key}</dt>
+          <dd dir="auto" className="min-w-0 break-words whitespace-pre-wrap">
+            {r.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/**
+ * The conversation first (UX-66): what was asked and the answer, as text in
+ * their own direction (Arabic reads right to left), with the raw JSON behind
+ * a toggle.
+ */
+function Conversation({ run }: { run: ConsoleRun }) {
+  const [json, setJson] = useState(false);
   if (!run.content_visible) {
     return (
-      <Card>
+      <Card className="mb-4">
         <p className="p-4 text-[12.5px] text-fg-muted">{CONTENT_HIDDEN}</p>
       </Card>
     );
   }
+  const noOutput = run.output === undefined || run.output === null;
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <Card>
-        <CardHeader title="Input" />
-        <div className="p-4">
-          <CodeBlock label="Run input" language="json" code={prettyJson(run.input ?? null)} />
-        </div>
-      </Card>
-      <Card>
-        <CardHeader title="Output" description={run.partial ? 'Partial result' : undefined} />
-        <div className="p-4">
-          {run.output === undefined || run.output === null ? (
-            <p className="text-[12.5px] text-fg-muted">No output yet.</p>
+    <Card className="mb-4">
+      <CardHeader
+        title="The conversation"
+        actions={
+          <Button size="sm" variant="ghost" aria-pressed={json} onClick={() => setJson((j) => !j)}>
+            {json ? 'Show as text' : 'Show as JSON'}
+          </Button>
+        }
+      />
+      <div className="grid gap-4 p-4 lg:grid-cols-2">
+        <section aria-labelledby="asked-h" className="min-w-0">
+          <h3 id="asked-h" className="mb-1.5 text-[12.5px] font-semibold">
+            What was asked
+          </h3>
+          {json ? (
+            <CodeBlock label="Run input" language="json" code={prettyJson(run.input ?? null)} />
           ) : (
-            <CodeBlock label="Run output" language="json" code={prettyJson(run.output)} />
+            <Readable value={run.input ?? null} label="What was asked" />
           )}
-        </div>
-      </Card>
-    </div>
+        </section>
+        <section aria-labelledby="answer-h" className="min-w-0">
+          <h3 id="answer-h" className="mb-1.5 text-[12.5px] font-semibold">
+            The answer{run.partial ? ' (partial)' : ''}
+          </h3>
+          {noOutput ? (
+            <p className="text-[12.5px] text-fg-muted">No answer yet.</p>
+          ) : json ? (
+            <CodeBlock label="Run output" language="json" code={prettyJson(run.output)} />
+          ) : (
+            <Readable value={run.output} label="The answer" />
+          )}
+        </section>
+      </div>
+    </Card>
   );
 }
 
@@ -415,13 +524,11 @@ function Waiting({ tenantId, run }: { tenantId: string; run: ConsoleRun }) {
   return (
     <Card className="mb-4 border-warn/50">
       <CardHeader
-        title={
-          kind === 'approval' ? 'Waiting for approval of a tainted call' : 'Waiting for an answer'
-        }
+        title={kind === 'approval' ? 'Waiting for your approval' : 'Waiting for an answer'}
         description={
           <>
             Step <code className="font-mono">{awaiting.step}</code>. Your decision is recorded under
-            your name in the audit log.
+            your name.
           </>
         }
       />
@@ -431,10 +538,11 @@ function Waiting({ tenantId, run }: { tenantId: string; run: ConsoleRun }) {
             approval={approval}
             question={awaiting.question}
             contentVisible={run.content_visible}
+            run={run}
           />
         ) : run.content_visible ? (
-          <p className="text-[13px] break-words whitespace-pre-wrap">
-            {awaiting.question ?? 'The run asks for input without a question.'}
+          <p dir="auto" className="text-[13px] break-words whitespace-pre-wrap">
+            {awaiting.question ?? 'The assistant asks for input without a question.'}
           </p>
         ) : null}
         <HumanStepActions
@@ -445,6 +553,7 @@ function Waiting({ tenantId, run }: { tenantId: string; run: ConsoleRun }) {
           approval={approval}
           question={awaiting.question}
           contentVisible={run.content_visible}
+          run={run}
           onAnswered={setDone}
         />
       </div>
@@ -502,7 +611,7 @@ export function RunDetailPage() {
     <>
       <nav aria-label="Breadcrumb" className="mb-2 text-[12.5px] text-fg-muted">
         <Link to="/runs" search={{ tenant: tenantId }} className="hover:text-fg hover:underline">
-          Runs
+          Conversations
         </Link>
         <span aria-hidden="true"> / </span>
         <span>{tenantName}</span>
@@ -512,10 +621,11 @@ export function RunDetailPage() {
         </span>
       </nav>
       <PageHeader
-        title={<span className="font-mono">{runId}</span>}
+        title={r ? `Conversation with ${r.node}` : 'Conversation'}
         description={
           r ? (
             <span className="flex flex-wrap items-center gap-2">
+              <code className="font-mono text-[12px]">{runId}</code>
               <Link
                 to="/nodes/$tenantId/$nodeName"
                 params={{ tenantId, nodeName: r.node }}
@@ -526,7 +636,7 @@ export function RunDetailPage() {
               <Badge>v{r.version}</Badge>
               <RunStatusBadge status={r.status} />
               {isRunActive(r.status) && (
-                <span className="text-fg-subtle">Refreshing while the run is not ended.</span>
+                <span className="text-fg-subtle">Refreshing until it ends.</span>
               )}
             </span>
           ) : undefined
@@ -539,7 +649,7 @@ export function RunDetailPage() {
                 search={{ tenant: tenantId, node: r.node }}
                 className="text-[13px] text-accent hover:underline"
               >
-                Runs of {r.node}
+                Other conversations of {r.node}
               </Link>
               <Link
                 to="/usage"
@@ -548,6 +658,13 @@ export function RunDetailPage() {
               >
                 Model calls in Usage
               </Link>
+              <SaveAsTest
+                tenantId={tenantId}
+                runId={r.id}
+                node={r.node}
+                version={r.version}
+                status={r.status}
+              />
               <CancelRun tenantId={tenantId} run={r} />
             </>
           )
@@ -558,15 +675,15 @@ export function RunDetailPage() {
       ) : run.isError && isNotFound(run.error) ? (
         <Card>
           <EmptyState
-            title="Run not found"
-            description={`${tenantName} has no run ${runId}, or it was removed by the run retention.`}
+            title="Conversation not found"
+            description={`${tenantName} has no conversation ${runId}, or it was removed after its retention period.`}
             action={
               <Link
                 to="/runs"
                 search={{ tenant: tenantId }}
                 className="text-[13px] text-accent hover:underline"
               >
-                Back to runs
+                Back to conversations
               </Link>
             }
           />
@@ -578,10 +695,10 @@ export function RunDetailPage() {
       ) : (
         <>
           <Waiting tenantId={tenantId} run={run.data} />
-          <Summary run={run.data} />
+          <Conversation run={run.data} />
           {run.data.answer_check && <AnswerGuard check={run.data.answer_check} />}
           <Steps run={run.data} />
-          <Content run={run.data} />
+          <Summary run={run.data} />
         </>
       )}
     </>
