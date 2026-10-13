@@ -58,18 +58,6 @@ const DATA_MODULES: Record<string, Set<string> | 'all-values'> = {
  * empty: remove a file here when its copy is migrated.
  */
 const PENDING = new Set<string>([
-  'components/tenant-select.tsx',
-  'components/tenant/api-keys-panel.tsx',
-  'components/tenant/delete-tenant-section.tsx',
-  'components/tenant/intents-panel.tsx',
-  'components/tenant/key-access-fields.tsx',
-  'components/tenant/node-limits-section.tsx',
-  'components/tenant/pii-detectors-section.tsx',
-  'components/tenant/provider-keys-panel.tsx',
-  'components/tenant/tenant-deleted-state.tsx',
-  'components/tenant/tenant-settings-section.tsx',
-  'pages/tenant-detail.tsx',
-  'pages/tenants.tsx',
 ]);
 
 function walk(dir: string, out: string[] = []): string[] {

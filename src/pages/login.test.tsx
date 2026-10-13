@@ -107,7 +107,7 @@ describe('Sign-in screen', () => {
     await user.click(screen.getByRole('button', { name: 'Sign in with the token' }));
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/tenants'));
-    expect(await screen.findByRole('table', { name: 'Tenants' })).toBeInTheDocument();
+    expect(await screen.findByRole('table', { name: 'Workspaces' })).toBeInTheDocument();
     expect(getToken()).toBe('adm_secret');
     // The shell says it is the break-glass token, not a person.
     expect(screen.getByText('Shared admin token')).toBeInTheDocument();

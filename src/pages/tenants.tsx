@@ -27,7 +27,9 @@ import {
 } from '@/components/ui';
 import { IconChevronRight, IconPlus } from '@/components/ui/icons';
 import { cn } from '@/lib/cn';
+import { doc } from '@/lib/docs';
 import { EMPTY, formatDate } from '@/lib/format';
+import { PII_MODE_LABEL, PII_MODE_OPTIONS } from '@/lib/labels';
 
 type Pii = NonNullable<TenantCreate['pii_default']>;
 
@@ -65,8 +67,8 @@ function CreateTenantDialog({ open, onClose }: { open: boolean; onClose: () => v
         onClose();
       }}
       side="center"
-      title="New tenant"
-      description="A tenant is an isolation boundary: keys, cache, ontology and budgets never cross it."
+      title="New workspace"
+      description="A workspace keeps its own keys, data, assistants and budget: nothing crosses between workspaces."
     >
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <Field label="Name" required>
@@ -76,11 +78,14 @@ function CreateTenantDialog({ open, onClose }: { open: boolean; onClose: () => v
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="acme-finance"
+              placeholder="Northwind Clinic"
             />
           )}
         </Field>
-        <Field label="Region" hint="Optional data-residency label, e.g. eu-west-1 or on-prem-dc1.">
+        <Field
+          label="Region"
+          hint="Optional: where its data lives, such as eu-west-1 or on-prem-dc1."
+        >
           {({ id, describedBy }) => (
             <Input
               id={id}
@@ -91,8 +96,8 @@ function CreateTenantDialog({ open, onClose }: { open: boolean; onClose: () => v
           )}
         </Field>
         <Field
-          label="Default PII handling"
-          hint="Reversible pseudonymizes before the model and restores in the response."
+          label="How personal data is protected"
+          hint="Names, ID numbers and phone numbers are hidden from models. You can change this later in the workspace's Privacy tab."
         >
           {({ id, describedBy }) => (
             <Select
@@ -101,9 +106,12 @@ function CreateTenantDialog({ open, onClose }: { open: boolean; onClose: () => v
               value={pii}
               onChange={(e) => setPii(e.target.value as Pii)}
             >
-              <option value="reversible">Reversible pseudonymization</option>
-              <option value="mask">Mask (irreversible)</option>
-              <option value="off">Off</option>
+              {PII_MODE_OPTIONS.map((m) => (
+                <option key={m} value={m}>
+                  {PII_MODE_LABEL[m]}
+                  {m === 'reversible' ? ' (recommended)' : ''}
+                </option>
+              ))}
             </Select>
           )}
         </Field>
@@ -116,7 +124,7 @@ function CreateTenantDialog({ open, onClose }: { open: boolean; onClose: () => v
             loading={create.isPending}
             disabled={!name.trim()}
           >
-            Create tenant
+            Create workspace
           </Button>
         </div>
       </form>
@@ -133,8 +141,8 @@ export function TenantsPage() {
   return (
     <>
       <PageHeader
-        title="Tenants"
-        description="Each tenant has its own API keys, BYOK provider credentials, datasources and ontology."
+        title="Workspaces"
+        description="Each workspace has its own app keys, provider accounts, data, assistants and budget."
         actions={
           canCreate && (
             <Button
@@ -142,7 +150,7 @@ export function TenantsPage() {
               icon={<IconPlus size={14} />}
               onClick={() => setCreating(true)}
             >
-              New tenant
+              New workspace
             </Button>
           )
         }
@@ -162,32 +170,34 @@ export function TenantsPage() {
         ) : tenants.data.length === 0 ? (
           canCreate ? (
             <EmptyState
-              title="No tenants yet"
-              description="Create a tenant, then add a provider key (BYOK) and mint an API key for your apps."
+              title="No workspaces yet"
+              description="A workspace holds the keys, data and assistants of one team or customer. Create one to start."
               action={
                 <Button
                   variant="primary"
                   icon={<IconPlus size={14} />}
                   onClick={() => setCreating(true)}
                 >
-                  New tenant
+                  New workspace
                 </Button>
               }
+              learnMore={doc('guides/workspaces', 'create')}
             />
           ) : (
             <EmptyState
-              title="No tenants to show"
-              description="Your roles do not cover any tenant yet. An owner or admin can grant you a role on one."
+              title="No workspaces to show"
+              description="Your roles do not cover any workspace yet. An owner or admin can grant you a role on one."
+              learnMore={doc('guides/people-and-roles', 'roles')}
             />
           )
         ) : (
-          <Table label="Tenants">
+          <Table label="Workspaces">
             <THead>
               <tr>
                 <TH>Name</TH>
                 <TH>ID</TH>
                 <TH>Region</TH>
-                <TH>PII default</TH>
+                <TH>Personal data</TH>
                 <TH>Created</TH>
                 {showDeleted && <TH>Status</TH>}
                 <TH>
@@ -217,7 +227,7 @@ export function TenantsPage() {
                     <TD>{t.region ?? <span className="text-fg-subtle">{EMPTY}</span>}</TD>
                     <TD>
                       {t.pii_default ? (
-                        <Badge>{t.pii_default}</Badge>
+                        <Badge>{PII_MODE_LABEL[t.pii_default]}</Badge>
                       ) : (
                         <span className="text-fg-subtle">{EMPTY}</span>
                       )}

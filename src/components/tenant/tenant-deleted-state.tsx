@@ -21,16 +21,16 @@ export function TenantDeletedState({
   const all = useQuery(tenantsQuery(true));
   const tenant = all.data?.find((t) => t.id === tenantId);
 
-  if (all.isPending) return <LoadingState rows={2} label="Checking tenant…" />;
+  if (all.isPending) return <LoadingState rows={2} label="Checking the workspace…" />;
 
   if (all.isSuccess && !tenant) {
     return (
       <EmptyState
         className={className}
-        title="Tenant not found"
+        title="Workspace not found"
         description={
           <>
-            No tenant has the id <code className="font-mono">{tenantId}</code>.
+            No workspace has the id <code className="font-mono">{tenantId}</code>.
           </>
         }
         action={action}
@@ -41,13 +41,13 @@ export function TenantDeletedState({
   return (
     <EmptyState
       className={className}
-      title="This tenant was deleted"
+      title="This workspace was deleted"
       description={
         <>
           <span className="font-medium text-fg">{tenant?.name ?? tenantId}</span> was deleted
-          {tenant?.deleted_at ? ` on ${formatDateTime(tenant.deleted_at)}` : ''}. Its API keys were
-          revoked and its provider credentials, routes, datasources and nodes were removed. Audit
-          history is kept.
+          {tenant?.deleted_at ? ` on ${formatDateTime(tenant.deleted_at)}` : ''}. Its app keys were
+          revoked and its provider accounts, routing, data connections and assistants were removed.
+          The audit log is kept.
         </>
       }
       action={action}

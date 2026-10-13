@@ -42,10 +42,14 @@ export function TenantSelect({
       onChange={(e) => onChange(e.target.value || undefined)}
     >
       {allowAll ? (
-        <option value="">All tenants</option>
+        <option value="">All workspaces</option>
       ) : (
         <option value="" disabled>
-          {isPending ? 'Loading tenants…' : isError ? 'Could not load tenants' : 'Select a tenant…'}
+          {isPending
+            ? 'Loading workspaces…'
+            : isError
+              ? 'Could not load workspaces'
+              : 'Select a workspace…'}
         </option>
       )}
       {options?.map((t) => (
@@ -69,7 +73,7 @@ export function TenantFilter({
 }) {
   return (
     <label className="flex items-center gap-2 text-[12.5px] text-fg-muted">
-      Tenant
+      Workspace
       <TenantSelect value={value} onChange={onChange} allowAll={allowAll} className="w-52" />
     </label>
   );

@@ -97,13 +97,20 @@ const tenantsRoute = createRoute({
   component: lazyRouteComponent(() => import('@/pages/tenants'), 'TenantsPage'),
 });
 
-export type TenantTab = 'api-keys' | 'provider-keys' | 'intents';
+export const TENANT_TABS = [
+  'api-keys',
+  'provider-keys',
+  'intents',
+  'privacy',
+  'limits',
+  'danger',
+] as const;
+export type TenantTab = (typeof TENANT_TABS)[number];
 const tenantDetailRoute = createRoute({
   getParentRoute: () => appRoute,
   path: 'tenants/$tenantId',
   validateSearch: (s: Record<string, unknown>): { tab?: TenantTab } => ({
-    tab:
-      s.tab === 'provider-keys' || s.tab === 'api-keys' || s.tab === 'intents' ? s.tab : undefined,
+    tab: TENANT_TABS.find((t) => t === s.tab),
   }),
   component: lazyRouteComponent(() => import('@/pages/tenant-detail'), 'TenantDetailPage'),
 });

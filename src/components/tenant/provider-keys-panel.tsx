@@ -30,10 +30,12 @@ import {
   TR,
 } from '../ui';
 import { IconPlus, IconTrash } from '../ui/icons';
+import { doc } from '@/lib/docs';
 import { isNotFound } from '@/lib/errors';
 import { formatDate } from '@/lib/format';
 import { PROVIDER_LABEL, PROVIDER_SHORT, TRUST_TIER_HINT, TRUST_TIER_LABEL } from '@/lib/labels';
 import { PROVIDER_RULES } from '@/lib/providerForm';
+import { Toggletip } from '../help/toggletip';
 import { TenantDeletedState } from './tenant-deleted-state';
 
 export function ProviderKeyForm({ tenantId, onDone }: { tenantId: string; onDone: () => void }) {
@@ -72,7 +74,7 @@ export function ProviderKeyForm({ tenantId, onDone }: { tenantId: string; onDone
   };
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4" aria-label="Add provider key">
+    <form onSubmit={onSubmit} className="flex flex-col gap-4" aria-label="Add provider account">
       <Field label="Provider" required>
         {({ id }) => (
           <Select id={id} value={kind} onChange={(e) => onKind(e.target.value as ProviderKind)}>
@@ -141,8 +143,8 @@ export function ProviderKeyForm({ tenantId, onDone }: { tenantId: string; onDone
         required={rules.apiKey === 'required'}
         hint={
           rules.apiKey === 'optional'
-            ? 'Optional for keyless local endpoints. Write-only: encrypted with the tenant key, never shown again.'
-            : 'Write-only: encrypted with the tenant key, never shown again. Only the last 4 characters are kept for display.'
+            ? 'Optional for local servers without a key. Encrypted and never shown again.'
+            : 'Encrypted and never shown again. Only the last 4 characters are kept for display.'
         }
       >
         {({ id, describedBy }) => (
@@ -159,7 +161,7 @@ export function ProviderKeyForm({ tenantId, onDone }: { tenantId: string; onDone
           />
         )}
       </Field>
-      <Field label="Trust tier" required hint={TRUST_TIER_HINT[tier]}>
+      <Field label="Where the model runs" required hint={TRUST_TIER_HINT[tier]}>
         {({ id, describedBy }) => (
           <Select
             id={id}
@@ -179,7 +181,7 @@ export function ProviderKeyForm({ tenantId, onDone }: { tenantId: string; onDone
       <div className="flex justify-end gap-2">
         <Button onClick={onDone}>Cancel</Button>
         <Button type="submit" variant="primary" loading={create.isPending} disabled={!label.trim()}>
-          Add provider key
+          Add provider account
         </Button>
       </div>
     </form>
@@ -226,8 +228,19 @@ export function ProviderKeysPanel({ tenantId }: { tenantId: string }) {
   return (
     <Card>
       <CardHeader
-        title="Provider keys (BYOK)"
-        description="Your own provider credentials or local model endpoints. Caliban never pools upstream keys."
+        title={
+          <span className="inline-flex items-center gap-1">
+            Provider accounts
+            <Toggletip
+              label="provider accounts"
+              doc={doc('guides/workspaces', 'provider-accounts')}
+            >
+              Your own account with a model provider, or a model server of your own, used only by
+              this workspace. Also called BYOK (bring your own key).
+            </Toggletip>
+          </span>
+        }
+        description="This workspace's own accounts with model providers, or its own model servers. Caliban never shares them with other workspaces."
         actions={
           canWrite && (
             <Button
@@ -236,7 +249,7 @@ export function ProviderKeysPanel({ tenantId }: { tenantId: string }) {
               icon={<IconPlus size={14} />}
               onClick={() => setAdding(true)}
             >
-              Add provider key
+              Add provider account
             </Button>
           )
         }
@@ -249,17 +262,25 @@ export function ProviderKeysPanel({ tenantId }: { tenantId: string }) {
         <ErrorState error={keys.error} onRetry={() => void keys.refetch()} />
       ) : keys.data.length === 0 ? (
         <EmptyState
-          title="No provider keys"
-          description="Add an OpenAI-compatible endpoint (vLLM, llama.cpp, Ollama) for fully on-prem inference, or a cloud provider key."
+          title="No provider accounts"
+          description="Optional: add your own account with a cloud provider, or a model server only this workspace uses. Without one, the workspace uses the models the administrator added."
+          action={
+            canWrite && (
+              <Button variant="primary" size="sm" onClick={() => setAdding(true)}>
+                Add a provider account
+              </Button>
+            )
+          }
+          learnMore={doc('guides/workspaces', 'provider-accounts')}
         />
       ) : (
-        <Table label="Provider keys">
+        <Table label="Provider accounts">
           <THead>
             <tr>
               <TH>Label</TH>
               <TH>Provider</TH>
               <TH>Endpoint</TH>
-              <TH>Trust tier</TH>
+              <TH>Where the model runs</TH>
               <TH>Secret</TH>
               <TH>Created</TH>
               <TH>
@@ -300,8 +321,8 @@ export function ProviderKeysPanel({ tenantId }: { tenantId: string }) {
       <Drawer
         open={adding}
         onClose={() => setAdding(false)}
-        title="Add provider key"
-        description="Secrets are encrypted at rest (AES-256-GCM) and are write-only."
+        title="Add provider account"
+        description="Keys are encrypted at rest and never shown again."
       >
         {adding && <ProviderKeyForm tenantId={tenantId} onDone={() => setAdding(false)} />}
       </Drawer>
