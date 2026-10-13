@@ -307,7 +307,8 @@ export function NodeDetailPage() {
                       <tr>
                         <TH>Version</TH>
                         <TH>State</TH>
-                        <TH>Fingerprint</TH>
+                        {/* The fingerprint is also in "View settings": shown here only when there is room, so the actions never scroll out of view. */}
+                        <TH className="hidden 2xl:table-cell">Fingerprint</TH>
                         <TH>Created by</TH>
                         <TH>Created</TH>
                         <TH>Published</TH>
@@ -328,7 +329,7 @@ export function NodeDetailPage() {
                               {v.live && <LiveBadge />}
                             </span>
                           </TD>
-                          <TD className="whitespace-nowrap">
+                          <TD className="hidden whitespace-nowrap 2xl:table-cell">
                             <code className="font-mono text-[12px] text-fg-muted" title={v.hash}>
                               {shortHash(v.hash)}
                             </code>
