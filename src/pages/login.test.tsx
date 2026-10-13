@@ -110,7 +110,7 @@ describe('Sign-in screen', () => {
     expect(await screen.findByRole('table', { name: 'Tenants' })).toBeInTheDocument();
     expect(getToken()).toBe('adm_secret');
     // The shell says it is the break-glass token, not a person.
-    expect(screen.getByText('Break-glass')).toBeInTheDocument();
+    expect(screen.getByText('Shared admin token')).toBeInTheDocument();
   });
 
   it('keeps a rejected token out and says so', async () => {

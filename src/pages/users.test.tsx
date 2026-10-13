@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import type { RoleBinding, RoleBindingList, Tenant, User } from '@/api/types';
 import { meWith, ssoRoutes, type Grant } from '@/test/auth';
+import { expectNoAxeViolations } from '@/test/a11y';
 import { mockApi, renderApp } from '@/test/utils';
 
 const acme: Tenant = {
@@ -86,7 +87,14 @@ function routes(roles: Grant[], list: Partial<RoleBindingList> = {}) {
   };
 }
 
-describe('Users and roles page', () => {
+describe('People and roles page', () => {
+  it('has no axe violations', async () => {
+    mockApi(routes([{ role: 'admin' }]).routes);
+    await renderApp('/users', { token: null });
+    await screen.findByRole('table', { name: 'Role bindings' });
+    await expectNoAxeViolations();
+  });
+
   it('lists bindings, the config group mappings read-only, and users', async () => {
     mockApi(routes([{ role: 'admin' }]).routes);
     await renderApp('/users', { token: null });
@@ -94,7 +102,7 @@ describe('Users and roles page', () => {
     const table = await screen.findByRole('table', { name: 'Role bindings' });
     const ownerRow = within(table).getByText('Grace Hopper').closest('tr')!;
     expect(within(ownerRow).getByText('Owner')).toBeInTheDocument();
-    expect(within(ownerRow).getByText('Deployment')).toBeInTheDocument();
+    expect(within(ownerRow).getByText('Whole installation')).toBeInTheDocument();
     // Admins cannot revoke the owner role.
     expect(within(ownerRow).getByText('Owners only')).toBeInTheDocument();
     expect(within(ownerRow).queryByRole('button')).not.toBeInTheDocument();
@@ -129,14 +137,14 @@ describe('Users and roles page', () => {
     expect(within(form).getByRole('option', { name: /^Owner/ })).toBeDisabled();
     // Deployment roles take no tenant.
     await user.selectOptions(within(form).getByLabelText(/^Role/), 'admin');
-    expect(within(form).queryByLabelText(/Tenant/)).not.toBeInTheDocument();
+    expect(within(form).queryByLabelText(/^Workspace/)).not.toBeInTheDocument();
 
     await user.selectOptions(within(form).getByLabelText(/^User/), 'usr_grace');
     await user.selectOptions(within(form).getByLabelText(/^Role/), 'developer');
     const submit = within(form).getByRole('button', { name: 'Grant role' });
     // A tenant role needs its tenant.
     expect(submit).toBeDisabled();
-    await user.selectOptions(await within(form).findByLabelText(/Tenant/), 'acme');
+    await user.selectOptions(await within(form).findByLabelText(/^Workspace/), 'acme');
     await user.click(submit);
 
     await waitFor(() => expect(calls.some((c) => c.method === 'POST')).toBe(true));
@@ -215,9 +223,9 @@ describe('Users and roles page', () => {
     });
     await renderApp('/users');
 
-    expect(await screen.findByText('Single sign-on is not configured')).toBeInTheDocument();
-    expect(screen.getByText('No role bindings')).toBeInTheDocument();
-    expect(screen.getByText('No users yet')).toBeInTheDocument();
+    expect(await screen.findByText('Single sign-on is not set up')).toBeInTheDocument();
+    expect(screen.getByText('No roles granted here yet')).toBeInTheDocument();
+    expect(screen.getByText('No people yet')).toBeInTheDocument();
   });
 
   it('a tenant role holder is told their role does not allow the page', async () => {

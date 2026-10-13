@@ -3,7 +3,7 @@ import { ROLE_DESCRIPTION, ROLE_LABEL } from '@/lib/labels';
 import { isTenantRole, type Principal } from '@/lib/permissions';
 import { Badge } from './ui';
 
-/** A role, with its tenant for tenant roles ("Developer: acme"). */
+/** A role, with its workspace for workspace roles ("Developer: acme"). */
 export function RoleBadge({ value: role, tenantId }: { value: Role; tenantId?: string | null }) {
   const deployment = !isTenantRole(role);
   return (
@@ -29,7 +29,7 @@ export function PrincipalRoles({
   if (!me || me.method === 'break_glass') {
     return ssoEnabled ? (
       <Badge tone="warn" title="Emergency access. Every use is recorded in the audit log.">
-        Break-glass
+        Shared admin token
       </Badge>
     ) : (
       <RoleBadge value="owner" />
