@@ -14,6 +14,7 @@ import {
   type RunStatusFilter,
 } from '@/lib/runs';
 import { api, ApiError, slashPreservingPath, unwrap } from './client';
+import type { paths } from './schema';
 import type {
   ApiKeyCreate,
   ConsoleRun,
@@ -1426,3 +1427,30 @@ export function useRotateEvalKey(tenantId: string) {
       ]),
   });
 }
+
+/**
+ * Saves a finished run as a test case of its version (or of `version`): a
+ * right answer, or a wrong one with what it should have done. Needs
+ * `nodes.write`; the case comes back only with `runs.data`. Audited as
+ * `node.golden_set.capture`.
+ */
+export function useCaptureGoldenCase(tenantId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ runId, body }: { runId: string; body: GoldenCaseCaptureBody }) =>
+      unwrap(
+        api.POST('/api/v1/tenants/{tenantId}/runs/{runId}/golden-case', {
+          params: { path: { tenantId, runId } },
+          body,
+        }),
+      ),
+    onSuccess: (captured) =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: qk.nodeEvals(tenantId, captured.node) }),
+        qc.invalidateQueries({ queryKey: qk.run(tenantId, captured.run_id) }),
+      ]),
+  });
+}
+
+type GoldenCaseCaptureBody =
+  paths['/api/v1/tenants/{tenantId}/runs/{runId}/golden-case']['post']['requestBody']['content']['application/json'];
