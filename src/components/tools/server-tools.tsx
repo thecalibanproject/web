@@ -1,3 +1,5 @@
+import { LearnMore } from '@/components/help/learn-more';
+import { doc } from '@/lib/docs';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState, type ReactNode } from 'react';
 import { usePermissions } from '@/api/auth';
@@ -75,11 +77,16 @@ export function ServerTools({
             Tools of <code className="font-mono">{name}</code>
           </>
         }
-        description="Every manifest discovered on this server. Only approved manifests reach the data plane, and a node can only pin those."
+        description={
+          <>
+            Every action this system offers. Assistants can only use the approved ones.{' '}
+            <LearnMore doc={doc('guides/connected-systems', 'approve-a-tool')} />
+          </>
+        }
         actions={
           <>
             <GatedButton size="sm" deniedReason={cannotWrite} onClick={() => setImporting(true)}>
-              Import manifests
+              Import descriptions
             </GatedButton>
             <GatedButton
               size="sm"
@@ -88,7 +95,7 @@ export function ServerTools({
               loading={discovering}
               onClick={onDiscover}
             >
-              Discover tools
+              Check for tools
             </GatedButton>
           </>
         }
@@ -100,8 +107,9 @@ export function ServerTools({
           className="mx-4 mt-3 flex items-start gap-2 rounded-md bg-warn-soft px-3 py-2 text-[12.5px] text-fg"
         >
           <IconAlert size={14} className="mt-0.5 shrink-0 text-warn" />
-          {changed} tool{changed === 1 ? '' : 's'} changed since approval. Runs refuse a changed
-          tool until its new manifest is approved; node versions must then pin the new reference.
+          {changed} action{changed === 1 ? '' : 's'} changed since approval. A changed action is
+          refused until someone approves it again, and assistants then need a new version that uses
+          it.
         </p>
       )}
       {manifests.isPending ? (
@@ -110,8 +118,9 @@ export function ServerTools({
         <ErrorState error={manifests.error} onRetry={() => void manifests.refetch()} />
       ) : rows.length === 0 ? (
         <EmptyState
-          title="No tools discovered yet"
-          description="Discover the server's tools, or import their manifests if the control plane cannot reach it."
+          title="No actions found yet"
+          description="Check the system for tools, or import their descriptions when Caliban cannot reach it."
+          learnMore={doc('guides/connected-systems', 'add-a-tool-server')}
         />
       ) : (
         <Table label={`Manifests of ${name}`}>
@@ -194,7 +203,7 @@ export function ServerTools({
         open={review !== null}
         onClose={() => setReviewing(null)}
         title={review ? `Review ${review.manifest.name}` : ''}
-        description={`On ${name}. What the model sees when a node offers this tool.`}
+        description={`On ${name}. What the model sees when an assistant offers this action.`}
       >
         {review && (
           <ToolReview
@@ -235,8 +244,8 @@ export function ServerTools({
         }}
       >
         <p>
-          Nodes can no longer pin this manifest, and it leaves the data plane with the next
-          snapshot. Published versions that call it fail their calls to this tool.
+          New assistant versions can no longer use this action, and Caliban stops calling it within
+          a few seconds. Published versions that call it fail their calls to it.
         </p>
       </ConfirmDialog>
     </Card>

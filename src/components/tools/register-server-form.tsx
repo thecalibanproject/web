@@ -1,3 +1,4 @@
+import { Advanced } from '@/components/help/advanced';
 import { useState, type FormEvent } from 'react';
 import { useRegisterToolServer } from '@/api/queries';
 import { TOOL_AUTH_METHODS, type ToolAuth, type ToolAuthMethod } from '@/api/types';
@@ -35,7 +36,7 @@ function buildAuth(method: ToolAuthMethod, f: AuthFields): ToolAuth {
 
 /** Explains the trusted flag: who sees personal data in tool arguments. */
 export const TRUSTED_HINT =
-  "Off (the default): the server receives tool arguments with personal data replaced, as the tenant's PII mode says (the same surrogates or masks the node's model calls see). On: Caliban puts the real values back before the call. Turn it on only for a server inside your trust boundary that may process personal data. Tool results enter the run as they are in reversible mode (models get surrogates, the caller the real values) and masked, for good, in mask mode.";
+  "Off (the default): the system gets placeholders instead of personal data, as the workspace's privacy setting says. On: Caliban puts the real values back before each call. Turn it on only for a system on your own network that may process personal data.";
 
 /**
  * Registers an MCP server (Streamable HTTP) for a tenant. The credential, for
@@ -87,9 +88,9 @@ export function RegisterServerForm({
   };
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4" aria-label="Register tool server">
+    <form onSubmit={onSubmit} className="flex flex-col gap-4" aria-label="Add a connected system">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Name" required hint="The server in mcp://server/tool references.">
+        <Field label="Name" required hint="A short name for this system, such as crm.">
           {({ id, describedBy }) => (
             <Input
               id={id}
@@ -123,11 +124,7 @@ export function RegisterServerForm({
           )}
         </Field>
       </div>
-      <Field
-        label="URL"
-        required
-        hint="A Streamable HTTP endpoint (http or https). Stdio servers are not supported. The control plane checks it against the egress rules: no link-local or cloud metadata addresses."
-      >
+      <Field label="Address" required hint="The tool server's https or http address.">
         {({ id, describedBy }) => (
           <Input
             id={id}
@@ -148,33 +145,50 @@ export function RegisterServerForm({
           {TOOL_AUTH_LABEL[method]}
         </legend>
         <p className="text-[12.5px] text-fg-muted">{TOOL_AUTH_HINT[method]}</p>
-        {method === 'caliban_token' && (
-          <Field label="Audience" hint="The aud claim of minted tokens. Default: the URL's origin.">
-            {({ id, describedBy }) => (
-              <Input
-                id={id}
-                aria-describedby={describedBy}
-                spellCheck={false}
-                {...field('audience')}
-              />
-            )}
-          </Field>
-        )}
-        {method === 'api_key' && (
-          <Field
-            label="Header"
-            hint="The header that carries the key. Default: Authorization: Bearer."
+        {(method === 'caliban_token' || method === 'api_key') && (
+          <Advanced
+            summary={
+              method === 'caliban_token'
+                ? "Tokens are made for the address's origin"
+                : 'The key goes in Authorization: Bearer'
+            }
           >
-            {({ id, describedBy }) => (
-              <Input
-                id={id}
-                aria-describedby={describedBy}
-                spellCheck={false}
-                placeholder="X-Api-Key"
-                {...field('header')}
-              />
+            <p className="text-[12px] text-fg-muted">
+              Only Streamable HTTP servers are supported (not stdio). Caliban checks the address
+              against its outgoing rules: no link-local or cloud metadata addresses.
+            </p>
+            {method === 'caliban_token' && (
+              <Field
+                label="Audience"
+                hint="The aud claim of minted tokens. Default: the address's origin."
+              >
+                {({ id, describedBy }) => (
+                  <Input
+                    id={id}
+                    aria-describedby={describedBy}
+                    spellCheck={false}
+                    {...field('audience')}
+                  />
+                )}
+              </Field>
             )}
-          </Field>
+            {method === 'api_key' && (
+              <Field
+                label="Header"
+                hint="The header that carries the key. Default: Authorization: Bearer."
+              >
+                {({ id, describedBy }) => (
+                  <Input
+                    id={id}
+                    aria-describedby={describedBy}
+                    spellCheck={false}
+                    placeholder="X-Api-Key"
+                    {...field('header')}
+                  />
+                )}
+              </Field>
+            )}
+          </Advanced>
         )}
         {oauth && (
           <>
@@ -211,7 +225,7 @@ export function RegisterServerForm({
           <Field
             label={secretLabel}
             required
-            hint="Sealed under the tenant's data key as soon as it reaches the control plane, and never shown again. To change it, delete the server and register it again."
+            hint="Encrypted with the workspace's data key as soon as Caliban receives it, and never shown again. To change it, delete the system and add it again."
           >
             {({ id, describedBy }) => (
               <Input
@@ -237,16 +251,16 @@ export function RegisterServerForm({
             aria-describedby={describedBy}
             checked={trusted}
             onChange={setTrusted}
-            onLabel="Trusted: receives the real values"
-            offLabel="Not trusted: receives surrogates"
+            onLabel="Trusted: gets the real values"
+            offLabel="Not trusted: gets placeholders"
           />
         )}
       </Field>
       {trusted && (
         <p className="flex items-start gap-2 rounded-md bg-warn-soft px-3 py-2 text-[12.5px] text-fg">
           <IconAlert size={14} className="mt-0.5 shrink-0 text-warn" />
-          This server will receive the personal data in tool arguments. This can only be changed by
-          deleting the server and registering it again.
+          This system will receive personal data in its arguments. This can only be changed by
+          deleting the system and adding it again.
         </p>
       )}
 
@@ -259,7 +273,7 @@ export function RegisterServerForm({
           loading={register.isPending}
           disabled={!name.trim() || !url.trim()}
         >
-          Register server
+          Add system
         </Button>
       </div>
     </form>

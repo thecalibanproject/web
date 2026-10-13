@@ -123,8 +123,8 @@ export function ToolReview({
       {row.reapproval && (
         <p className="flex items-start gap-2 rounded-md bg-warn-soft px-3 py-2 text-[12.5px] text-fg">
           <IconAlert size={14} className="mt-0.5 shrink-0 text-warn" />
-          The server changed this tool since it was approved. Runs refuse the tool until this
-          manifest is approved, and node versions must then pin its new reference.
+          The system changed this action since it was approved. It is refused until this version is
+          approved, and assistants then need a new version that uses it.
         </p>
       )}
       {row.superseded && (
@@ -178,7 +178,9 @@ export function ToolReview({
           aria-label="Reference"
           className="flex flex-col gap-2 rounded-md border border-border p-3"
         >
-          <p className="text-[12.5px] text-fg-muted">Pin this reference in node specs:</p>
+          <p className="text-[12.5px] text-fg-muted">
+            Assistants use this action by this reference (the form fills it in):
+          </p>
           <span className="flex min-w-0 items-center gap-1.5">
             <code className="min-w-0 flex-1 font-mono text-[12px] break-all">{ref}</code>
             <CopyButton value={ref} label="Copy reference" />
@@ -196,14 +198,14 @@ export function ToolReview({
         >
           {approve.isSuccess ? (
             <p role="status" className="text-[12.5px] text-ok">
-              Approved. Pin <code className="font-mono break-all">{approve.data.ref ?? ref}</code>{' '}
-              in node specs.
+              Approved. Assistants can now use{' '}
+              <code className="font-mono break-all">{approve.data.ref ?? ref}</code>.
             </p>
           ) : (
             <>
               <p className="text-[12.5px] text-fg-muted">
-                Approving lets node versions of this tenant pin and call this exact manifest.
-                Approvals are recorded in the audit log
+                Approving lets the assistants of this workspace call this exact version of the
+                action. Approvals are recorded in the audit log
                 {findings.length > 0 ? ', with the findings and your acknowledgement.' : '.'}
               </p>
               {findings.length > 0 && (
