@@ -161,7 +161,8 @@ export function CollectionDocuments({
         }
       />
       <div className="flex flex-col gap-2 border-b border-border px-4 py-2.5">
-        <p className="flex flex-wrap items-center gap-1.5 text-[12.5px] text-fg-muted">
+        {/* Inline text, not a flex row: as flex items the commas started new lines on a phone. */}
+        <p className="text-[12.5px] text-fg-muted">
           Search model <code className="font-mono text-fg">{collection.embedding_model}</code>
           {collection.rerank_model && (
             <>
@@ -169,8 +170,10 @@ export function CollectionDocuments({
             </>
           )}
           , passages of at most {formatInt(settings.chunk_tokens)} tokens. Access name{' '}
-          <code className="font-mono text-fg">{scope}</code>
-          <CopyButton value={scope} label={`Copy ${scope}`} compact />
+          <code className="font-mono break-all text-fg">{scope}</code>{' '}
+          <span className="inline-block align-middle">
+            <CopyButton value={scope} label={`Copy ${scope}`} compact />
+          </span>
         </p>
         <UsedBy tenantId={tenantId} collection={name} />
       </div>
@@ -255,11 +258,11 @@ export function CollectionDocuments({
                 const live = d.live_version;
                 return (
                   <TR key={d.doc_id}>
-                    <TD>
+                    <TD className="min-w-44">
                       <button
                         type="button"
                         onClick={() => onDoc(d.doc_id)}
-                        className="font-mono text-[12.5px] font-medium hover:text-accent hover:underline"
+                        className="text-left font-mono text-[12.5px] font-medium break-words hover:text-accent hover:underline"
                       >
                         {d.doc_id}
                       </button>
