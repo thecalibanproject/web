@@ -101,7 +101,6 @@ const PENDING = new Set<string>([
   'pages/node-detail.tsx',
   'pages/nodes.tsx',
   'pages/ontology.tsx',
-  'pages/overview.tsx',
   'pages/rag.tsx',
   'pages/run-detail.tsx',
   'pages/runs.tsx',

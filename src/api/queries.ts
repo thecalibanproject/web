@@ -111,6 +111,8 @@ export const qk = {
     ['evals', tenantId, name, 'list', version] as const,
   eval: (tenantId: string, evalId: string) => ['eval', tenantId, evalId] as const,
   evalKey: (tenantId: string) => ['tenants', tenantId, 'eval-key'] as const,
+  nodeSpend: (tenantId: string) => ['tenants', tenantId, 'node-spend'] as const,
+  routes: (tenantId: string) => ['tenants', tenantId, 'routes'] as const,
 };
 
 // ───────────── Queries ─────────────
@@ -507,6 +509,18 @@ export const runQuery = (tenantId: string, runId: string) =>
       ),
     refetchInterval: (q) =>
       q.state.data && isRunActive(q.state.data.status) ? RUN_POLL_MS : false,
+  });
+
+/**
+ * What the workspace's assistants spent today and this month against its
+ * caps (`503` when the control plane runs without a node journal).
+ */
+export const nodeSpendQuery = (tenantId: string) =>
+  queryOptions({
+    queryKey: qk.nodeSpend(tenantId),
+    queryFn: () =>
+      unwrap(api.GET('/api/v1/tenants/{tenantId}/node-spend', { params: { path: { tenantId } } })),
+    refetchInterval: 60_000,
   });
 
 /** Questions and approvals of tainted writes waiting for a human, oldest wait first. */

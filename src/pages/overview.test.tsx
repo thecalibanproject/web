@@ -12,7 +12,7 @@ function mockUsage(raw: string) {
 }
 
 async function expectCost(text: RegExp) {
-  const totals = await screen.findByRole('region', { name: 'Totals' });
+  const totals = await screen.findByRole('region', { name: 'Recent activity' });
   const tile = within(totals).getByText('Cost').nextElementSibling;
   await waitFor(() => expect(tile).toHaveTextContent(text));
 }
