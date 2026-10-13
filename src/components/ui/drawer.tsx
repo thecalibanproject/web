@@ -37,6 +37,11 @@ export function Drawer({
       // jsdom (tests) and very old browsers lack showModal.
       if (typeof d.showModal === 'function') d.showModal();
       else d.setAttribute('open', '');
+      // showModal focuses the first focusable element (the Close button). A
+      // child that tried to take focus on mount could not (the dialog was still
+      // closed), so a field marked data-autofocus gets it now: the command
+      // palette's search field, where the user is already typing.
+      d.querySelector<HTMLElement>('[data-autofocus]')?.focus();
     } else if (!open && d.open) {
       if (typeof d.close === 'function') d.close();
       else d.removeAttribute('open');

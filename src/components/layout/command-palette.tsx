@@ -201,6 +201,7 @@ function Palette({ onDone }: { onDone: () => void }) {
     <div className="flex flex-col gap-3">
       <input
         ref={inputRef}
+        data-autofocus
         role="combobox"
         aria-expanded={results.length > 0}
         aria-controls={listId}
