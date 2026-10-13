@@ -1454,3 +1454,29 @@ export function useCaptureGoldenCase(tenantId: string) {
 
 type GoldenCaseCaptureBody =
   paths['/api/v1/tenants/{tenantId}/runs/{runId}/golden-case']['post']['requestBody']['content']['application/json'];
+
+/**
+ * The workspace's model routes: for each topic (`default` for everything
+ * else), the models that answer it, preferred first. Audited on change.
+ */
+export const routesQuery = (tenantId: string) =>
+  queryOptions({
+    queryKey: qk.routes(tenantId),
+    queryFn: () =>
+      unwrap(api.GET('/api/v1/tenants/{tenantId}/routes', { params: { path: { tenantId } } })),
+  });
+
+/** Replaces the workspace's model routes (422 when a route names a model it cannot reach). */
+export function useSetRoutes(tenantId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (routes: Array<{ intent: string; models: string[] }>) =>
+      unwrap(
+        api.PUT('/api/v1/tenants/{tenantId}/routes', {
+          params: { path: { tenantId } },
+          body: { routes },
+        }),
+      ),
+    onSuccess: (routes) => qc.setQueryData(qk.routes(tenantId), routes),
+  });
+}

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { exemplarsError, intentNameError, parseExemplars, routeNode } from './intents';
+import {
+  exemplarsError,
+  intentNameError,
+  parseExemplars,
+  routeNode,
+  withDefaultModel,
+  withNodeRoute,
+} from './intents';
 
 describe('intentNameError', () => {
   it('takes the names the control plane takes', () => {
@@ -41,5 +48,32 @@ describe('routeNode', () => {
     expect(routeNode('node/triage@v3')).toBe('triage');
     expect(routeNode('node/triage@published')).toBe('triage');
     expect(routeNode('model:local/qwen3')).toBeNull();
+  });
+});
+
+describe('routing helpers', () => {
+  it('sends one topic to an assistant without touching the others, and clears to null', () => {
+    expect(withNodeRoute({ a: 'node/x' }, 'b', 'triage')).toEqual({
+      a: 'node/x',
+      b: 'node/triage',
+    });
+    expect(withNodeRoute({ b: 'node/triage' }, 'b', null)).toBeNull();
+    expect(withNodeRoute(null, 'b', null)).toBeNull();
+  });
+
+  it('sets the default model first and keeps its fallbacks and the other routes', () => {
+    expect(withDefaultModel([], 'm1')).toEqual([{ intent: 'default', models: ['m1'] }]);
+    expect(
+      withDefaultModel(
+        [
+          { intent: 'code', models: ['c'] },
+          { intent: 'default', models: ['old', 'm1'] },
+        ],
+        'm1',
+      ),
+    ).toEqual([
+      { intent: 'code', models: ['c'] },
+      { intent: 'default', models: ['m1', 'old'] },
+    ]);
   });
 });
