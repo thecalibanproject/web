@@ -37,11 +37,11 @@ describe('NodesPage', () => {
     expect(triage).toHaveTextContent('Acme');
     const cells = within(triage).getAllByRole('cell');
     expect(cells[2]).toHaveTextContent('v1');
-    expect(cells[3]).toHaveTextContent('v2draft');
+    expect(cells[3]).toHaveTextContent('v2Draft');
     expect(cells[4]).toHaveTextContent('2');
     const billing = within(table).getByRole('link', { name: 'billing' }).closest('tr')!;
     expect(within(billing).getAllByRole('cell')[2]).toHaveTextContent('None');
-    expect(within(billing).getAllByRole('cell')[3]).toHaveTextContent('retired');
+    expect(within(billing).getAllByRole('cell')[3]).toHaveTextContent('Retired');
   });
 
   it('opens a node from the list', async () => {

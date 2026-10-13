@@ -77,10 +77,7 @@ function Item({ item }: { item: ChecklistItem }) {
       </div>
       {!item.done && (
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 text-[12.5px]">
-          <Link
-            {...item.link}
-            className="font-medium text-accent hover:underline"
-          >
+          <Link {...item.link} className="font-medium text-accent hover:underline">
             {item.action}
           </Link>
           <LearnMore doc={item.doc} className="text-fg-muted" />

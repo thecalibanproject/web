@@ -59,10 +59,6 @@ const DATA_MODULES: Record<string, Set<string> | 'all-values'> = {
  */
 const PENDING = new Set<string>([
   'components/auto-margin-card.tsx',
-  'components/evals/eval-detail.tsx',
-  'components/evals/evals-panel.tsx',
-  'components/evals/golden-set-card.tsx',
-  'components/evals/start-eval.tsx',
   'components/models/catalogue-panel.tsx',
   'components/models/model-form.tsx',
   'components/models/server-form.tsx',
@@ -71,7 +67,6 @@ const PENDING = new Set<string>([
   'components/nodes/node-behavior.tsx',
   'components/nodes/node-editor.tsx',
   'components/nodes/node-scopes.tsx',
-  'components/nodes/version-dialogs.tsx',
   'components/ontology/breaking-changes.tsx',
   'components/ontology/propose-drawer.tsx',
   'components/purpose-cost-card.tsx',
@@ -98,7 +93,6 @@ const PENDING = new Set<string>([
   'pages/datasources.tsx',
   'pages/inbox.tsx',
   'pages/models.tsx',
-  'pages/node-detail.tsx',
   'pages/nodes.tsx',
   'pages/ontology.tsx',
   'pages/rag.tsx',

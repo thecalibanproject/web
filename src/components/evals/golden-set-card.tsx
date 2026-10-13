@@ -3,12 +3,12 @@ import { useState } from 'react';
 import { usePermissions } from '@/api/auth';
 import { goldenSetQuery, useDeleteGoldenSet, usePutGoldenSet } from '@/api/queries';
 import type { GoldenCase } from '@/api/types';
-import { checkKinds, MAX_GOLDEN_CASES, parseGoldenCases } from '@/lib/evals';
+import { doc } from '@/lib/docs';
+import { describeCheck, MAX_GOLDEN_CASES, parseGoldenCases } from '@/lib/evals';
 import { EMPTY, formatDateTime } from '@/lib/format';
 import { shortHash } from '@/lib/nodes';
 import { deniedReason } from '@/lib/permissions';
 import {
-  Badge,
   Button,
   Card,
   CardHeader,
@@ -27,6 +27,7 @@ import {
   TR,
   Textarea,
 } from '../ui';
+import { LearnMore } from '../help/learn-more';
 import { NodeProblems } from '../nodes/node-problems';
 
 const EXAMPLE: GoldenCase[] = [
@@ -37,10 +38,26 @@ const EXAMPLE: GoldenCase[] = [
   },
 ];
 
+/** A test case's input for people: its text when it has one, else compact JSON. */
 const preview = (v: unknown) => {
-  const s = JSON.stringify(v) ?? '';
-  return s.length > 80 ? `${s.slice(0, 80)}...` : s;
+  const text =
+    typeof v === 'string'
+      ? v
+      : v &&
+          typeof v === 'object' &&
+          Object.values(v).length === 1 &&
+          typeof Object.values(v)[0] === 'string'
+        ? (Object.values(v)[0] as string)
+        : (JSON.stringify(v) ?? '');
+  return text.length > 100 ? `${text.slice(0, 100)}...` : text;
 };
+
+/** A case's checks, plus the `expected` shorthand, in plain words. */
+function caseChecks(c: GoldenCase): string[] {
+  const out = (c.checks ?? []).map(describeCheck);
+  if (c.expected !== undefined) out.unshift(describeCheck({ type: 'exact', value: c.expected }));
+  return out;
+}
 
 function GoldenEditor({
   tenantId,
@@ -70,19 +87,25 @@ function GoldenEditor({
     <Drawer
       open
       onClose={onClose}
-      title={`Golden set of ${name} v${version}`}
-      description={`A JSON array of at most ${MAX_GOLDEN_CASES} cases: id, input, and checks (exact, contains, regex, json_schema, llm_judge) or expected; answers script human steps. Inputs are checked against the version's input schema when you save.`}
+      title={`Test cases of ${name} v${version}`}
+      description={
+        <>
+          At most {MAX_GOLDEN_CASES} test cases, as JSON. Each has a name (id), the request (input)
+          and what a good answer looks like (checks). Inputs are checked against the version when
+          you save. <LearnMore doc={doc('guides/tests-and-go-live', 'test-cases')} />
+        </>
+      }
       footer={
         <>
           <Button onClick={onClose}>Cancel</Button>
           <Button variant="primary" loading={put.isPending} onClick={save}>
-            Save golden set
+            Save test cases
           </Button>
         </>
       }
     >
       <div className="flex flex-col gap-3">
-        <Field label="Cases" error={error}>
+        <Field label="Test cases (JSON)" error={error}>
           {({ id, describedBy, invalid }) => (
             <Textarea
               id={id}
@@ -99,7 +122,7 @@ function GoldenEditor({
             />
           )}
         </Field>
-        <NodeProblems error={put.error} title="The control plane refused the golden set" />
+        <NodeProblems error={put.error} title="Caliban could not save these test cases" />
       </div>
     </Drawer>
   );
@@ -125,14 +148,14 @@ export function GoldenSetCard({
   const cannotEdit =
     cannotWrite ??
     (set && !set.content_visible
-      ? 'Your role cannot see the cases, so it cannot edit them (needs runs.data).'
+      ? 'Your role cannot see the test cases, so it cannot edit them (needs runs.data).'
       : null);
 
   return (
     <Card className="mb-4">
       <CardHeader
-        title={`Golden set of v${version}`}
-        description="The cases a golden eval runs, k times each. Cases are tenant content, sealed at rest."
+        title={`Test cases of v${version}`}
+        description="What the quality tests run, a few tries each. Kept encrypted, like conversations."
         actions={
           q.isSuccess && (
             <>
@@ -152,7 +175,7 @@ export function GoldenSetCard({
                 deniedReason={cannotEdit}
                 onClick={() => setEditing(true)}
               >
-                {set ? 'Edit cases' : 'Create golden set'}
+                {set ? 'Edit test cases' : 'Add test cases'}
               </GatedButton>
             </>
           )
@@ -164,47 +187,50 @@ export function GoldenSetCard({
         <ErrorState error={q.error} onRetry={() => void q.refetch()} />
       ) : !set ? (
         <EmptyState
-          title={`v${version} has no golden set`}
-          description="Golden sets belong to one version, since inputs follow its input schema. Without one, only the injection suite can run."
+          title={`v${version} has no test cases yet`}
+          description="Add a few example requests with what a good answer looks like, or save real conversations as tests from their page."
+          learnMore={doc('guides/tests-and-go-live', 'save-a-run-as-a-test')}
         />
       ) : (
         <>
           <p className="border-b border-border px-4 py-2 text-[12px] text-fg-muted">
-            {set.case_count} case{set.case_count === 1 ? '' : 's'} ·{' '}
-            <code className="font-mono" title={set.hash}>
+            {set.case_count} test case{set.case_count === 1 ? '' : 's'} ·{' '}
+            <code className="font-mono" title={`Fingerprint ${set.hash}`}>
               {shortHash(set.hash)}
             </code>{' '}
             · updated {formatDateTime(set.updated_at)} by {set.updated_by}
           </p>
           {!set.content_visible ? (
             <p className="p-4 text-[12.5px] text-fg-muted">
-              The cases are run content: your role sees how many there are, not what they say (needs
-              runs.data).
+              Test cases are conversation content: your role sees how many there are, not what they
+              say (needs runs.data).
             </p>
           ) : (
-            <Table label="Golden cases">
+            <Table label="Test cases">
               <THead>
                 <tr>
-                  <TH>Case</TH>
-                  <TH>Input</TH>
-                  <TH>Checks</TH>
-                  <TH>Scripted answers</TH>
-                  <TH>Tags</TH>
+                  <TH>Test case</TH>
+                  <TH>Request</TH>
+                  <TH>A good answer</TH>
+                  <TH>Pre-filled replies</TH>
+                  <TH>Labels</TH>
                 </tr>
               </THead>
               <TBody>
                 {(set.cases ?? []).map((c) => (
                   <TR key={c.id}>
                     <TD className="font-mono text-[12px]">{c.id}</TD>
-                    <TD className="max-w-80 truncate font-mono text-[12px] text-fg-muted">
+                    <TD className="max-w-80 truncate text-[12.5px] text-fg-muted" dir="auto">
                       {preview(c.input)}
                     </TD>
-                    <TD>
-                      <span className="inline-flex flex-wrap gap-1">
-                        {checkKinds(c).map((k, i) => (
-                          <Badge key={i}>{k}</Badge>
+                    <TD className="max-w-96">
+                      <ul className="flex flex-col gap-0.5 text-[12.5px]">
+                        {caseChecks(c).map((k, i) => (
+                          <li key={i} className="break-words" dir="auto">
+                            {k}
+                          </li>
                         ))}
-                      </span>
+                      </ul>
                     </TD>
                     <TD className="font-mono text-[12px] text-fg-muted">
                       {Object.keys(c.answers ?? {}).join(', ') || EMPTY}
@@ -228,8 +254,8 @@ export function GoldenSetCard({
       )}
       <ConfirmDialog
         open={deleting}
-        title={`Delete the golden set of v${version}?`}
-        confirmLabel="Delete golden set"
+        title={`Delete the test cases of v${version}?`}
+        confirmLabel="Delete test cases"
         loading={del.isPending}
         error={del.error}
         onCancel={() => {
@@ -239,8 +265,9 @@ export function GoldenSetCard({
         onConfirm={() => del.mutate(undefined, { onSuccess: () => setDeleting(false) })}
       >
         <p>
-          Its cases are deleted. Evals already run keep their metrics, and the promotion gate still
-          counts them. New golden evals of v{version} need a new set.
+          Every test case of v{version} is deleted. Test runs already finished keep their results,
+          and the go-live check still counts them. New quality tests of v{version} need new test
+          cases.
         </p>
       </ConfirmDialog>
     </Card>

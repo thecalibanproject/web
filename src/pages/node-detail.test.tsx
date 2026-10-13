@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import type { Node, NodeDiff, NodeVersions, Tenant } from '@/api/types';
 import { meWith, ssoRoutes, type Grant } from '@/test/auth';
+import { expectNoAxeViolations } from '@/test/a11y';
 import { mockApi, renderApp } from '@/test/utils';
 
 const tenants: Tenant[] = [{ id: 't1', name: 'Acme', created_at: '2026-10-01T10:00:00Z' }];
@@ -107,6 +108,33 @@ async function openAs(roles: Grant[] | null, versions: Node[] = [v1, v2], extra 
 }
 
 describe('NodeDetailPage', () => {
+  it('shows going live as four steps, starting with publishing the draft', async () => {
+    const user = userEvent.setup();
+    await openAs(null);
+    const panel = screen.getByRole('region', { name: 'Go live' });
+    expect(panel).toHaveTextContent('Go live with v2');
+    const steps = within(panel).getAllByRole('listitem');
+    expect(steps.map((s) => s.textContent?.split(':')[0])).toEqual([
+      '1Publish',
+      '2Run tests',
+      '3Check the bar',
+      '4Make live',
+    ]);
+    expect(steps[0]).toHaveAttribute('aria-current', 'step');
+    expect(steps[0]).toHaveTextContent('to do now');
+    await user.click(within(panel).getByRole('button', { name: 'Publish v2' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Publish triage v2?' });
+    expect(
+      within(dialog).getByRole('checkbox', { name: 'Make it the live version' }),
+    ).not.toBeChecked();
+  });
+
+  it('has no axe violations', async () => {
+    await openAs(null);
+    await screen.findByRole('region', { name: 'Go live' });
+    await expectNoAxeViolations();
+  });
+
   it('lists versions with state, live marker, hash and author, newest first', async () => {
     await openAs(null);
     expect(screen.getByRole('heading', { name: 'triage' })).toBeInTheDocument();
@@ -117,21 +145,21 @@ describe('NodeDetailPage', () => {
     expect(rows[1]).toHaveTextContent('v2');
     expect(rows[2]).toHaveTextContent('v1');
     const live = versionRow(1);
-    expect(within(live).getByText('published')).toBeInTheDocument();
-    expect(within(live).getByText('live')).toBeInTheDocument();
+    expect(within(live).getByText('Published')).toBeInTheDocument();
+    expect(within(live).getByText('Live')).toBeInTheDocument();
     expect(within(live).getByText('sha256:111111111111')).toHaveAttribute('title', v1.hash);
     expect(live).toHaveTextContent('ada@example.internal');
-    expect(within(versionRow(2)).getByText('draft')).toBeInTheDocument();
+    expect(within(versionRow(2)).getByText('Draft')).toBeInTheDocument();
   });
 
   it("shows a version's spec read-only, as formatted JSON", async () => {
     const user = userEvent.setup();
     const { router } = await openAs(null);
-    await user.click(screen.getByRole('button', { name: 'View spec of v1' }));
+    await user.click(screen.getByRole('button', { name: 'View settings of v1' }));
 
     const drawer = await screen.findByRole('dialog', { name: 'triage v1' });
-    expect(drawer).toHaveTextContent('Read only. Change a node by creating a new version.');
-    expect(within(drawer).getByLabelText('Node spec').textContent).toBe(
+    expect(drawer).toHaveTextContent('Read only. Change an assistant by creating a new version.');
+    expect(within(drawer).getByLabelText('Assistant settings (JSON)').textContent).toBe(
       JSON.stringify(spec, null, 2),
     );
     expect(drawer).toHaveTextContent(v1.hash);
@@ -144,14 +172,15 @@ describe('NodeDetailPage', () => {
     await user.click(within(versionRow(2)).getByRole('button', { name: 'Publish v2' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'Publish triage v2?' });
-    expect(
-      within(dialog).getByRole('checkbox', { name: 'Make it the live version' }),
-    ).toBeChecked();
-    expect(dialog).toHaveTextContent('Runs that name no version run it instead of v1.');
+    const promote = within(dialog).getByRole('checkbox', { name: 'Make it the live version' });
+    // Unticked by default: the go-live bar usually needs tests first (UX-38).
+    expect(promote).not.toBeChecked();
+    await user.click(promote);
+    expect(dialog).toHaveTextContent('New requests go to it instead of v1.');
     await user.click(within(dialog).getByRole('button', { name: 'Publish and make live' }));
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(await within(versionRow(2)).findByText('live')).toBeInTheDocument();
+    expect(await within(versionRow(2)).findByText('Live')).toBeInTheDocument();
     expect(calls.find((c) => c.path.endsWith('/publish'))?.body).toEqual({ promote: true });
   });
 
@@ -160,8 +189,10 @@ describe('NodeDetailPage', () => {
     const { calls } = await openAs(null);
     await user.click(within(versionRow(2)).getByRole('button', { name: 'Publish v2' }));
     const dialog = await screen.findByRole('dialog', { name: 'Publish triage v2?' });
-    await user.click(within(dialog).getByRole('checkbox', { name: 'Make it the live version' }));
-    expect(dialog).toHaveTextContent('v1 stays live.');
+    expect(
+      within(dialog).getByRole('checkbox', { name: 'Make it the live version' }),
+    ).not.toBeChecked();
+    expect(dialog).toHaveTextContent('v1 stays live while you test this version.');
     await user.click(within(dialog).getByRole('button', { name: 'Publish' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(calls.find((c) => c.path.endsWith('/publish'))?.body).toEqual({ promote: false });
@@ -178,7 +209,7 @@ describe('NodeDetailPage', () => {
     });
     await user.click(within(versionRow(2)).getByRole('button', { name: 'Publish v2' }));
     const dialog = await screen.findByRole('dialog', { name: 'Publish triage v2?' });
-    await user.click(within(dialog).getByRole('button', { name: 'Publish and make live' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Publish' }));
 
     const alert = await within(dialog).findByRole('alert');
     expect(alert).toHaveTextContent('Cannot publish triage@v2: 3 problems');
@@ -188,7 +219,7 @@ describe('NodeDetailPage', () => {
     expect(alert).toHaveTextContent("budgets.steps = 150 exceeds the tenant's node cap of 100");
     expect(alert).toHaveTextContent(/raise the tenant's node caps/);
     // Still a draft: the dialog stays open.
-    expect(within(versionRow(2)).getByText('draft')).toBeInTheDocument();
+    expect(within(versionRow(2)).getByText('Draft')).toBeInTheDocument();
   });
 
   it('makes another published version live (rollback)', async () => {
@@ -209,15 +240,15 @@ describe('NodeDetailPage', () => {
     await openAs(null);
     await user.click(within(versionRow(1)).getByRole('button', { name: 'Retire v1' }));
     const dialog = await screen.findByRole('dialog', { name: 'Retire triage v1?' });
-    expect(dialog).toHaveTextContent('new runs of it are refused');
+    expect(dialog).toHaveTextContent('stops answering new requests');
     expect(dialog).toHaveTextContent(
-      'Runs already in flight are not cut off: they finish on the version they started on.',
+      'Conversations already under way are not cut off: they finish on this version.',
     );
     expect(dialog).toHaveTextContent(/It is the live version/);
-    expect(dialog).toHaveTextContent(/Retirement is final/);
+    expect(dialog).toHaveTextContent(/Retiring is final/);
     await user.click(within(dialog).getByRole('button', { name: 'Retire version' }));
-    expect(await within(versionRow(1)).findByText('retired')).toBeInTheDocument();
-    expect(screen.getByText('No live version')).toBeInTheDocument();
+    expect(await within(versionRow(1)).findByText('Retired')).toBeInTheDocument();
+    expect(screen.getByText('Nothing live yet')).toBeInTheDocument();
   });
 
   it('shows the conflict when another published version still calls it', async () => {
@@ -239,9 +270,9 @@ describe('NodeDetailPage', () => {
     const { calls } = await openAs(null);
     expect(within(versionRow(1)).queryByRole('button', { name: 'Delete v1' })).toBeNull();
     await user.click(within(versionRow(2)).getByRole('button', { name: 'Delete v2' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Delete node version?' });
+    const dialog = await screen.findByRole('dialog', { name: 'Delete this version?' });
     expect(dialog).toHaveTextContent('Only this draft version is deleted');
-    await user.click(within(dialog).getByRole('button', { name: 'Delete node version' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Delete version' }));
     await waitFor(() =>
       expect(within(screen.getByRole('table', { name: 'Versions' })).queryByText('v2')).toBeNull(),
     );
@@ -309,7 +340,7 @@ describe('NodeDetailPage', () => {
     await user.click(publish);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     // Reading is allowed: the spec still opens.
-    await user.click(within(versionRow(1)).getByRole('button', { name: 'View spec of v1' }));
+    await user.click(within(versionRow(1)).getByRole('button', { name: 'View settings of v1' }));
     expect(await screen.findByRole('dialog', { name: 'triage v1' })).toBeInTheDocument();
     expect(calls.every((c) => c.method === 'GET')).toBe(true);
   });
@@ -346,8 +377,8 @@ describe('NodeDetailPage', () => {
       }),
     });
     await renderApp('/nodes/t1/triage');
-    expect(await screen.findByText('Node not found')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Back to nodes' })).toBeInTheDocument();
+    expect(await screen.findByText('Assistant not found')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to assistants' })).toBeInTheDocument();
   });
 
   describe('data access', () => {
@@ -361,7 +392,7 @@ describe('NodeDetailPage', () => {
     it('shows the collections the live version searches, linked to Retrieval', async () => {
       await openAs(null, [searching, v2]);
       const card = screen.getByRole('region', { name: 'Data access' });
-      expect(card).toHaveTextContent('Data access of v1');
+      expect(card).toHaveTextContent('What v1 may read');
       const handbook = within(card).getByRole('link', {
         name: 'rag.handbook:read: open collection handbook in Retrieval',
       });
@@ -385,7 +416,7 @@ describe('NodeDetailPage', () => {
         ],
         [{ ...searching, spec: { ...ragSpec, tools: [] } }],
       );
-      await user.click(screen.getByRole('button', { name: 'View spec of v1' }));
+      await user.click(screen.getByRole('button', { name: 'View settings of v1' }));
       const drawer = await screen.findByRole('dialog', { name: 'triage v1' });
       const access = within(drawer).getByRole('region', { name: 'Data access' });
       const list = within(access).getByRole('list', { name: 'Document collections' });
@@ -423,8 +454,8 @@ describe('NodeDetailPage', () => {
         },
       };
       await openAs(null, [workflow, v2]);
-      const card = screen.getByRole('region', { name: 'Answer and model calls' });
-      expect(card).toHaveTextContent('Answer and model calls of v1');
+      const card = screen.getByRole('region', { name: 'Answers and models' });
+      expect(card).toHaveTextContent('Answers and models of v1');
       expect(card).toHaveTextContent('what the node reads can steer what it tells the user');
       expect(card).toHaveTextContent('mask on every model call, sovereign models included');
       expect(card).toHaveTextContent(
@@ -441,14 +472,14 @@ describe('NodeDetailPage', () => {
     it('shows the default answer guard of an agent, in its spec too', async () => {
       const user = userEvent.setup();
       await openAs(null);
-      const card = screen.getByRole('region', { name: 'Answer and model calls' });
+      const card = screen.getByRole('region', { name: 'Answers and models' });
       expect(card).toHaveTextContent('redact(default)');
       expect(within(card).queryByRole('table')).not.toBeInTheDocument();
-      await user.click(screen.getByRole('button', { name: 'View spec of v1' }));
+      await user.click(screen.getByRole('button', { name: 'View settings of v1' }));
       const drawer = await screen.findByRole('dialog', { name: 'triage v1' });
-      expect(
-        within(drawer).getByRole('region', { name: 'Answer and model calls' }),
-      ).toHaveTextContent("the tenant's PII settings apply");
+      expect(within(drawer).getByRole('region', { name: 'Answers and models' })).toHaveTextContent(
+        "the tenant's PII settings apply",
+      );
       expect(card).toHaveTextContent(
         'In reversible mode tool results enter the run as they are and the caller gets the real values',
       );

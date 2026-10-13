@@ -22,13 +22,13 @@ export const EVAL_STATUS_TONE: Record<EvalStatus, Tone> = {
 };
 
 export const EVAL_SUITE_LABEL: Record<Eval['suite'], string> = {
-  golden: 'Golden set',
-  injection: 'Injection suite',
+  golden: 'Quality tests',
+  injection: 'Safety tests',
 };
 
 /** Why a role cannot start or cancel evals. */
 export const NO_RUN = (tenantId?: string) =>
-  `Your role cannot start or cancel evals${tenantId ? ' on this tenant' : ''} (needs nodes.run).`;
+  `Your role cannot start or cancel tests${tenantId ? ' in this workspace' : ''} (needs nodes.run).`;
 
 /** The version the Evals tab opens on: the live one, else the newest published, else the newest. */
 export function defaultEvalVersion(versions: readonly Node[]): number | undefined {
@@ -103,7 +103,8 @@ export function policyForm(p: EvalPolicy | undefined): PolicyForm {
     minK: p?.golden?.min_k != null ? String(p.golden.min_k) : '',
     maxCostPerSuccess:
       p?.golden?.max_cost_per_success_usd != null ? String(p.golden.max_cost_per_success_usd) : '',
-    maxP95: p?.golden?.max_p95_latency_ms != null ? String(p.golden.max_p95_latency_ms) : '',
+    // Typed in seconds, stored in milliseconds (UX-40).
+    maxP95: p?.golden?.max_p95_latency_ms != null ? String(p.golden.max_p95_latency_ms / 1000) : '',
     injectionMinPassRate: pct(p?.injection?.min_pass_rate),
     injectionReadOnly: p?.injection?.read_only ?? 'required',
   };
@@ -138,9 +139,10 @@ export function policyFromForm(
   if (cost !== undefined && !(Number.isFinite(cost) && cost > 0)) {
     errors.maxCostPerSuccess = 'An amount above 0.';
   }
-  const p95 = n(f.maxP95);
-  if (p95 !== undefined && !(Number.isInteger(p95) && p95 >= 1)) {
-    errors.maxP95 = 'Whole milliseconds, at least 1.';
+  const p95s = n(f.maxP95);
+  const p95 = p95s === undefined ? undefined : Math.round(p95s * 1000);
+  if (p95s !== undefined && !(Number.isFinite(p95s) && p95 !== undefined && p95 >= 1)) {
+    errors.maxP95 = 'A number of seconds above 0.';
   }
   const goldenSet = minK !== undefined || cost !== undefined || p95 !== undefined;
   if (minPassK === undefined && goldenSet && !errors.minPassK) {
@@ -213,4 +215,51 @@ export function checkKinds(c: GoldenCase): string[] {
   const kinds = (c.checks ?? []).map((k) => k.type);
   if (c.expected !== undefined) kinds.unshift('exact');
   return kinds;
+}
+
+/** What each kind of check asks of an answer, in plain words. */
+export const CHECK_LABEL: Record<string, string> = {
+  exact: 'Must equal',
+  contains: 'Must mention',
+  regex: 'Must match a pattern',
+  json_schema: 'Must have these fields',
+  llm_judge: 'Grader',
+  tool_call: 'Must call an action',
+};
+
+export function checkLabel(type: string): string {
+  return CHECK_LABEL[type] ?? type;
+}
+
+/** One check of a test case, described for people (the JSON stays in the editor). */
+export function describeCheck(c: NonNullable<GoldenCase['checks']>[number]): string {
+  const v = c as Record<string, unknown> & { type: string };
+  const text = (x: unknown) => (typeof x === 'string' ? x : JSON.stringify(x));
+  switch (v.type) {
+    case 'contains': {
+      const vals = Array.isArray(v.value) ? v.value : [v.value];
+      return `Must mention ${vals.map((x) => `"${text(x)}"`).join(', ')}`;
+    }
+    case 'exact':
+      return `Must equal ${text(v.value)}`;
+    case 'regex':
+      return `Must match the pattern ${text(v.pattern)}`;
+    case 'json_schema':
+      return 'Must have the expected fields';
+    case 'llm_judge':
+      return `Grader: ${text(v.rubric)}${v.reference !== undefined ? ' (compared with a reference answer)' : ''}`;
+    case 'tool_call': {
+      const args =
+        v.args && typeof v.args === 'object' && Object.keys(v.args).length > 0
+          ? ` with ${Object.entries(v.args as Record<string, unknown>)
+              .map(([k, x]) => `${k} = ${text(x)}`)
+              .join(', ')}`
+          : '';
+      return v.must_not_call
+        ? `Must not call ${text(v.tool)}${args}`
+        : `Must call ${text(v.tool)}${args}`;
+    }
+    default:
+      return checkLabel(v.type);
+  }
 }

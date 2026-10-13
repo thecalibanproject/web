@@ -244,7 +244,7 @@ async function openEvals(
 ) {
   const calls = mockEvals(roles, extra);
   const rendered = await renderApp(path, { token: roles ? null : 'test-admin-token' });
-  await screen.findByRole('table', { name: 'Evals' });
+  await screen.findByRole('table', { name: 'Test runs' });
   return { calls, ...rendered };
 }
 
@@ -252,50 +252,71 @@ const lastCall = (calls: RecordedCall[], method: string, path: string) =>
   calls.filter((c) => c.method === method && c.path === path).at(-1);
 
 describe('Node evals', () => {
-  it('shows the gate, the promotion bar, the golden set and the evals of a version', async () => {
+  it('shows the go-live check, the bar, the test cases and the test runs of a version', async () => {
     await openEvals(null);
-    expect(screen.getByRole('tab', { name: 'Evals' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Tests' })).toHaveAttribute('aria-selected', 'true');
 
-    expect(screen.getByText('Blocked by the promotion bar')).toBeInTheDocument();
-    expect(screen.getByText('Write tools')).toBeInTheDocument();
-    const why = screen.getByRole('list', { name: 'Why the gate refuses' });
-    expect(why).toHaveTextContent('is below the bar 0.9');
-    expect(why).toHaveTextContent('no injection eval met the bar');
-
-    expect(screen.getByText('Least pass^k').nextSibling).toHaveTextContent('90%');
-    expect(screen.getByText('Attacks blocked').nextSibling).toHaveTextContent('100% (default)');
-    expect(screen.getByText('Read-only versions').nextSibling).toHaveTextContent(
-      'Need an injection eval (default)',
+    expect(screen.getByText('Not ready to go live')).toBeInTheDocument();
+    expect(screen.getByText('Can change things')).toBeInTheDocument();
+    const reqs = screen.getByRole('list', { name: 'Requirements' });
+    expect(reqs).toHaveTextContent('Quality tests: at least 90% of test cases pass all 3 tries');
+    expect(reqs).toHaveTextContent('1 of 2 test cases passed all 3 tries (50%).');
+    expect(reqs).toHaveTextContent(
+      'Safety tests: required, because this version can change things',
     );
-    expect(screen.queryByText('Untrusted reads')).not.toBeInTheDocument();
+    expect(reqs).toHaveTextContent('is below the bar 0.9');
+    expect(reqs).toHaveTextContent('no injection eval met the bar');
+    // Failing cases are named first, even before the requirements.
+    expect(screen.getByRole('region', { name: 'Failing test cases' })).toHaveTextContent(
+      'chestpassed 2 of 3 tries',
+    );
 
-    const cases = screen.getByRole('table', { name: 'Golden cases' });
-    expect(within(cases).getByText('chest').closest('tr')).toHaveTextContent('llm_judge');
+    expect(screen.getByText('Test cases that must pass every try').nextSibling).toHaveTextContent(
+      '90%',
+    );
+    expect(screen.getByText('Attacks that must be blocked').nextSibling).toHaveTextContent(
+      '100% (default)',
+    );
+    expect(screen.getByText('Versions that only read').nextSibling).toHaveTextContent(
+      'Need safety tests (default)',
+    );
+    expect(screen.queryByText('Reads outside data')).not.toBeInTheDocument();
+
+    const cases = screen.getByRole('table', { name: 'Test cases' });
+    expect(within(cases).getByText('chest').closest('tr')).toHaveTextContent(
+      'Grader: Fits the case?',
+    );
     expect(within(cases).getByText('chest').closest('tr')).toHaveTextContent('clarify');
-    expect(within(cases).getByText('refund').closest('tr')).toHaveTextContent('exact');
+    expect(within(cases).getByText('refund').closest('tr')).toHaveTextContent('Must equal billing');
 
-    const evals = within(screen.getByRole('table', { name: 'Evals' })).getAllByRole('row');
-    expect(evals[1]).toHaveTextContent('Injection suite');
-    expect(evals[1]).toHaveTextContent('blocked 66.7% · attack success 33.3% · utility 50%');
-    expect(evals[2]).toHaveTextContent('Golden set');
+    const evals = within(screen.getByRole('table', { name: 'Test runs' })).getAllByRole('row');
+    expect(evals[1]).toHaveTextContent('Safety tests');
+    expect(evals[1]).toHaveTextContent('66.7% of attacks blocked · still did its job in 50%');
+    expect(evals[2]).toHaveTextContent('Quality tests');
     expect(evals[2]).toHaveTextContent(
-      'pass^k 50% · pass@1 83.3% · per success $0.0060 · p95 2.40 s',
+      '1 of 2 passed all 3 tries · $0.0060 per good answer · 95% under 2.40 s',
     );
   });
 
-  it('opens a golden eval with pass^k, pass@1, cost per success, p95, cases and trials', async () => {
+  it('opens quality tests with results per test case and every try', async () => {
     const user = userEvent.setup();
     const { router } = await openEvals(null);
-    await user.click(screen.getByRole('button', { name: 'Open eval ev_g1' }));
-    const drawer = await screen.findByRole('dialog', { name: 'Eval ev_g1' });
+    await user.click(screen.getByRole('button', { name: 'Open test run ev_g1' }));
+    const drawer = await screen.findByRole('dialog', { name: 'Test run' });
     await within(drawer).findByRole('table', { name: 'Trials' });
     expect(router.state.location.search).toMatchObject({ eval: 'ev_g1' });
 
-    expect(within(drawer).getByText('pass^k').nextSibling).toHaveTextContent('50%');
-    expect(within(drawer).getByText('pass@1').nextSibling).toHaveTextContent('83.3%');
-    expect(within(drawer).getByText('Cost per success').nextSibling).toHaveTextContent('$0.0060');
-    expect(within(drawer).getByText('p95 latency').nextSibling).toHaveTextContent('2.40 s');
-    expect(within(drawer).getByRole('table', { name: 'Cases' })).toHaveTextContent('chest2 of 3no');
+    expect(within(drawer).getByText('Passed every try').nextSibling).toHaveTextContent('50%');
+    expect(within(drawer).getByText('Tries that passed').nextSibling).toHaveTextContent('83.3%');
+    expect(within(drawer).getByText('Cost of a good answer').nextSibling).toHaveTextContent(
+      '$0.0060',
+    );
+    expect(within(drawer).getByText('Slowest typical answer').nextSibling).toHaveTextContent(
+      '2.40 s',
+    );
+    expect(within(drawer).getByRole('table', { name: 'Test cases' })).toHaveTextContent(
+      'chest2 of 3No',
+    );
 
     const trial = within(within(drawer).getByRole('table', { name: 'Trials' })).getAllByRole(
       'row',
@@ -310,16 +331,16 @@ describe('Node evals', () => {
     expect(within(drawer).getByLabelText('Detail of chest#0')).toHaveTextContent('"output"');
   });
 
-  it('opens an injection eval with attacks blocked, attack success rate and utility', async () => {
+  it('opens safety tests with attacks blocked, attacks that worked and whether it still did its job', async () => {
     const user = userEvent.setup();
     await openEvals(null);
-    await user.click(screen.getByRole('button', { name: 'Open eval ev_i1' }));
-    const drawer = await screen.findByRole('dialog', { name: 'Eval ev_i1' });
+    await user.click(screen.getByRole('button', { name: 'Open test run ev_i1' }));
+    const drawer = await screen.findByRole('dialog', { name: 'Test run' });
     await within(drawer).findByText('Attacks blocked');
     expect(within(drawer).getByText('Attacks blocked').nextSibling).toHaveTextContent('66.7%');
-    expect(within(drawer).getByText('Attack success rate').nextSibling).toHaveTextContent('33.3%');
-    expect(within(drawer).getByText('Utility under attack').nextSibling).toHaveTextContent('50%');
-    expect(within(drawer).getByRole('table', { name: 'Categories' })).toHaveTextContent(
+    expect(within(drawer).getByText('Attacks that worked').nextSibling).toHaveTextContent('33.3%');
+    expect(within(drawer).getByText('Still did its job').nextSibling).toHaveTextContent('50%');
+    expect(within(drawer).getByRole('table', { name: 'Kinds of attack' })).toHaveTextContent(
       'replay0 of 10%',
     );
     expect(drawer).toHaveTextContent('write.staged: the node is not an agent');
@@ -341,19 +362,20 @@ describe('Node evals', () => {
   it('starts an eval as an API key allowed to run the node, then opens it', async () => {
     const user = userEvent.setup();
     const { calls } = await openEvals(null);
-    await user.click(screen.getByRole('button', { name: 'Start eval' }));
-    const drawer = await screen.findByRole('dialog', { name: 'Start an eval of triage v2' });
+    await user.click(screen.getByRole('button', { name: 'Run tests' }));
+    const drawer = await screen.findByRole('dialog', { name: 'Run tests of triage v2' });
     const key = within(drawer).getByLabelText('Runs as');
-    await within(drawer).findByRole('option', { name: 'API key evals (cal_ab12)' });
+    await within(drawer).findByRole('option', { name: 'App key evals (cal_ab12)' });
     // The managed eval key is the default, not one of the customer keys.
     expect(within(drawer).queryByRole('option', { name: /cal_ev99/ })).not.toBeInTheDocument();
     expect(
       within(drawer).queryByRole('option', { name: /other-node-only/ }),
     ).not.toBeInTheDocument();
     await user.selectOptions(key, 'key_1');
-    await user.type(within(drawer).getByLabelText(/^k/), '5');
-    await user.type(within(drawer).getByLabelText('Only these cases'), 'chest, refund');
-    await user.click(within(drawer).getByRole('button', { name: 'Start eval' }));
+    await user.click(within(drawer).getByText('Advanced'));
+    await user.type(within(drawer).getByLabelText('Tries per test case'), '5');
+    await user.type(within(drawer).getByLabelText('Only these test cases'), 'chest, refund');
+    await user.click(within(drawer).getByRole('button', { name: 'Run quality tests' }));
 
     await waitFor(() =>
       expect(lastCall(calls, 'POST', `${P}/versions/2/evals`)?.body).toEqual({
@@ -363,18 +385,22 @@ describe('Node evals', () => {
         cases: ['chest', 'refund'],
       }),
     );
-    expect(await screen.findByRole('dialog', { name: 'Eval ev_new' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Test run' })).toBeInTheDocument();
   });
 
-  it('starts an injection eval on a golden case input, as the managed eval key', async () => {
+  it('starts safety tests on a test case input, as the managed test key', async () => {
     const user = userEvent.setup();
     const { calls } = await openEvals(null);
-    await user.click(screen.getByRole('button', { name: 'Start eval' }));
-    const drawer = await screen.findByRole('dialog', { name: 'Start an eval of triage v2' });
-    await user.selectOptions(within(drawer).getByLabelText('Suite'), 'injection');
-    await within(drawer).findByText(/The tenant's eval key \(cal_ev99\)/);
-    await user.selectOptions(within(drawer).getByLabelText('Run input'), 'Golden case refund');
-    await user.click(within(drawer).getByRole('button', { name: 'Start eval' }));
+    await user.click(screen.getByRole('button', { name: 'Run tests' }));
+    const drawer = await screen.findByRole('dialog', { name: 'Run tests of triage v2' });
+    await user.click(within(drawer).getByRole('radio', { name: /Safety tests/ }));
+    await within(drawer).findByText(/The workspace's test key \(cal_ev99\)/);
+    await user.click(within(drawer).getByText('Advanced'));
+    await user.selectOptions(
+      within(drawer).getByLabelText('Request the attacks ride on'),
+      'Test case refund',
+    );
+    await user.click(within(drawer).getByRole('button', { name: 'Run safety tests' }));
     // No api_key_id: the eval runs as the tenant's eval key.
     await waitFor(() =>
       expect(lastCall(calls, 'POST', `${P}/versions/2/evals`)?.body).toEqual({
@@ -395,22 +421,22 @@ describe('Node evals', () => {
         },
       }),
     });
-    await user.click(screen.getByRole('button', { name: 'Open eval ev_g1' }));
-    const drawer = await screen.findByRole('dialog', { name: 'Eval ev_g1' });
-    expect(await within(drawer).findByText(/run retention cleared/)).toBeInTheDocument();
-    expect(within(drawer).getByText('pass^k').nextSibling).toHaveTextContent('50%');
+    await user.click(screen.getByRole('button', { name: 'Open test run ev_g1' }));
+    const drawer = await screen.findByRole('dialog', { name: 'Test run' });
+    expect(await within(drawer).findByText(/retention period cleared/)).toBeInTheDocument();
+    expect(within(drawer).getByText('Passed every try').nextSibling).toHaveTextContent('50%');
   });
 
-  it('sets the promotion bar', async () => {
+  it('sets the go-live bar', async () => {
     const user = userEvent.setup();
     const { calls } = await openEvals(null);
     await user.click(screen.getByRole('button', { name: 'Edit bar' }));
-    const drawer = await screen.findByRole('dialog', { name: 'Promotion bar of triage' });
-    const passK = within(drawer).getByLabelText('Least pass^k');
+    const drawer = await screen.findByRole('dialog', { name: 'Go-live bar of triage' });
+    const passK = within(drawer).getByLabelText('Test cases that must pass every try');
     expect(passK).toHaveValue('90');
     await user.clear(passK);
     await user.type(passK, '95');
-    await user.type(within(drawer).getByLabelText('Least share of attacks blocked'), '90');
+    await user.type(within(drawer).getByLabelText('Attacks that must be blocked'), '90');
     await user.click(within(drawer).getByRole('button', { name: 'Save bar' }));
     await waitFor(() =>
       expect(lastCall(calls, 'PUT', `${P}/eval-policy`)?.body).toEqual({
@@ -420,7 +446,7 @@ describe('Node evals', () => {
     );
   });
 
-  it('makes the injection eval optional for read-only versions', async () => {
+  it('makes safety tests optional for versions that only read', async () => {
     const user = userEvent.setup();
     const { calls } = await openEvals(null, undefined, {
       [`GET ${P}/versions/2/gate`]: () => ({
@@ -435,14 +461,14 @@ describe('Node evals', () => {
         },
       }),
     });
-    expect(await screen.findByText('Untrusted reads')).toHaveAttribute(
+    expect(await screen.findByText('Reads outside data')).toHaveAttribute(
       'title',
-      expect.stringMatching(/unless the bar makes that optional for read-only versions/),
+      expect.stringMatching(/unless the bar makes them optional/),
     );
     await user.click(screen.getByRole('button', { name: 'Edit bar' }));
-    const drawer = await screen.findByRole('dialog', { name: 'Promotion bar of triage' });
-    const readOnly = within(drawer).getByLabelText('Read-only versions');
-    expect(readOnly).toHaveAccessibleDescription(/what they read can steer their answer/);
+    const drawer = await screen.findByRole('dialog', { name: 'Go-live bar of triage' });
+    const readOnly = within(drawer).getByLabelText('Versions that only read');
+    expect(readOnly).toHaveAccessibleDescription(/what they read can still steer their answer/);
     await user.selectOptions(readOnly, 'optional');
     await user.click(within(drawer).getByRole('button', { name: 'Save bar' }));
     await waitFor(() =>
@@ -453,7 +479,7 @@ describe('Node evals', () => {
     );
   });
 
-  it("edits a version's golden set and shows the control plane's refusal", async () => {
+  it("edits a version's test cases and shows why they were refused", async () => {
     const user = userEvent.setup();
     const { calls } = await openEvals(null, undefined, {
       [`PUT ${P}/versions/2/golden-set`]: () => ({
@@ -470,38 +496,38 @@ describe('Node evals', () => {
         },
       }),
     });
-    await user.click(screen.getByRole('button', { name: 'Edit cases' }));
-    const drawer = await screen.findByRole('dialog', { name: 'Golden set of triage v2' });
-    const text = within(drawer).getByLabelText('Cases');
+    await user.click(screen.getByRole('button', { name: 'Edit test cases' }));
+    const drawer = await screen.findByRole('dialog', { name: 'Test cases of triage v2' });
+    const text = within(drawer).getByLabelText('Test cases (JSON)');
     expect((text as HTMLTextAreaElement).value).toContain('"chest"');
 
     await user.clear(text);
     await user.type(text, '[[{{"id": "x"}]');
-    await user.click(within(drawer).getByRole('button', { name: 'Save golden set' }));
+    await user.click(within(drawer).getByRole('button', { name: 'Save test cases' }));
     expect(within(drawer).getByText("Case 'x' has no input.")).toBeInTheDocument();
 
     await user.clear(text);
     await user.type(text, '[[{{"id": "x", "input": 1}]');
-    await user.click(within(drawer).getByRole('button', { name: 'Save golden set' }));
+    await user.click(within(drawer).getByRole('button', { name: 'Save test cases' }));
     const alert = await within(drawer).findByRole('alert');
-    expect(alert).toHaveTextContent('The control plane refused the golden set: 1 problem');
+    expect(alert).toHaveTextContent('Caliban could not save these test cases: 1 problem');
     expect(alert).toHaveTextContent('Golden set');
     expect(lastCall(calls, 'PUT', `${P}/versions/2/golden-set`)?.body).toEqual({
       cases: [{ id: 'x', input: 1 }],
     });
   });
 
-  it('hides golden cases without runs.data and gates actions by role', async () => {
+  it('hides test cases without runs.data and gates actions by role', async () => {
     await openEvals([{ role: 'viewer', tenant_id: 't1' }]);
     await screen.findByText(/your role sees how many there are/);
-    expect(screen.queryByRole('table', { name: 'Golden cases' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Start eval' })).toHaveAccessibleDescription(
+    expect(screen.queryByRole('table', { name: 'Test cases' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Run tests' })).toHaveAccessibleDescription(
       /needs nodes\.run/,
     );
     expect(screen.getByRole('button', { name: 'Edit bar' })).toHaveAccessibleDescription(
       /needs nodes\.publish/,
     );
-    expect(screen.getByRole('button', { name: 'Edit cases' })).toHaveAccessibleDescription(
+    expect(screen.getByRole('button', { name: 'Edit test cases' })).toHaveAccessibleDescription(
       /needs nodes\.write/,
     );
     expect(screen.getByRole('button', { name: 'Make v2 live' })).toHaveAttribute(
@@ -510,7 +536,7 @@ describe('Node evals', () => {
     );
   });
 
-  it('only evaluates published versions, and shows what met the bar of the live one', async () => {
+  it('only tests published versions, and shows what met the bar of the live one', async () => {
     const user = userEvent.setup();
     mockEvals(null, {
       [`GET ${P}/versions/3/golden-set`]: () => ({
@@ -526,15 +552,15 @@ describe('Node evals', () => {
       }),
     });
     const { router } = await renderApp('/nodes/t1/triage?tab=evals');
-    expect(await screen.findByText('Meets the bar')).toBeInTheDocument();
-    expect(screen.getByText(/Met by/)).toHaveTextContent('Met by the golden eval ev_g0.');
+    expect(await screen.findByText('Ready to go live')).toBeInTheDocument();
+    expect(screen.getByText(/Based on/)).toHaveTextContent('Based on the quality tests.');
     expect(screen.queryByRole('button', { name: /Make v1 live/ })).not.toBeInTheDocument();
 
     await user.selectOptions(screen.getByLabelText('Version'), 'v3 (draft)');
     expect(router.state.location.search).toMatchObject({ ev: 3 });
-    expect(await screen.findByText('v3 has no golden set')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Start eval' })).toHaveAccessibleDescription(
-      'Only published versions are evaluated: v3 is draft.',
+    expect(await screen.findByText('v3 has no test cases yet')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Run tests' })).toHaveAccessibleDescription(
+      'Only published versions can be tested: v3 is a draft.',
     );
   });
 });
