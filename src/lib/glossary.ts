@@ -229,8 +229,8 @@ export const BANNED_IN_BASIC_COPY: readonly RegExp[] = [
   /\bgolden set\b/i,
   /\btrust tiers?\b/i,
   // The house rule: no em or en dashes in copy.
-  /—/,
-  /–/,
+  /\u2014/,
+  /\u2013/,
 ];
 
 /** The glossary entries a free-text query matches, by label, old name or definition. */
