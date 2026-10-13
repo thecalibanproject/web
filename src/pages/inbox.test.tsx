@@ -240,12 +240,19 @@ describe('InboxPage (Approvals)', () => {
     ).toBeInTheDocument();
   });
 
-  it('starts the review on the first card when J is pressed with nothing focused', async () => {
+  it('starts the review on the first card when J is pressed outside the cards', async () => {
     const user = userEvent.setup();
     await openInbox(null);
     (document.activeElement as HTMLElement | null)?.blur();
     await user.keyboard('j');
     expect(card('run_a')).toHaveFocus();
+
+    // From a link of the page header too, and J then moves on as usual.
+    screen.getByRole('link', { name: /Learn more/ }).focus();
+    await user.keyboard('j');
+    expect(card('run_a')).toHaveFocus();
+    await user.keyboard('j');
+    expect(card('run_q')).toHaveFocus();
   });
 
   it('ignores the review keys while typing an answer', async () => {

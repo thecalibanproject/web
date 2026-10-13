@@ -150,15 +150,18 @@ export function InboxPage() {
   const approvals = items.filter((w) => w.item.kind === 'approval').length;
   const severalWorkspaces = waiting.tenants.length > 1;
 
-  // J or K with nothing focused (just arrived, or after a click on the page)
-  // starts the review on the first card, as the "Keys" hint promises.
+  // J or K outside the cards (just arrived, or after a click on the page)
+  // starts the review on the first card, as the "Keys" hint promises. Keys
+  // typed in a field or a dialog are left alone; inside the list, the list's
+  // own handler has already acted (and prevented the default).
   const count = items.length;
   useEffect(() => {
     const start = (e: globalThis.KeyboardEvent) => {
-      if (e.altKey || e.ctrlKey || e.metaKey || count === 0) return;
+      if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || count === 0) return;
       if (e.key.toLowerCase() !== 'j' && e.key.toLowerCase() !== 'k') return;
-      const active = document.activeElement;
-      if (active && active !== document.body) return;
+      const active = document.activeElement as HTMLElement | null;
+      if (active && (TEXT_ENTRY.test(active.tagName) || active.isContentEditable)) return;
+      if (active?.closest('dialog')) return;
       e.preventDefault();
       cards.current[0]?.focus();
     };
