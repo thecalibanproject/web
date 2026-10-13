@@ -70,7 +70,14 @@ export function Drawer({
       )}
     >
       {open && (
-        <div className={cn('flex flex-col', side === 'right' ? 'h-full' : 'max-h-[85dvh]')}>
+        <div
+          className={cn(
+            'flex flex-col',
+            side === 'right'
+              ? 'h-full motion-safe:animate-drawer-in'
+              : 'max-h-[85dvh] motion-safe:animate-dialog-in',
+          )}
+        >
           <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-3.5">
             <div className="min-w-0">
               <h2 id={titleId} className="truncate text-[15px] font-semibold">
