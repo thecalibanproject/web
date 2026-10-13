@@ -92,7 +92,7 @@ export function NodeEditor({
   return (
     <form
       onSubmit={onSubmit}
-      className="flex h-full flex-col gap-4"
+      className="flex min-h-full flex-col gap-4"
       aria-label={target ? 'Create version' : 'Create assistant'}
     >
       {target ? (
@@ -144,7 +144,8 @@ export function NodeEditor({
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col">
+      {/* Grows with the form (no min-h-0): the drawer scrolls, the actions stay below. */}
+      <div className="flex flex-1 flex-col">
         <Tabs<View> label="Edit with" tabs={VIEWS} value={view} onChange={setView}>
           {view === 'form' ? (
             parsed ? (
