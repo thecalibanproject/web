@@ -15,7 +15,7 @@ export function AutoMarginCard({ totals }: { totals: UsageReport['totals'] }) {
   const billed = totals.billed_usd ?? flat;
   const hits = totals.auto_cache_hits ?? 0;
   return (
-    <Card role="region" aria-label="caliban/auto margin">
+    <Card role="region" aria-label="Automatic routing billing and margin">
       <CardHeader
         title={
           <>
@@ -56,8 +56,8 @@ export function AutoMarginCard({ totals }: { totals: UsageReport['totals'] }) {
         />
       </dl>
       <p className="px-4 pb-3 text-[12px] text-fg-subtle">
-        Covers requests that carry both prices. A cache hit calls no model and is billed a share of
-        the flat price: 20% unless the deployment or the tenant sets another share.
+        Covers requests that carry both prices. A reused answer calls no model and is billed a share
+        of the flat price: 20% unless the deployment or the workspace sets another share.
       </p>
     </Card>
   );

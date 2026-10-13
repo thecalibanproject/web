@@ -31,27 +31,27 @@ export function RouteCountsCard({
     <Card role="region" aria-label="Routing per day">
       <CardHeader
         title="Routing per day"
-        description="Requests per day, intent, the stage that decided it and why a model answered instead of a node. Only these daily counts are kept: single requests carry no routing decision."
+        description="Requests per day and topic, how the topic was decided, and why a model answered instead of an assistant. Only these daily counts are kept, not the decision for each request."
       />
       {filtered ? (
         <EmptyState
-          title="Not counted per node or run"
-          description="Clear the node and run filters to see the routing counts."
+          title="Not counted per assistant or conversation"
+          description="Clear the assistant and conversation filters to see the routing counts."
         />
       ) : rows.length === 0 ? (
         <EmptyState
           title="No routing counts"
-          description="caliban/auto requests will be counted here."
+          description="Requests that use automatic routing are counted here."
         />
       ) : (
         <Table label="Routing per day">
           <THead>
             <tr>
               <TH>Day</TH>
-              <TH>Tenant</TH>
-              <TH>Intent</TH>
-              <TH>Stage</TH>
-              <TH>Fallback</TH>
+              <TH>Workspace</TH>
+              <TH>Topic</TH>
+              <TH>Decided</TH>
+              <TH>Why a model answered</TH>
               <TH className="text-right">Requests</TH>
             </tr>
           </THead>

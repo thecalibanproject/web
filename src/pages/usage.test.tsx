@@ -2,6 +2,8 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import type { UsageEvent, UsageReport } from '@/api/types';
+import { expectNoAxeViolations } from '@/test/a11y';
+import { meWith, ssoRoutes } from '@/test/auth';
 import { mockApi, renderApp } from '@/test/utils';
 
 const tenants = [{ id: 't1', name: 'Acme', created_at: '2026-10-01T10:00:00Z' }];
@@ -96,6 +98,47 @@ function shownRequests() {
 }
 
 describe('UsagePage', () => {
+  it('leads with what was charged, and keeps the margin cards for operators', async () => {
+    const calls = mockApi({
+      ...ssoRoutes(meWith([{ role: 'tenant_admin', tenant_id: 't1' }])),
+      'GET /api/v1/tenants': () => ({ body: tenants }),
+      'GET /api/v1/usage': () => ({ body: { events, totals: { ...totals, charged_usd: 0.0029 } } }),
+    });
+    await renderApp('/usage', { token: null });
+    const charged = await screen.findByText('Charged to your budget');
+    expect(charged.nextSibling).toHaveTextContent('$0.0029');
+    await screen.findByRole('table', { name: 'Usage events' });
+    expect(
+      screen.queryByRole('region', { name: 'Automatic routing billing and margin' }),
+    ).not.toBeInTheDocument();
+    // A workspace role sees its workspace, with no "all workspaces" choice.
+    expect(screen.queryByRole('combobox', { name: 'Workspaces' })).not.toBeInTheDocument();
+    expect(calls.find((c) => c.path === '/api/v1/usage')?.query.get('tenant_id')).toBe('t1');
+  });
+
+  it('lets a deployment-wide role look across every workspace', async () => {
+    const user = userEvent.setup();
+    const calls = mockUsage();
+    await renderApp('/usage');
+    const scope = await screen.findByRole('combobox', { name: 'Workspaces' });
+    await user.selectOptions(scope, 'all');
+    await waitFor(() =>
+      expect(
+        calls
+          .filter((c) => c.path === '/api/v1/usage')
+          .at(-1)
+          ?.query.has('tenant_id'),
+      ).toBe(false),
+    );
+  });
+
+  it('has no axe violations', async () => {
+    mockUsage();
+    await renderApp('/usage');
+    await screen.findByRole('table', { name: 'Usage events' });
+    await expectNoAxeViolations();
+  });
+
   it('shows the route (requested → routed model) and the cache tier', async () => {
     mockUsage();
     await renderApp('/usage');
@@ -103,7 +146,7 @@ describe('UsagePage', () => {
     const headers = within(table)
       .getAllByRole('columnheader')
       .map((h) => h.textContent);
-    expect(headers).toEqual(expect.arrayContaining(['Route', 'Cache', 'Cache tier']));
+    expect(headers).toEqual(expect.arrayContaining(['Route', 'Answer', 'Reuse']));
     // Routing decisions are not kept per event.
     expect(headers).not.toContain('Intent');
 
@@ -156,9 +199,11 @@ describe('UsagePage', () => {
     expect(rows[1]).toHaveTextContent('2026-10-09AcmechitchatBy a rulelow_confidence7');
     expect(rows[2]).toHaveTextContent('2026-10-08AcmesqlBy example sentencesnone3');
 
-    await user.type(screen.getByPlaceholderText('Run id'), 'run_1');
+    await user.type(screen.getByPlaceholderText('Conversation id'), 'run_1');
     await user.click(screen.getByRole('button', { name: 'Apply' }));
-    expect(await screen.findByText('Not counted per node or run')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Not counted per assistant or conversation'),
+    ).toBeInTheDocument();
   });
 
   it('filters by cache tier alongside the cache status filter, and keeps it in the URL', async () => {
@@ -168,7 +213,7 @@ describe('UsagePage', () => {
     await screen.findByRole('table', { name: 'Usage events' });
     expect(shownRequests()).toHaveLength(4);
 
-    const tier = screen.getByRole('combobox', { name: 'Cache tier' });
+    const tier = screen.getByRole('combobox', { name: 'Reuse' });
     await user.selectOptions(tier, 'semantic');
     await waitFor(() => expect(shownRequests()).toEqual(['req-semantic-hit']));
     expect(router.state.location.search).toMatchObject({ tier: 'semantic' });
@@ -177,14 +222,14 @@ describe('UsagePage', () => {
     await waitFor(() => expect(shownRequests()).toEqual(['req-pinned-exact']));
 
     // The hit/miss/bypass filter still applies on top of the tier.
-    const cache = screen.getByRole('combobox', { name: 'Cache' });
+    const cache = screen.getByRole('combobox', { name: 'Answer' });
     expect(
       within(cache)
         .getAllByRole('option')
         .map((o) => o.textContent),
-    ).toEqual(['All', 'hit', 'miss', 'bypass']);
+    ).toEqual(['All', 'Reused', 'New answer', 'Not cached']);
     await user.selectOptions(cache, 'miss');
-    expect(await screen.findByText('No events match')).toBeInTheDocument();
+    expect(await screen.findByText('No requests match')).toBeInTheDocument();
 
     await user.selectOptions(tier, '');
     await waitFor(() => expect(shownRequests()).toEqual(['req-auto-miss']));
@@ -223,7 +268,7 @@ describe('UsagePage', () => {
       ],
     });
     await renderApp('/usage');
-    const card = await screen.findByRole('region', { name: 'Retrieval spend' });
+    const card = await screen.findByRole('region', { name: 'Knowledge spend' });
     const rows = within(card).getAllByRole('row');
     expect(rows[1]).toHaveTextContent(/^Indexing documents rag\.ingest3012,000\$0\.0030\$0\.0030$/);
     expect(rows[2]).toHaveTextContent('Retrieval queries rag.search');
@@ -238,8 +283,8 @@ describe('UsagePage', () => {
     mockUsage();
     await renderApp('/usage');
     expect(
-      await within(await screen.findByRole('region', { name: 'Retrieval spend' })).findByText(
-        'No retrieval calls',
+      await within(await screen.findByRole('region', { name: 'Knowledge spend' })).findByText(
+        'No document library calls yet',
       ),
     ).toBeInTheDocument();
   });
@@ -247,7 +292,7 @@ describe('UsagePage', () => {
   it('totals cache hits with the semantic share and what they saved', async () => {
     mockUsage();
     await renderApp('/usage');
-    expect(await screen.findByText(/2 cache hits \(1 semantic\)/)).toBeInTheDocument();
+    expect(await screen.findByText(/2 reused \(1 similar\)/)).toBeInTheDocument();
     expect(screen.getByText(/300 tokens saved \(\$0\.0025\)/)).toBeInTheDocument();
   });
 
@@ -266,7 +311,9 @@ describe('UsagePage', () => {
   it('shows the caliban/auto card with billed, flat price, cache-hit savings, cost and margin', async () => {
     mockUsage();
     await renderApp('/usage');
-    const card = await screen.findByRole('region', { name: 'caliban/auto margin' });
+    const card = await screen.findByRole('region', {
+      name: 'Automatic routing billing and margin',
+    });
     expect(card).toHaveTextContent('2 requests asked for caliban/auto, 1 answered from cache');
     const value = (label: string) => within(card).getByText(label).nextElementSibling;
     expect(value('Billed')).toHaveTextContent('$0.0024');
@@ -275,7 +322,7 @@ describe('UsagePage', () => {
     expect(value('Routed model cost')).toHaveTextContent('$0.0005');
     expect(value('Margin')).toHaveTextContent('$0.0019');
     expect(card).toHaveTextContent('1 cache hit at the discounted price');
-    expect(card).toHaveTextContent('A cache hit calls no model and is billed a share');
+    expect(card).toHaveTextContent('A reused answer calls no model and is billed a share');
   });
 
   it('treats totals without billed_usd (older servers) as billed at the flat price', async () => {
@@ -287,7 +334,9 @@ describe('UsagePage', () => {
     } = totals;
     mockUsage({ events, totals: { ...older, margin_usd: 0.0035 } });
     await renderApp('/usage');
-    const card = await screen.findByRole('region', { name: 'caliban/auto margin' });
+    const card = await screen.findByRole('region', {
+      name: 'Automatic routing billing and margin',
+    });
     const value = (label: string) => within(card).getByText(label).nextElementSibling;
     expect(value('Billed')).toHaveTextContent('$0.0040');
     expect(value('Cache-hit savings')).toHaveTextContent('$0.00');
@@ -305,7 +354,9 @@ describe('UsagePage', () => {
       },
     });
     await renderApp('/usage');
-    const card = await screen.findByRole('region', { name: 'caliban/auto margin' });
+    const card = await screen.findByRole('region', {
+      name: 'Automatic routing billing and margin',
+    });
     const margin = within(card).getByText('-$0.0020');
     expect(margin).toHaveClass('text-danger');
   });
@@ -316,7 +367,9 @@ describe('UsagePage', () => {
       totals: { ...totals, billed_usd: 0.3, routed_model_cost_usd: 0.3, margin_usd: -1e-17 },
     });
     await renderApp('/usage');
-    const card = await screen.findByRole('region', { name: 'caliban/auto margin' });
+    const card = await screen.findByRole('region', {
+      name: 'Automatic routing billing and margin',
+    });
     const margin = within(card).getByText('Margin').nextElementSibling!;
     expect(margin).toHaveTextContent(/^\$0\.00$/);
     expect(margin.querySelector('span')).not.toHaveClass('text-danger');
@@ -339,7 +392,9 @@ describe('UsagePage', () => {
       'GET /api/v1/usage': () => ({ raw }),
     });
     await renderApp('/usage');
-    const card = await screen.findByRole('region', { name: 'caliban/auto margin' });
+    const card = await screen.findByRole('region', {
+      name: 'Automatic routing billing and margin',
+    });
     expect(within(card).getAllByText('$0.00')).toHaveLength(5);
     expect(document.body).not.toHaveTextContent('-$');
     expect(screen.getByText(/shown ·/)).toHaveTextContent('tokens saved ($0.00) · $0.00');
@@ -348,7 +403,9 @@ describe('UsagePage', () => {
   it('shows zeros when there was no caliban/auto traffic', async () => {
     mockUsage({ events: [], totals: { requests: 0 } });
     await renderApp('/usage');
-    const card = await screen.findByRole('region', { name: 'caliban/auto margin' });
+    const card = await screen.findByRole('region', {
+      name: 'Automatic routing billing and margin',
+    });
     expect(card).toHaveTextContent('0 requests asked for caliban/auto');
     expect(within(card).getAllByText('$0.00')).toHaveLength(5);
     expect(screen.getByText('No usage yet')).toBeInTheDocument();
@@ -409,7 +466,7 @@ describe('UsagePage', () => {
     it('shows the cost per node with its versions, most charged first', async () => {
       mockUsage(report);
       await renderApp('/usage');
-      const card = await screen.findByRole('region', { name: 'Cost per node' });
+      const card = await screen.findByRole('region', { name: 'Cost per assistant' });
       const rows = within(within(card).getByRole('table')).getAllByRole('row').slice(1);
       expect(rows.map((r) => r.querySelector('td')?.textContent)).toEqual(['intake', 'triage']);
       const triage = rows[1]!;
@@ -435,14 +492,14 @@ describe('UsagePage', () => {
       const calls = mockUsage(report);
       const user = userEvent.setup();
       const { router } = await renderApp('/usage');
-      const card = await screen.findByRole('region', { name: 'Cost per node' });
+      const card = await screen.findByRole('region', { name: 'Cost per assistant' });
 
       await user.click(within(card).getByRole('button', { name: 'triage' }));
       await waitFor(() => expect(router.state.location.search).toMatchObject({ node: 'triage' }));
       await waitFor(() => expect(calls.at(-1)?.query.get('node')).toBe('triage'));
-      expect(screen.getByRole('combobox', { name: 'Node' })).toHaveValue('triage');
+      expect(screen.getByRole('combobox', { name: 'Assistant' })).toHaveValue('triage');
 
-      await user.selectOptions(screen.getByRole('combobox', { name: 'Node' }), '');
+      await user.selectOptions(screen.getByRole('combobox', { name: 'Assistant' }), '');
       await waitFor(() => expect(router.state.location.search).not.toHaveProperty('node'));
     });
 
@@ -451,20 +508,20 @@ describe('UsagePage', () => {
       const user = userEvent.setup();
       const { router } = await renderApp('/usage');
       await screen.findByRole('table', { name: 'Usage events' });
-      const filter = screen.getByRole('form', { name: 'Run filter' });
-      await user.type(within(filter).getByLabelText('Run'), 'run_123');
+      const filter = screen.getByRole('form', { name: 'Conversation filter' });
+      await user.type(within(filter).getByLabelText('Conversation'), 'run_123');
       await user.click(within(filter).getByRole('button', { name: 'Apply' }));
       await waitFor(() => expect(router.state.location.search).toMatchObject({ run: 'run_123' }));
       await waitFor(() => expect(calls.at(-1)?.query.get('run_id')).toBe('run_123'));
-      await user.click(within(filter).getByRole('button', { name: 'Clear run' }));
+      await user.click(within(filter).getByRole('button', { name: 'Clear' }));
       await waitFor(() => expect(router.state.location.search).not.toHaveProperty('run'));
     });
 
     it('says when there are no node calls', async () => {
       mockUsage();
       await renderApp('/usage');
-      const card = await screen.findByRole('region', { name: 'Cost per node' });
-      expect(within(card).getByText('No node calls')).toBeInTheDocument();
+      const card = await screen.findByRole('region', { name: 'Cost per assistant' });
+      expect(within(card).getByText('No assistant calls yet')).toBeInTheDocument();
     });
   });
 });
