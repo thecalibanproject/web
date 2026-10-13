@@ -191,8 +191,7 @@ function WorkspaceSwitcher() {
   }
   return (
     <label className="flex min-w-0 items-center gap-2 text-[12.5px] text-fg-muted">
-      <span className="hidden sm:inline">Workspace</span>
-      <span className="sr-only sm:hidden">Workspace</span>
+      <span className="sr-only sm:not-sr-only">Workspace</span>
       <Select
         value={ws.id ?? ''}
         className="w-44 sm:w-52"
@@ -226,9 +225,9 @@ function ApprovalsBadge({ waiting }: { waiting: number }) {
       className="inline-flex h-8 items-center gap-1.5 rounded-md bg-warn-soft px-2 text-[12.5px] font-medium text-warn hover:underline"
     >
       <IconInbox size={14} />
-      <span className="tabular-nums">{waiting}</span>
-      <span className="hidden sm:inline">waiting for you</span>
-      <span className="sr-only sm:hidden">approvals and questions waiting</span>
+      <span className="tabular-nums">
+        {waiting} <span className="sr-only sm:not-sr-only">waiting for you</span>
+      </span>
     </Link>
   );
 }

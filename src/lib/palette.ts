@@ -12,6 +12,8 @@ export interface PaletteCommand {
   /** Searched too, and shown as "also called" when it is what matched. */
   aliases?: readonly string[];
   hint?: string;
+  /** Added to the match score: pages rank above glossary terms that match as well. */
+  boost?: number;
   run: () => void;
 }
 
@@ -45,7 +47,7 @@ export function rankCommands(
       const s = score(a, q) - 5;
       if (s > best.s) best = { s, via: a };
     }
-    if (best.s > 0) ranked.push({ command, via: best.via, s: best.s, i });
+    if (best.s > 0) ranked.push({ command, via: best.via, s: best.s + (command.boost ?? 0), i });
   });
   ranked.sort((a, b) => b.s - a.s || a.i - b.i);
   return ranked.slice(0, limit).map(({ command, via }) => ({ command, via }));

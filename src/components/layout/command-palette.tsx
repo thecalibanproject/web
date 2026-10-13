@@ -89,6 +89,7 @@ function Palette({ onDone }: { onDone: () => void }) {
         label: n.label,
         group: 'Pages',
         aliases: n.also,
+        boost: 20,
         run: go(n.to),
       }));
     const actions: PaletteCommand[] = [];
@@ -130,7 +131,7 @@ function Palette({ onDone }: { onDone: () => void }) {
       id: `ws:${t.id}`,
       label: `Switch to ${t.name}`,
       group: 'Workspaces',
-      aliases: [t.id, 'tenant', 'workspace'],
+      aliases: [t.id],
       hint: t.id === ws.id ? 'Current' : undefined,
       run: () => setWorkspace(t.id),
     }));
