@@ -51,17 +51,20 @@ function ArgList({
 }) {
   if (rows.length === 0) return <p className="text-[12.5px] text-fg-muted">No details.</p>;
   return (
-    <dl aria-label={label} className="flex flex-col gap-1 text-[12.5px]">
+    // One grid for the whole list, so every value starts in the same column
+    // however long its key; on a phone each key sits above its value.
+    <dl
+      aria-label={label}
+      className="grid grid-cols-1 gap-y-1 text-[12.5px] sm:grid-cols-[max-content_minmax(0,1fr)] sm:gap-x-4"
+    >
       {rows.map((r, i) => {
         const p = run && r.value !== null ? provenance(r.value, run) : null;
         const note = p ? provenanceText(p) : null;
         return (
-          <div
-            key={i}
-            className="grid grid-cols-[minmax(7rem,max-content)_1fr] gap-x-3"
-            style={{ paddingLeft: `${r.depth}rem` }}
-          >
-            <dt className="text-fg-muted">{r.key}</dt>
+          <div key={i} className="contents">
+            <dt className="break-words text-fg-muted" style={{ paddingLeft: `${r.depth}rem` }}>
+              {r.key}
+            </dt>
             <dd className="min-w-0 break-words">
               {r.value !== null && <span dir="auto">{r.value}</span>}
               {note && p && <span className={cn('block text-[12px]', TONE[p.kind])}>{note}</span>}

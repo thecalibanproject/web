@@ -200,15 +200,18 @@ describe('RunDetailPage', () => {
     expect(screen.getByRole('heading', { name: 'Conversation with triage' })).toBeInTheDocument();
     const steps = within(screen.getByRole('table', { name: 'Steps' })).getAllByRole('row');
     expect(steps[1]).toHaveTextContent('fetch#0');
-    expect(steps[1]).toHaveTextContent('tool');
+    expect(steps[1]).toHaveTextContent('Tool or lookup');
     expect(steps[1]).toHaveTextContent('400 ms');
-    expect(steps[1]).toHaveTextContent('tool:mail/read_inbox');
+    expect(steps[1]).toHaveTextContent('Result of mail/read_inbox');
     expect(steps[2]).toHaveTextContent('classify#0');
     expect(steps[2]).toHaveTextContent('+500 ms');
     expect(steps[2]).toHaveTextContent('2.50 s');
     expect(steps[2]).toHaveTextContent('900');
     expect(steps[2]).toHaveTextContent('$0.0042');
-    expect(within(steps[2]!).getByText('pii')).toHaveAttribute('title', 'Holds personal data.');
+    expect(within(steps[2]!).getByText('Personal data')).toHaveAttribute(
+      'title',
+      'Holds personal data.',
+    );
 
     const budget = screen.getByRole('table', { name: 'Budget' });
     expect(within(budget).getByText('Steps').closest('tr')).toHaveTextContent(/^Steps38$/);
@@ -271,7 +274,7 @@ describe('RunDetailPage', () => {
     expect(rows[1]).toHaveTextContent('Contact from untrusted text');
     expect(rows[1]).toHaveTextContent('/recommendation');
     expect(rows[2]).toHaveTextContent('Echo of an injected instruction');
-    expect(rows[2]).toHaveTextContent('tool:catalogue/search');
+    expect(rows[2]).toHaveTextContent('Result of catalogue/search');
   });
 
   it('shows the answer guard to roles without runs.data, as metadata only', async () => {
@@ -389,7 +392,7 @@ describe('RunDetailPage', () => {
 
   it('shows the taint labels the run input carries', async () => {
     await openDetail(null, { ...run, input_labels: ['caller'] });
-    expect(screen.getByText('caller')).toHaveAttribute(
+    expect(screen.getByText("Customer's message")).toHaveAttribute(
       'title',
       "From the customer's message: untrusted data.",
     );

@@ -272,7 +272,7 @@ describe('InboxPage (Approvals)', () => {
     await openInbox([{ role: 'viewer', tenant_id: 't1' }], { contentVisible: false });
     const a = card('run_a');
     expect(a).toHaveTextContent('update_ticket on crm');
-    expect(within(a).getByText('pii')).toBeInTheDocument();
+    expect(within(a).getByText('Personal data')).toBeInTheDocument();
     expect(a).toHaveTextContent('Hidden: the details are conversation content (needs runs.data)');
     expect(within(a).queryByLabelText('Arguments')).not.toBeInTheDocument();
     expect(
