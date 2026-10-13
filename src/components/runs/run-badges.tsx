@@ -11,21 +11,21 @@ export function RunStatusBadge({ status }: { status: RunStatus }) {
   );
 }
 
-/** What a taint label says about where a value came from. */
+/** What a label says about where a value came from (also called a taint label). */
 function taintOf(label: string): { tone: Tone; hint: string } {
   if (label === 'pii') return { tone: 'danger', hint: 'Holds personal data.' };
-  if (label === 'datasource') return { tone: 'info', hint: 'Read from a tenant datasource.' };
+  if (label === 'datasource') return { tone: 'info', hint: 'Read from your database.' };
   if (label === 'caller') {
-    return { tone: 'warn', hint: 'Untrusted data the caller passed in the run input.' };
+    return { tone: 'warn', hint: "From the customer's message: untrusted data." };
   }
-  if (label === 'retrieved') return { tone: 'warn', hint: 'Retrieved from a document store.' };
+  if (label === 'retrieved') return { tone: 'warn', hint: 'From a document: untrusted data.' };
   if (label.startsWith('tool:')) {
-    return { tone: 'warn', hint: `Came from the output of the untrusted tool ${label.slice(5)}.` };
+    return { tone: 'warn', hint: `From the result of ${label.slice(5)}: untrusted data.` };
   }
-  return { tone: 'neutral', hint: 'Taint label.' };
+  return { tone: 'neutral', hint: 'Where the data came from.' };
 }
 
-/** Taint labels of a value: where untrusted data in it came from. */
+/** Where the untrusted data in a value came from. */
 export function TaintLabels({
   labels,
   empty = EMPTY,

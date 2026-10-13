@@ -1,85 +1,236 @@
-import { useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { usePermissions } from '@/api/auth';
 import { ApiError } from '@/api/client';
 import { useAnswerRun } from '@/api/queries';
+import type { Approval, ConsoleRun } from '@/api/types';
+import {
+  actionName,
+  argRows,
+  parseToolRef,
+  provenance,
+  provenanceText,
+  REJECT_REASONS,
+  whyApproval,
+  type ArgRow,
+} from '@/lib/approvalArgs';
+import { cn } from '@/lib/cn';
 import { deniedReason } from '@/lib/permissions';
-import type { Approval } from '@/api/types';
-import { prettyJson } from '@/lib/runs';
-import { Checkbox, CodeBlock, ConfirmDialog, Field, FormError, GatedButton, Textarea } from '../ui';
+import { Checkbox, ConfirmDialog, Field, FormError, GatedButton, Input, Textarea } from '../ui';
 import { TaintLabels } from './run-badges';
 
 const HIDDEN =
-  'Run content is hidden: your role can see that a run waits, not what it asks (needs runs.data).';
+  'The content of this conversation is hidden: your role can see that it waits, not what it says (needs runs.data).';
 
 /** A 409: the run no longer waits for this step (answered elsewhere, timed out or cancelled). */
 function AnswerError({ error }: { error: unknown }) {
   if (error instanceof ApiError && error.status === 409) {
     return (
       <p role="alert" className="rounded-md bg-warn-soft px-3 py-2 text-[12.5px] text-warn">
-        This run no longer waits for this step: someone else may have answered it, or it timed out
-        or was cancelled. The list has been refreshed.
+        This conversation no longer waits for this step: someone else may have answered it, or it
+        timed out or was cancelled. The list has been refreshed.
       </p>
     );
   }
   return <FormError error={error} />;
 }
 
+const TONE: Record<string, string> = {
+  'on-file': 'text-ok',
+  'customer-only': 'text-warn font-medium',
+  'not-found': 'text-fg-muted',
+};
+
+function ArgList({
+  rows,
+  run,
+  label,
+}: {
+  rows: ArgRow[];
+  run?: Pick<ConsoleRun, 'input' | 'steps'> | null;
+  label: string;
+}) {
+  if (rows.length === 0) return <p className="text-[12.5px] text-fg-muted">No details.</p>;
+  return (
+    <dl aria-label={label} className="flex flex-col gap-1 text-[12.5px]">
+      {rows.map((r, i) => {
+        const p = run && r.value !== null ? provenance(r.value, run) : null;
+        const note = p ? provenanceText(p) : null;
+        return (
+          <div
+            key={i}
+            className="grid grid-cols-[minmax(7rem,max-content)_1fr] gap-x-3"
+            style={{ paddingLeft: `${r.depth}rem` }}
+          >
+            <dt className="text-fg-muted">{r.key}</dt>
+            <dd className="min-w-0 break-words">
+              {r.value !== null && <span dir="auto">{r.value}</span>}
+              {note && p && <span className={cn('block text-[12px]', TONE[p.kind])}>{note}</span>}
+            </dd>
+          </div>
+        );
+      })}
+    </dl>
+  );
+}
+
+/** The customer's message (the run input), as text in its own direction. */
+export function CustomerMessage({ input }: { input: unknown }) {
+  if (input === undefined || input === null) return null;
+  return (
+    <div className="rounded-md bg-surface-2 p-3">
+      <h3 className="mb-1 text-[12px] font-medium text-fg-muted">What the customer wrote</h3>
+      {typeof input === 'string' ? (
+        <p dir="auto" className="text-[13px] break-words whitespace-pre-wrap">
+          {input}
+        </p>
+      ) : (
+        <ArgList rows={argRows(input)} label="What the customer wrote" />
+      )}
+    </div>
+  );
+}
+
 /**
- * The tool, its effect, the untrusted taint labels and (with runs.data) the
- * arguments of a call waiting for approval. Without the structured approval
- * (a run from a worker that recorded none) the question is shown as it is.
+ * A call waiting for approval, in plain words: the action and its system, why
+ * it needs a person, and (with runs.data) its details as a list, each checked
+ * against the conversation when `run` is given. Without the structured
+ * approval (a run from a worker that recorded none) the question is shown.
  */
 export function ApprovalDetails({
   approval,
   question,
   contentVisible,
+  run,
 }: {
   approval: Approval | null | undefined;
   question: string | null | undefined;
   contentVisible: boolean;
+  run?: Pick<ConsoleRun, 'input' | 'steps'> | null;
 }) {
   if (!approval) {
     if (!contentVisible) return <p className="text-[12.5px] text-fg-muted">{HIDDEN}</p>;
     return question ? (
-      <p className="text-[13px] break-words whitespace-pre-wrap">{question}</p>
+      <p dir="auto" className="text-[13px] break-words whitespace-pre-wrap">
+        {question}
+      </p>
     ) : (
-      <p className="text-[12.5px] text-fg-muted">The run did not say what it would do.</p>
+      <p className="text-[12.5px] text-fg-muted">The assistant did not say what it would do.</p>
     );
   }
+  const t = parseToolRef(approval.tool);
   return (
-    <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-[12.5px]">
-      <dt className="text-fg-muted">Tool</dt>
-      <dd className="min-w-0">
-        <code className="font-mono text-[12px] break-all">{approval.tool}</code>
-        {approval.effect && <span className="text-fg-subtle"> (effect: {approval.effect})</span>}
-      </dd>
-      <dt className="text-fg-muted">Untrusted data</dt>
-      <dd className="min-w-0">
-        <TaintLabels labels={approval.labels ?? []} />
-      </dd>
-      <dt className="text-fg-muted">Arguments</dt>
-      <dd className="min-w-0">
-        {contentVisible ? (
-          <CodeBlock
-            label="Arguments"
-            language="json"
-            code={prettyJson(approval.arguments ?? null)}
-            className="max-h-72"
-          />
-        ) : (
-          <span className="text-fg-muted">
-            Hidden: arguments are run content (needs runs.data).
-          </span>
+    <div className="flex flex-col gap-3 text-[12.5px]">
+      <p className="text-[13px]">
+        <span className="font-medium">{t.tool}</span>
+        {t.system && <span className="text-fg-muted"> on {t.system}</span>}
+        {approval.tool && (
+          <code className="ml-2 font-mono text-[11.5px] text-fg-subtle" title={approval.tool}>
+            {approval.tool}
+          </code>
         )}
-      </dd>
-    </dl>
+      </p>
+      <p>
+        <span className="text-fg-muted">Why it needs you: </span>
+        {whyApproval(approval.effect, approval.labels ?? [])}
+      </p>
+      {(approval.labels ?? []).length > 0 && (
+        <p className="flex flex-wrap items-center gap-2">
+          <span className="text-fg-muted">Data from</span>
+          <TaintLabels labels={approval.labels ?? []} />
+        </p>
+      )}
+      <div>
+        <h3 className="mb-1 text-[12px] font-medium text-fg-muted">What it would send</h3>
+        {contentVisible ? (
+          <ArgList rows={argRows(approval.arguments ?? null)} run={run} label="Arguments" />
+        ) : (
+          <p className="text-fg-muted">
+            Hidden: the details are conversation content (needs runs.data).
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
+/** Reject with a reason: the reason goes back with the answer and stays with the conversation. */
+function RejectDialog({
+  open,
+  what,
+  loading,
+  error,
+  onCancel,
+  onReject,
+}: {
+  open: boolean;
+  what: string;
+  loading: boolean;
+  error: unknown;
+  onCancel: () => void;
+  onReject: (reason: string) => void;
+}) {
+  const [choice, setChoice] = useState('');
+  const [text, setText] = useState('');
+  const name = useId();
+  const needsText = choice === 'Other';
+  const ready = Boolean(choice) && (!needsText || text.trim().length > 0);
+  const reason = needsText ? text.trim() : text.trim() ? `${choice}: ${text.trim()}` : choice;
+  return (
+    <ConfirmDialog
+      open={open}
+      title={`Reject ${what}?`}
+      confirmLabel="Reject"
+      confirmDisabled={!ready}
+      loading={loading}
+      error={error}
+      onCancel={onCancel}
+      onConfirm={() => {
+        if (ready) onReject(reason);
+      }}
+    >
+      <fieldset className="flex flex-col gap-1.5">
+        <legend className="mb-1 text-[12.5px] font-medium">Why are you rejecting it?</legend>
+        {REJECT_REASONS.map((r) => (
+          <label key={r} className="inline-flex items-center gap-2 text-[13px]">
+            <input
+              type="radio"
+              name={name}
+              value={r}
+              checked={choice === r}
+              onChange={() => setChoice(r)}
+              className="accent-accent"
+            />
+            {r}
+          </label>
+        ))}
+      </fieldset>
+      <Field label={needsText ? 'Your reason' : 'Anything to add (optional)'} required={needsText}>
+        {({ id }) => (
+          <Input
+            id={id}
+            dir="auto"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            maxLength={500}
+          />
+        )}
+      </Field>
+      <p className="text-[12.5px] text-fg-muted">
+        The action is not taken. Your reason goes back to the assistant and is kept with the
+        conversation; the audit log records the rejection under your name.
+      </p>
+    </ConfirmDialog>
+  );
+}
+
+export type HumanIntent = 'approve' | 'reject' | null;
+export type HumanDecision = 'approved' | 'rejected' | 'answered';
+
 /**
  * Answers the human step a run waits for, as the signed-in user: approve or
- * deny a tainted call, or answer a question. `onAnswered` gets a sentence
- * for the page's status line.
+ * reject (with a reason) an action, or answer a question. `onAnswered` gets a
+ * sentence for the page's status line. `intent` lets a page open the approve
+ * or reject dialog from the keyboard.
  */
 export function HumanStepActions({
   tenantId,
@@ -89,6 +240,9 @@ export function HumanStepActions({
   approval,
   question,
   contentVisible,
+  run,
+  intent: controlled,
+  onIntentChange,
   onAnswered,
 }: {
   tenantId: string;
@@ -98,29 +252,45 @@ export function HumanStepActions({
   approval?: Approval | null;
   question: string | null | undefined;
   contentVisible: boolean;
-  onAnswered?: (message: string) => void;
+  run?: Pick<ConsoleRun, 'input' | 'steps'> | null;
+  intent?: HumanIntent;
+  onIntentChange?: (intent: HumanIntent) => void;
+  onAnswered?: (message: string, decision: HumanDecision) => void;
 }) {
   const answer = useAnswerRun(tenantId);
   const denied = deniedReason(usePermissions(), 'runs.answer', tenantId);
-  const [confirming, setConfirming] = useState(false);
+  const [own, setOwn] = useState<HumanIntent>(null);
+  const intent = controlled !== undefined ? controlled : own;
+  const setIntent = (i: HumanIntent) => {
+    if (controlled === undefined) setOwn(i);
+    onIntentChange?.(i);
+  };
   const [text, setText] = useState('');
   const [asJson, setAsJson] = useState(false);
   const [jsonError, setJsonError] = useState<string | null>(null);
+  const what = actionName(approval);
 
-  const send = (value: unknown, done: string) =>
+  const send = (value: unknown, done: string, decision: HumanDecision) =>
     answer.mutate(
       { runId, step, answer: value },
       {
         onSuccess: () => {
-          setConfirming(false);
+          setIntent(null);
           setText('');
-          onAnswered?.(done);
+          onAnswered?.(done, decision);
         },
-        onError: () => setConfirming(false),
+        // The step is gone (answered elsewhere, timed out): close the dialog and say so.
+        onError: (e) => {
+          if (e instanceof ApiError && e.status === 409) setIntent(null);
+        },
       },
     );
 
   if (kind === 'approval') {
+    const open = (i: HumanIntent) => {
+      answer.reset();
+      setIntent(i);
+    };
     return (
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
@@ -129,11 +299,9 @@ export function HumanStepActions({
             variant="primary"
             deniedReason={denied}
             disabled={answer.isPending}
-            aria-label={`Approve the call of run ${runId}`}
-            onClick={() => {
-              answer.reset();
-              setConfirming(true);
-            }}
+            aria-label={`Approve ${what} for conversation ${runId}`}
+            aria-keyshortcuts="A"
+            onClick={() => open('approve')}
           >
             Approve
           </GatedButton>
@@ -141,42 +309,54 @@ export function HumanStepActions({
             size="sm"
             variant="danger"
             deniedReason={denied}
-            loading={answer.isPending && !confirming}
-            aria-label={`Deny the call of run ${runId}`}
-            onClick={() => send({ approve: false }, `Denied the call of run ${runId}.`)}
+            disabled={answer.isPending}
+            aria-label={`Reject ${what} for conversation ${runId}`}
+            aria-keyshortcuts="R"
+            onClick={() => open('reject')}
           >
-            Deny
+            Reject
           </GatedButton>
         </div>
-        <AnswerError error={answer.error} />
+        {!intent && <AnswerError error={answer.error} />}
         <ConfirmDialog
-          open={confirming}
-          title="Approve this call?"
-          confirmLabel="Approve call"
+          open={intent === 'approve' && !denied}
+          title={`Approve ${what}?`}
+          confirmLabel="Approve"
           confirmVariant="primary"
           loading={answer.isPending}
-          onCancel={() => setConfirming(false)}
-          onConfirm={() => send({ approve: true }, `Approved the call of run ${runId}.`)}
+          error={answer.error}
+          onCancel={() => setIntent(null)}
+          onConfirm={() =>
+            send({ approve: true }, `Approved ${what} for conversation ${runId}.`, 'approved')
+          }
         >
           <p>
-            {approval ? (
-              <>
-                <code className="font-mono font-medium break-all">{approval.tool}</code> is called
-                once
-              </>
-            ) : (
-              'The tool is called once'
-            )}{' '}
-            with arguments derived from untrusted data
-            {approval?.labels?.length ? ` (${approval.labels.join(', ')})` : ''}. The approval
-            covers this step only, and is recorded under your name in the audit log.
+            It runs once, with the details below. The approval covers this step only, and the audit
+            log records it under your name.
           </p>
           <ApprovalDetails
             approval={approval}
             question={question}
             contentVisible={contentVisible}
+            run={run}
           />
         </ConfirmDialog>
+        {intent === 'reject' && !denied && (
+          <RejectDialog
+            open
+            what={what}
+            loading={answer.isPending}
+            error={answer.error}
+            onCancel={() => setIntent(null)}
+            onReject={(reason) =>
+              send(
+                { approve: false, reason },
+                `Rejected ${what} for conversation ${runId}.`,
+                'rejected',
+              )
+            }
+          />
+        )}
       </div>
     );
   }
@@ -192,11 +372,15 @@ export function HumanStepActions({
         return;
       }
     }
-    send(value, `Answered run ${runId}.`);
+    send(value, `Answered conversation ${runId}.`, 'answered');
   };
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-2" aria-label={`Answer run ${runId}`}>
+    <form
+      onSubmit={submit}
+      className="flex flex-col gap-2"
+      aria-label={`Answer conversation ${runId}`}
+    >
       <Field
         label="Your answer"
         hint={
@@ -207,6 +391,7 @@ export function HumanStepActions({
         {({ id, describedBy, invalid }) => (
           <Textarea
             id={id}
+            dir="auto"
             aria-describedby={describedBy}
             aria-invalid={invalid}
             value={text}
