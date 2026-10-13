@@ -8,9 +8,22 @@ import {
   type Tenant,
   type TenantUpdate,
 } from '@/api/types';
+import { cn } from '@/lib/cn';
+import { doc } from '@/lib/docs';
 import { PII_MODE_LABEL, PII_MODE_OPTIONS, SURROGATE_SCOPE_LABEL } from '@/lib/labels';
+import { Advanced } from '../help/advanced';
+import { LearnMore } from '../help/learn-more';
+import { Toggletip } from '../help/toggletip';
 import { Button, Field, FormError, Input, Select, Switch } from '../ui';
 import { useSavedTenant } from './use-saved-tenant';
+
+/** What each mode does, on one example sentence (static: a live preview needs a core dry run). */
+const PII_MODE_EXAMPLE: Record<PiiMode, string> = {
+  reversible:
+    'The model reads "Call [PERSON_1] on [PHONE_1]"; the caller gets the answer with the real name and number back.',
+  mask: 'The model reads "Call [PERSON] on [PHONE]", and the caller sees [PHONE] in the answer too.',
+  off: 'The model reads the text as written. Only for models on your own servers.',
+};
 
 interface Settings {
   pii_default: PiiMode;
@@ -125,134 +138,144 @@ export function TenantSettingsSection({
   return (
     <section
       aria-labelledby={headingId}
-      className="mt-6 rounded-lg border border-border bg-surface"
+      className="mt-4 rounded-lg border first:mt-0 border-border bg-surface"
     >
       <div className="border-b border-border px-4 py-2.5">
         <h2 id={headingId} className="text-[13px] font-semibold text-fg">
-          Privacy and caching
+          Personal data and reuse of answers
         </h2>
         <p className="text-[12px] text-fg-muted">
           {deleted
-            ? 'This tenant was deleted. Its settings can no longer be changed.'
+            ? 'This workspace was deleted. Its settings can no longer be changed.'
             : readOnly
               ? 'Read only: your role cannot change these settings.'
-              : 'Applies to new requests once routers pick up the change. Every change is recorded in the audit log.'}
+              : 'Applies to new requests within seconds. Every change is recorded in the audit log.'}
         </p>
       </div>
       <form
         onSubmit={onSubmit}
-        aria-label="Privacy and caching settings"
+        aria-label="Personal data settings"
         className="flex flex-col gap-4 p-4"
       >
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <Field
-            label="PII default mode"
-            hint="Reversible pseudonymizes before the model and restores in the response; tool results of node runs enter the run as they are. Mask is irreversible: the caller sees [PHONE] too."
-          >
-            {({ id, describedBy }) => (
-              <Select
-                id={id}
-                aria-describedby={describedBy}
-                value={values.pii_default}
-                disabled={locked}
-                onChange={(e) => edit({ pii_default: e.target.value as PiiMode })}
-              >
-                {PII_MODE_OPTIONS.map((m) => (
-                  <option key={m} value={m}>
-                    {PII_MODE_LABEL[m]}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
-          <Field
-            label="Surrogate scope"
-            hint="Tenant scope gives the same stand-in for the same value across requests, so repeated questions can hit the cache. The model provider can link this tenant's sessions through those stand-ins. Session scope gives fresh stand-ins per request and disables caching for requests that contain personal data."
-          >
-            {({ id, describedBy }) => (
-              <Select
-                id={id}
-                aria-describedby={describedBy}
-                value={values.pii_surrogate_scope}
-                disabled={locked}
-                onChange={(e) => edit({ pii_surrogate_scope: e.target.value as SurrogateScope })}
-              >
-                {SURROGATE_SCOPES.map((s) => (
-                  <option key={s} value={s}>
-                    {SURROGATE_SCOPE_LABEL[s]}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
-          <Field
-            label="PII mode on sovereign models"
-            hint={
-              <>
-                Off by default: sovereign and attested models (trust tiers t0 and t1) are inside the
-                trust boundary and get the text as is. On applies the PII mode to them too. External
-                models always get it, and a node&apos;s{' '}
-                <code className="font-mono">guardrails.pii</code> applies to every model.
-              </>
-            }
-          >
-            {({ id, describedBy }) => (
-              <Switch
-                id={id}
-                aria-describedby={describedBy}
-                checked={values.pii_on_sovereign}
-                disabled={locked}
-                onChange={(on) => edit({ pii_on_sovereign: on })}
+        <fieldset className="flex flex-col gap-2" disabled={locked}>
+          <legend className="mb-1 flex items-center gap-1 text-[12.5px] font-medium text-fg">
+            How personal data is protected
+            <Toggletip label="personal data modes" doc={doc('guides/privacy', 'modes')}>
+              Names, ID numbers, phone numbers and similar are found before a model sees the text.
+              Also called the PII default mode.
+            </Toggletip>
+          </legend>
+          {PII_MODE_OPTIONS.map((m) => (
+            <label
+              key={m}
+              className={cn(
+                'flex cursor-pointer gap-2.5 rounded-md border p-3 text-[13px]',
+                values.pii_default === m ? 'border-accent bg-accent-soft' : 'border-border-strong',
+              )}
+            >
+              <input
+                type="radio"
+                name={`${headingId}-pii`}
+                value={m}
+                checked={values.pii_default === m}
+                onChange={() => edit({ pii_default: m })}
+                className="mt-0.5 accent-accent"
               />
-            )}
-          </Field>
-          <Field
-            label="Semantic cache"
-            hint={
-              <>
-                Answers a request with the response to an earlier, similar one. Answers are reused
-                only within this tenant. Also requires{' '}
-                <code className="font-mono">[cache.semantic] enabled</code> in the deployment
-                config.
-              </>
-            }
-          >
-            {({ id, describedBy }) => (
-              <Switch
-                id={id}
-                aria-describedby={describedBy}
-                checked={values.semantic_cache === 'on'}
-                disabled={locked}
-                onChange={(on) => edit({ semantic_cache: on ? 'on' : 'off' })}
-              />
-            )}
-          </Field>
-          <Field
-            label="Cache-hit price for caliban/auto (%)"
-            error={percentError}
-            hint={
-              <>
-                Share of the flat <code className="font-mono">caliban/auto</code> price billed when
-                the cache answers and no model is called. Leave empty for the deployment default (
-                <code className="font-mono">[routing] auto_cache_hit_fraction</code>, 20% unless
-                configured).
-              </>
-            }
-          >
-            {({ id, describedBy, invalid }) => (
-              <Input
-                id={id}
-                aria-describedby={describedBy}
-                aria-invalid={invalid}
-                inputMode="decimal"
-                placeholder="Deployment default"
-                value={values.cache_hit_percent}
-                disabled={locked}
-                onChange={(e) => edit({ cache_hit_percent: e.target.value })}
-              />
-            )}
-          </Field>
-        </div>
+              <span className="min-w-0">
+                <span className="block font-medium">
+                  {PII_MODE_LABEL[m]}
+                  {m === 'reversible' && (
+                    <span className="ml-2 text-[12px] font-normal text-fg-muted">Recommended</span>
+                  )}
+                </span>
+                <span className="block text-[12.5px] text-fg-muted">{PII_MODE_EXAMPLE[m]}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        <Advanced
+          summary={`${SURROGATE_SCOPE_LABEL[values.pii_surrogate_scope]}; models on your servers ${
+            values.pii_on_sovereign ? 'also get' : 'get'
+          } ${values.pii_on_sovereign ? 'hidden data' : 'the text as is'}; reuse of answers ${
+            values.semantic_cache === 'on' ? 'on' : 'off'
+          }`}
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field
+              label="Placeholder consistency"
+              hint="Across the workspace, the same name always gets the same placeholder, so repeated questions can be answered from the cache, but the model provider can link conversations through them. For each conversation, placeholders are new every time and the cache is skipped when personal data is present. Also called surrogate scope."
+            >
+              {({ id, describedBy }) => (
+                <Select
+                  id={id}
+                  aria-describedby={describedBy}
+                  value={values.pii_surrogate_scope}
+                  disabled={locked}
+                  onChange={(e) => edit({ pii_surrogate_scope: e.target.value as SurrogateScope })}
+                >
+                  {SURROGATE_SCOPES.map((sc) => (
+                    <option key={sc} value={sc}>
+                      {SURROGATE_SCOPE_LABEL[sc]}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+            <Field
+              label="Also hide personal data from models on your servers"
+              hint="Off by default: models on your own servers or in a verified enclave get the text as is. On applies the mode above to them too. Outside models always get it, and an assistant's own personal data setting applies to every model."
+            >
+              {({ id, describedBy }) => (
+                <Switch
+                  id={id}
+                  aria-describedby={describedBy}
+                  checked={values.pii_on_sovereign}
+                  disabled={locked}
+                  onChange={(on) => edit({ pii_on_sovereign: on })}
+                />
+              )}
+            </Field>
+            <Field
+              label="Reuse answers to similar questions"
+              hint="Answers a request with the answer to an earlier, similar one from this workspace. Your IT administrator must also turn it on for the installation."
+            >
+              {({ id, describedBy }) => (
+                <Switch
+                  id={id}
+                  aria-describedby={describedBy}
+                  checked={values.semantic_cache === 'on'}
+                  disabled={locked}
+                  onChange={(on) => edit({ semantic_cache: on ? 'on' : 'off' })}
+                />
+              )}
+            </Field>
+            <Field
+              label="Price of a reused answer (%)"
+              error={percentError}
+              hint="Share of the automatic routing price charged when a reused answer means no model is called. Empty: the installation's default, 20% unless your administrator changed it."
+            >
+              {({ id, describedBy, invalid }) => (
+                <Input
+                  id={id}
+                  aria-describedby={describedBy}
+                  aria-invalid={invalid}
+                  inputMode="decimal"
+                  placeholder="Installation default"
+                  value={values.cache_hit_percent}
+                  disabled={locked}
+                  onChange={(e) => edit({ cache_hit_percent: e.target.value })}
+                />
+              )}
+            </Field>
+          </div>
+          <p className="text-[12px] text-fg-muted">
+            For administrators: reuse of answers also needs{' '}
+            <code className="font-mono">[cache.semantic] enabled</code> in the deployment config;
+            the default price is{' '}
+            <code className="font-mono">[routing] auto_cache_hit_fraction</code>.{' '}
+            <LearnMore doc={doc('reference/configuration')}>Configuration reference</LearnMore>
+          </p>
+        </Advanced>
         <FormError error={update.error} />
         {!readOnly && (
           <div className="flex flex-wrap items-center justify-end gap-3">

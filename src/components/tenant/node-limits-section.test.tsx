@@ -35,21 +35,22 @@ function mockTenant(initial: Tenant) {
 }
 
 function controls() {
-  const section = screen.getByRole('region', { name: 'Node limits' });
+  const section = screen.getByRole('region', { name: 'Limits and budget' });
   const q = within(section);
   return {
     section,
-    steps: q.getByLabelText('Steps per run'),
-    tokens: q.getByLabelText('Tokens per run'),
-    wall: q.getByLabelText('Wall clock per run (seconds)'),
-    depth: q.getByLabelText('Subnode depth'),
-    fanout: q.getByLabelText('Map fan-out'),
-    usd: q.getByLabelText('USD per run'),
+    steps: q.getByLabelText('Steps per conversation'),
+    tokens: q.getByLabelText('Words processed per conversation (tokens)'),
+    wall: q.getByLabelText('Time limit per conversation (seconds)'),
+    depth: q.getByLabelText('Assistants calling assistants (levels)'),
+    fanout: q.getByLabelText('Tasks in parallel'),
+    usd: q.getByLabelText('Cost per conversation (USD)'),
     daily: q.getByLabelText('Daily spend cap (USD)'),
     monthly: q.getByLabelText('Monthly spend cap (USD)'),
     save: q.getByRole('button', { name: 'Save' }),
-    restore: q.getByRole('button', { name: 'Restore default caps' }),
-    status: q.getByRole('status'),
+    restore: q.getByRole('button', { name: 'Restore default limits' }),
+    // The save status is the last live region (toggletips have their own).
+    status: q.getAllByRole('status').at(-1)!,
   };
 }
 
@@ -67,7 +68,13 @@ describe('NodeLimitsSection', () => {
     expect(c.daily).toHaveValue('');
     expect(c.daily).toHaveAttribute('placeholder', 'No cap');
     expect(c.steps).toHaveAccessibleDescription(/Default 200\./);
-    expect(c.usd).toHaveAccessibleDescription(/every version must declare budgets\.usd/);
+    expect(c.usd).toHaveAccessibleDescription(/every assistant must declare its own cost limit/);
+    // Levels and parallel tasks are expert settings, under Advanced (UX-46).
+    const advanced = within(c.section).getByText('Advanced').closest('details')!;
+    expect(advanced).toContainElement(c.depth);
+    expect(advanced).toContainElement(c.fanout);
+    expect(advanced).not.toContainElement(c.steps);
+    expect(advanced).toHaveTextContent('5 levels of sub-assistants, 32 tasks in parallel');
     expect(c.save).toBeDisabled();
     expect(c.restore).toBeDisabled();
   });
@@ -76,7 +83,7 @@ describe('NodeLimitsSection', () => {
     const { patches } = mockTenant(acme);
     const user = userEvent.setup();
     renderWithClient(<FromQuery />);
-    await screen.findByRole('region', { name: 'Node limits' });
+    await screen.findByRole('region', { name: 'Limits and budget' });
 
     await user.clear(controls().steps);
     await user.type(controls().steps, '50');
@@ -107,7 +114,7 @@ describe('NodeLimitsSection', () => {
     });
     const user = userEvent.setup();
     renderWithClient(<FromQuery />);
-    await screen.findByRole('region', { name: 'Node limits' });
+    await screen.findByRole('region', { name: 'Limits and budget' });
     expect(controls().steps).toHaveValue('50');
 
     await user.click(controls().restore);
@@ -122,7 +129,7 @@ describe('NodeLimitsSection', () => {
     const { patches } = mockTenant(acme);
     const user = userEvent.setup();
     renderWithClient(<FromQuery />);
-    await screen.findByRole('region', { name: 'Node limits' });
+    await screen.findByRole('region', { name: 'Limits and budget' });
 
     await user.type(controls().daily, '50');
     await user.type(controls().monthly, '1000');
@@ -149,7 +156,7 @@ describe('NodeLimitsSection', () => {
     mockTenant(acme);
     const user = userEvent.setup();
     renderWithClient(<FromQuery />);
-    await screen.findByRole('region', { name: 'Node limits' });
+    await screen.findByRole('region', { name: 'Limits and budget' });
     await user.clear(controls().steps);
     await user.type(controls().steps, '75');
 
@@ -209,9 +216,9 @@ describe('NodeLimitsSection', () => {
     renderWithClient(
       <NodeLimitsSection tenant={{ ...acme, node_spend_caps: { daily_usd: 10 } }} readOnly />,
     );
-    const section = screen.getByRole('region', { name: 'Node limits' });
+    const section = screen.getByRole('region', { name: 'Limits and budget' });
     expect(section).toHaveTextContent('Read only: your role cannot change these limits.');
-    expect(within(section).getByLabelText('Steps per run')).toBeDisabled();
+    expect(within(section).getByLabelText('Steps per conversation')).toBeDisabled();
     expect(within(section).getByLabelText('Daily spend cap (USD)')).toHaveValue('10');
     expect(within(section).queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
   });

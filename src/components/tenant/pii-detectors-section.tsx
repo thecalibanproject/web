@@ -15,6 +15,9 @@ import {
   PII_LABEL_ALIASES,
   sameList,
 } from '@/lib/piiDetectors';
+import { doc } from '@/lib/docs';
+import { Advanced } from '../help/advanced';
+import { Toggletip } from '../help/toggletip';
 import { Button, Field, FormError, Input, Textarea } from '../ui';
 import { IconPlus, IconTrash } from '../ui/icons';
 import { useSavedTenant } from './use-saved-tenant';
@@ -44,11 +47,11 @@ function Section({
   return (
     <section
       aria-labelledby={headingId}
-      className="mt-6 rounded-lg border border-border bg-surface"
+      className="mt-4 rounded-lg border first:mt-0 border-border bg-surface"
     >
       <div className="border-b border-border px-4 py-2.5">
         <h2 id={headingId} className="text-[13px] font-semibold text-fg">
-          Personal data detectors
+          Your own personal data rules
         </h2>
         <p className="text-[12px] text-fg-muted">{description}</p>
       </div>
@@ -87,7 +90,7 @@ export function PiiDetectorsSection({
         description={
           readOnly
             ? 'Read only: your role cannot see or change these detectors.'
-            : 'The patterns and terms did not come with the tenant, so they cannot be edited here.'
+            : 'The patterns and terms did not come with the workspace, so they cannot be edited here.'
         }
       >
         <div className="flex flex-col gap-1 p-4 text-[13px]">
@@ -97,8 +100,8 @@ export function PiiDetectorsSection({
               : 'Not reported by the control plane.'}
           </p>
           <p className="text-[12px] text-fg-subtle">
-            The tenant's own patterns and dictionary terms are shown only to roles with
-            tenant.write: the dictionary may hold staff or customer names.
+            The workspace's own patterns and names are shown only to roles that can change the
+            workspace: the list may hold staff or customer names.
           </p>
         </div>
       </Section>
@@ -159,82 +162,26 @@ function DetectorsEditor({ tenant, headingId }: { tenant: Tenant; headingId: str
       headingId={headingId}
       description={
         deleted
-          ? 'This tenant was deleted. Its detectors can no longer be changed.'
-          : "This tenant's own rules, applied with the built-in detectors before any model call. What they match is protected like any personal data, in the tenant's PII mode."
+          ? 'This workspace was deleted. Its rules can no longer be changed.'
+          : "This workspace's own rules, applied with the built-in detection before any model call. What they match is protected like any personal data."
       }
     >
       <form
         onSubmit={onSubmit}
-        aria-label="Personal data detectors"
+        aria-label="Your own personal data rules"
         className="flex flex-col gap-5 p-4"
       >
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 text-[13px] font-medium text-fg">Patterns</legend>
-          <p className="text-[12px] text-fg-subtle">
-            Regular expressions in the Rust regex syntax (no lookaround or backreferences), at most{' '}
-            {MAX_PII_PATTERNS}. Labels ignore case and are written upper-cased. A built-in label (
-            {PII_BUILTIN_LABELS.join(', ')}, or {PII_LABEL_ALIASES.join(', ')}) uses its surrogates;
-            any other label gets stand-ins of the same shape, and is masked as [LABEL].
-          </p>
-          <datalist id={listId}>
-            {PII_BUILTIN_LABELS.map((l) => (
-              <option key={l} value={l} />
-            ))}
-          </datalist>
-          {values.patterns.length === 0 && (
-            <p className="text-[12.5px] text-fg-muted">No patterns of its own.</p>
-          )}
-          {values.patterns.map((p, i) => (
-            <div key={i} className="grid grid-cols-[10rem_1fr_auto] items-start gap-2">
-              <Input
-                aria-label={`Label of pattern ${i + 1}`}
-                list={listId}
-                value={p.label}
-                disabled={locked}
-                placeholder="MRN"
-                onChange={(e) => setPattern(i, { label: normalizeLabel(e.target.value) })}
-                className="font-mono"
-              />
-              <span className="flex flex-col gap-1">
-                <Input
-                  aria-label={`Pattern ${i + 1}`}
-                  aria-invalid={patternErrors[i] != null}
-                  value={p.pattern}
-                  disabled={locked}
-                  placeholder="MRN-\d{6}"
-                  spellCheck={false}
-                  onChange={(e) => setPattern(i, { pattern: e.target.value })}
-                  className="font-mono"
-                />
-                {patternErrors[i] && (
-                  <span className="text-[12px] text-danger">{patternErrors[i]}</span>
-                )}
-              </span>
-              <Button
-                size="sm"
-                variant="ghost"
-                icon={<IconTrash size={14} />}
-                aria-label={`Remove pattern ${i + 1}`}
-                disabled={locked}
-                onClick={() => edit({ patterns: values.patterns.filter((_, j) => j !== i) })}
-              />
-            </div>
-          ))}
-          <span>
-            <Button
-              size="sm"
-              icon={<IconPlus size={14} />}
-              disabled={locked || values.patterns.length >= MAX_PII_PATTERNS}
-              onClick={() => edit({ patterns: [...values.patterns, { label: '', pattern: '' }] })}
-            >
-              Add pattern
-            </Button>
-          </span>
-        </fieldset>
+        <p className="-mb-3 flex items-center gap-1 text-[12px] text-fg-muted">
+          <Toggletip label="names to always hide" doc={doc('guides/privacy', 'dictionary')}>
+            Site names, internal codes or staff lists that general detection misses. Also called the
+            PII dictionary.
+          </Toggletip>
+          What the names list is for
+        </p>
         <Field
-          label="Dictionary"
+          label="Names to always hide"
           error={dictionary.ok ? undefined : dictionary.error}
-          hint={`One term per line, as LABEL: term. Matched as whole words, ignoring case; labels ignore case too and are written upper-cased. ${formatInt(
+          hint={`One per line, as KIND: name, such as ORG: Northwind Clinic. Matched as whole words, ignoring case. ${formatInt(
             dictionary.ok ? dictionary.terms.length : savedTerms.length,
           )} terms.`}
         >
@@ -248,11 +195,91 @@ function DetectorsEditor({ tenant, headingId }: { tenant: Tenant; headingId: str
               rows={8}
               spellCheck={false}
               placeholder={'ORG: Northwind Clinic\nLOCATION: Building C\nSTAFF_ID: K-1207'}
+              dir="auto"
               onChange={(e) => edit({ dictionary: e.target.value })}
               className="font-mono text-[12px]"
             />
           )}
         </Field>
+        <Advanced
+          summary={
+            values.patterns.length === 0
+              ? 'No patterns of its own'
+              : `${values.patterns.length} pattern${values.patterns.length === 1 ? '' : 's'} of its own`
+          }
+          defaultOpen={values.patterns.some((_, i) => patternErrors[i] != null)}
+        >
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-1 flex items-center gap-1 text-[13px] font-medium text-fg">
+              Your own identifier patterns
+              <Toggletip label="identifier patterns" doc={doc('guides/privacy', 'custom-patterns')}>
+                For ID formats the built-in detection does not know, such as a patient or matter
+                number. Written as regular expressions.
+              </Toggletip>
+            </legend>
+            <p className="text-[12px] text-fg-subtle">
+              Regular expressions (Rust syntax: no lookaround or backreferences), at most{' '}
+              {MAX_PII_PATTERNS}. Labels ignore case and are written upper-cased. A built-in label (
+              {PII_BUILTIN_LABELS.join(', ')}, or {PII_LABEL_ALIASES.join(', ')}) uses its
+              surrogates; any other label gets stand-ins of the same shape, and is masked as
+              [LABEL].
+            </p>
+            <datalist id={listId}>
+              {PII_BUILTIN_LABELS.map((l) => (
+                <option key={l} value={l} />
+              ))}
+            </datalist>
+            {values.patterns.length === 0 && (
+              <p className="text-[12.5px] text-fg-muted">No patterns of its own.</p>
+            )}
+            {values.patterns.map((p, i) => (
+              <div key={i} className="grid grid-cols-[10rem_1fr_auto] items-start gap-2">
+                <Input
+                  aria-label={`Label of pattern ${i + 1}`}
+                  list={listId}
+                  value={p.label}
+                  disabled={locked}
+                  placeholder="MRN"
+                  onChange={(e) => setPattern(i, { label: normalizeLabel(e.target.value) })}
+                  className="font-mono"
+                />
+                <span className="flex flex-col gap-1">
+                  <Input
+                    aria-label={`Pattern ${i + 1}`}
+                    aria-invalid={patternErrors[i] != null}
+                    value={p.pattern}
+                    disabled={locked}
+                    placeholder="MRN-\d{6}"
+                    spellCheck={false}
+                    onChange={(e) => setPattern(i, { pattern: e.target.value })}
+                    className="font-mono"
+                  />
+                  {patternErrors[i] && (
+                    <span className="text-[12px] text-danger">{patternErrors[i]}</span>
+                  )}
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={<IconTrash size={14} />}
+                  aria-label={`Remove pattern ${i + 1}`}
+                  disabled={locked}
+                  onClick={() => edit({ patterns: values.patterns.filter((_, j) => j !== i) })}
+                />
+              </div>
+            ))}
+            <span>
+              <Button
+                size="sm"
+                icon={<IconPlus size={14} />}
+                disabled={locked || values.patterns.length >= MAX_PII_PATTERNS}
+                onClick={() => edit({ patterns: [...values.patterns, { label: '', pattern: '' }] })}
+              >
+                Add pattern
+              </Button>
+            </span>
+          </fieldset>
+        </Advanced>
         <FormError error={update.error} />
         <div className="flex flex-wrap items-center justify-end gap-3">
           <p role="status" className="mr-auto text-[12.5px] text-fg-muted">

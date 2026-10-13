@@ -33,10 +33,10 @@ describe('PiiDetectorsSection', () => {
     });
     const user = userEvent.setup();
     renderWithClient(<FromQuery />);
-    const section = await screen.findByRole('region', { name: 'Personal data detectors' });
+    const section = await screen.findByRole('region', { name: 'Your own personal data rules' });
     const q = within(section);
     expect(q.getByLabelText('Pattern 1')).toHaveValue('MRN-\\d{6}');
-    const dictionary = q.getByLabelText('Dictionary');
+    const dictionary = q.getByLabelText('Names to always hide');
     expect(dictionary).toHaveValue('ORG: Northwind Clinic');
 
     await user.type(dictionary, '{Enter}Northwind');
@@ -47,7 +47,7 @@ describe('PiiDetectorsSection', () => {
     await user.paste('ORG: Northwind Clinic\nLOCATION: Building C\nLOCATION: building c');
     await user.click(q.getByRole('button', { name: 'Save' }));
 
-    await waitFor(() => expect(q.getByRole('status')).toHaveTextContent('Detectors saved.'));
+    await waitFor(() => expect(q.getByText('Detectors saved.')).toBeInTheDocument());
     expect(dictionary).toHaveValue('ORG: Northwind Clinic\nLOCATION: Building C');
 
     await user.click(q.getByRole('button', { name: 'Add pattern' }));
@@ -89,10 +89,10 @@ describe('PiiDetectorsSection', () => {
     });
     const user = userEvent.setup();
     renderWithClient(<FromQuery />);
-    const section = await screen.findByRole('region', { name: 'Personal data detectors' });
+    const section = await screen.findByRole('region', { name: 'Your own personal data rules' });
     const q = within(section);
     expect(q.getByLabelText('Label of pattern 1')).toHaveValue('MRN');
-    expect(q.getByLabelText('Dictionary')).toHaveValue('ORG: Northwind Clinic');
+    expect(q.getByLabelText('Names to always hide')).toHaveValue('ORG: Northwind Clinic');
     expect(q.getByRole('button', { name: 'Save' })).toBeDisabled();
 
     await user.click(q.getByRole('button', { name: 'Add pattern' }));
@@ -100,12 +100,12 @@ describe('PiiDetectorsSection', () => {
     expect(q.getByLabelText('Label of pattern 2')).toHaveValue('PHONE');
     await user.click(q.getByLabelText('Pattern 2'));
     await user.paste('\\+961 \\d+');
-    const dictionary = q.getByLabelText('Dictionary');
+    const dictionary = q.getByLabelText('Names to always hide');
     await user.click(dictionary);
     await user.paste('\nstaff_id: K-1207\nSTAFF_ID: k-1207');
     await user.click(q.getByRole('button', { name: 'Save' }));
 
-    await waitFor(() => expect(q.getByRole('status')).toHaveTextContent('Detectors saved.'));
+    await waitFor(() => expect(q.getByText('Detectors saved.')).toBeInTheDocument());
     expect(calls.find((c) => c.method === 'PATCH')?.body).toEqual({
       pii_patterns: [
         { label: 'MRN', pattern: 'MRN-\\d{6}' },
@@ -126,7 +126,7 @@ describe('PiiDetectorsSection', () => {
         readOnly
       />,
     );
-    const section = screen.getByRole('region', { name: 'Personal data detectors' });
+    const section = screen.getByRole('region', { name: 'Your own personal data rules' });
     expect(section).toHaveTextContent('Read only: your role cannot see or change these detectors.');
     expect(section).toHaveTextContent('12 patterns, 340 terms');
     expect(within(section).queryByRole('textbox')).not.toBeInTheDocument();
@@ -138,7 +138,7 @@ describe('PiiDetectorsSection', () => {
     renderWithClient(
       <PiiDetectorsSection tenant={{ ...rest, pii_patterns_count: 1, pii_dictionary_count: 1 }} />,
     );
-    const section = screen.getByRole('region', { name: 'Personal data detectors' });
+    const section = screen.getByRole('region', { name: 'Your own personal data rules' });
     expect(section).toHaveTextContent('1 pattern, 1 term');
     expect(within(section).queryByRole('textbox')).not.toBeInTheDocument();
   });
