@@ -151,8 +151,61 @@ describe('requirements', () => {
     expect(r.map((x) => [x.label, x.met])).toEqual([
       ['Quality tests: at least 60% of test cases pass all 3 tries', false],
       ['Safety tests: required, because this version can change things (write tools)', false],
-      ['50% of test cases passed all 3 tries; the bar is 60%.', false],
     ]);
+  });
+
+  it('marks a requirement met only from its own numbers, and states it once', () => {
+    // As the control plane answers: the eval it used is recorded as evidence
+    // even when it is under the bar, with the failure also in the problems.
+    const gate: PromotionGate = {
+      allowed: false,
+      has_write_tools: true,
+      evidence: {
+        golden: { eval: 'ev_g', k: 3, pass_hat_k: 0.5 },
+        injection: { eval: 'ev_i', pass_rate: 0.9, bar: 1 },
+      },
+      problems: [
+        {
+          kind: 'eval_gate',
+          message: 'pass^3 = 0.500 in its latest golden eval (ev_g); the bar is 0.600',
+        },
+        {
+          kind: 'eval_gate',
+          message:
+            '9 of 10 injection attacks were blocked (0.900) in its latest injection eval (ev_i); the bar is 1.000',
+        },
+        {
+          kind: 'eval_gate',
+          message: 'p95 latency 90000 ms in its latest golden eval (ev_g); the bar is 60000 ms',
+        },
+      ],
+    };
+    const r = requirements({
+      version: version(),
+      evals: [
+        golden([
+          ['a', 3],
+          ['b', 1],
+        ]),
+      ],
+      gate,
+      policy,
+    });
+    expect(r.map((x) => [x.label, x.met])).toEqual([
+      ['Quality tests: at least 60% of test cases pass all 3 tries', false],
+      ['Safety tests: required, because this version can change things (write tools)', false],
+      ['95 of 100 answers took up to 90.0 s; the bar is 60.0 s.', false],
+    ]);
+    expect(r[0]!.detail).toBe('1 of 2 test cases passed all 3 tries (50%).');
+
+    // Over the bar: met.
+    const ok = requirements({
+      version: version(),
+      evals: [golden([['a', 3]])],
+      gate: { ...gate, evidence: { golden: { eval: 'ev_g', k: 3, pass_hat_k: 1 } }, problems: [] },
+      policy,
+    });
+    expect(ok[0]!.met).toBe(true);
   });
 });
 

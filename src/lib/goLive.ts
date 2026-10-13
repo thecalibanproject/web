@@ -164,6 +164,15 @@ export function goLiveSteps(input: GoLiveInput): GoLiveStep[] {
   return [publish, test, check, live];
 }
 
+/** Gate problems that the quality or safety row of this version already states. */
+const RESTATED = [
+  /needs a finished (golden-set|injection) eval/,
+  /^pass\^\d+ = /,
+  /ran k = \d+; the bar needs k >=/,
+  /injection attacks were blocked/,
+  /injection eval \([^)]*\) is inconclusive/,
+];
+
 /** A requirement of the go-live check, in plain words, with whether it is met. */
 export interface Requirement {
   label: string;
@@ -186,33 +195,44 @@ export function requirements(input: GoLiveInput): Requirement[] {
     const bar = policy.golden.min_pass_k;
     const tries = policy.golden.min_k ?? 1;
     const passedAll = s ? s.by_case.filter((c) => c.all_passed).length : 0;
+    // The gate records the eval it used as evidence whether or not it met the
+    // bar, so "met" comes from the evidence's own numbers, never its presence.
+    const ev = gate?.evidence?.golden;
+    const fewTries = s ? s.k < tries : false;
     out.push({
       label: `Quality tests: at least ${pct(bar)} of test cases pass all ${tries} ${tries === 1 ? 'try' : 'tries'}`,
-      met: Boolean(gate?.evidence?.golden),
+      met: Boolean(ev && ev.pass_hat_k >= bar && ev.k >= tries),
       detail: s
-        ? `${passedAll} of ${s.cases} test cases passed all ${s.k} tries (${pct(s.pass_hat_k)}).`
+        ? `${passedAll} of ${s.cases} test cases passed all ${s.k} ${s.k === 1 ? 'try' : 'tries'} (${pct(s.pass_hat_k)}).${fewTries ? ` The bar needs ${tries} tries per case.` : ''}`
         : 'No quality tests of this version have finished.',
     });
   }
   const inj = latestSucceeded(evals, 'injection');
   const i = inj ? injectionSummary(inj) : null;
+  const injBar = gate?.evidence?.injection?.bar ?? policy?.injection?.min_pass_rate ?? null;
   if (need.safety) {
     out.push({
       label: gate?.has_write_tools
         ? 'Safety tests: required, because this version can change things (write tools)'
         : 'Safety tests: required, because what this version reads can steer its answer',
-      met: Boolean(gate?.evidence?.injection),
+      met: Boolean(
+        gate?.evidence?.injection &&
+        gate.evidence.injection.pass_rate >= gate.evidence.injection.bar &&
+        !gate.evidence.injection.errors,
+      ),
       detail: i
-        ? i.pass_rate == null
-          ? 'The last safety tests ended with errors and do not count.'
-          : `${pct(i.pass_rate)} of attacks blocked.`
+        ? i.pass_rate == null || i.errors > 0
+          ? 'The last safety tests ended with errors and do not count. Run them again.'
+          : `${pct(i.pass_rate)} of attacks blocked${injBar != null && i.pass_rate < injBar ? `; the bar is ${pct(injBar)}` : ''}.`
         : 'No safety tests of this version have finished.',
     });
   }
   for (const p of gate?.problems ?? []) {
-    // "Run the tests" for this version is already the quality or safety row.
-    const runTests = /needs a finished (golden-set|injection) eval/.test(p.message);
-    if (runTests && !p.path) continue;
+    // This version's quality and safety rows already say these, from the
+    // same numbers: running the tests, the pass rate and tries per case, the
+    // share of attacks blocked and runs that ended with errors. Listing them
+    // again would show one requirement twice.
+    if (!p.path && RESTATED.some((re) => re.test(p.message))) continue;
     out.push({ label: plainProblem(p.message, p.path), met: false });
   }
   return out;
