@@ -53,13 +53,6 @@ const DATA_MODULES: Record<string, Set<string> | 'all-values'> = {
   'lib/labels.ts': 'all-values',
 };
 
-/**
- * Files whose copy has not been moved to the glossary's terms yet. Shrinks to
- * empty: remove a file here when its copy is migrated.
- */
-const PENDING = new Set<string>([
-]);
-
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
@@ -175,7 +168,7 @@ describe('copy lint', () => {
   it('keeps internal jargon and dashes out of basic UI copy', () => {
     const hits = walk(SRC).flatMap(lintTsx);
     for (const [rel, props] of Object.entries(DATA_MODULES)) hits.push(...lintData(rel, props));
-    const bad = violations(hits.filter((h) => !PENDING.has(h.where.replace(/:\d+$/, ''))));
+    const bad = violations(hits);
     expect(bad, `Use the glossary's plain terms:\n${bad.join('\n')}`).toEqual([]);
   });
 

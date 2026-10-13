@@ -166,6 +166,42 @@ export const GLOSSARY = {
     ['break_glass', 'break glass', 'admin token'],
     doc('guides/people-and-roles', 'single-sign-on'),
   ),
+  appKey: g(
+    'App key',
+    'The key an application uses to call Caliban for one workspace, limited to the assistants and data it names.',
+    ['API key', 'api_key', 'Caliban key'],
+    doc('guides/api-keys', 'create'),
+  ),
+  providerAccount: g(
+    'Provider account',
+    "Your own account with an outside model provider, used for this workspace's requests.",
+    ['BYOK', 'provider key', 'provider keys'],
+    doc('guides/workspaces', 'provider-accounts'),
+  ),
+  answerCheck: g(
+    'Answer check',
+    'Checks the final answer for links, contacts or instructions that came only from untrusted text.',
+    ['answer guard', 'guardrails.answer', 'redact'],
+    doc('concepts/safety-model'),
+  ),
+  documentLibrary: g(
+    'Document library',
+    'A set of documents in Knowledge that assistants can search and cite.',
+    ['collection', 'rag collection'],
+    doc('guides/knowledge', 'create-a-library'),
+  ),
+  heldForReview: g(
+    'Held for review',
+    'An uploaded document the safety checks stopped; assistants cannot read it until someone allows it.',
+    ['quarantined', 'quarantine', 'vetting'],
+    doc('guides/knowledge', 'held-back-documents'),
+  ),
+  scan: g(
+    'Scan',
+    'Reads the structure of a data connection and suggests entries for the data dictionary.',
+    ['introspect', 'introspection'],
+    doc('guides/data-connections', 'scan-the-schema'),
+  ),
 } as const satisfies Record<string, GlossaryEntry>;
 
 export type GlossaryId = keyof typeof GLOSSARY;

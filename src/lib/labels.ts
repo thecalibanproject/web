@@ -91,8 +91,8 @@ export const SURROGATE_SCOPE_LABEL: Record<SurrogateScope, string> = {
 };
 
 export const CACHE_TIER_LABEL: Record<CacheTier, string> = {
-  exact: 'Exact',
-  semantic: 'Semantic',
+  exact: 'Identical request',
+  semantic: 'Similar request',
 };
 
 export const ROUTE_STAGE_LABEL: Record<RouteStage, string> = {

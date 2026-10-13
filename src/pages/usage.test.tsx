@@ -156,13 +156,13 @@ describe('UsagePage', () => {
     expect(within(auto).getByText('local/qwen3-8b')).toBeInTheDocument();
 
     const semantic = row('req-semantic-hit');
-    expect(within(semantic).getByText('Semantic')).toBeInTheDocument();
+    expect(within(semantic).getByText('Similar request')).toBeInTheDocument();
 
     // A pinned request served by the model it named shows the model once.
     const pinned = row('req-pinned-exact');
     expect(within(pinned).getAllByText('gpt-4o')).toHaveLength(1);
     expect(within(pinned).queryByText('routed to')).not.toBeInTheDocument();
-    expect(within(pinned).getByText('Exact')).toBeInTheDocument();
+    expect(within(pinned).getByText('Identical request')).toBeInTheDocument();
 
     const embedding = row('req-embedding');
     expect(within(embedding).getByText('local/bge-m3')).toBeInTheDocument();
