@@ -57,7 +57,7 @@ export function CommandPalette() {
         <IconSearch size={14} className="shrink-0" />
         <span className="hidden truncate sm:inline">Search or jump to</span>
         <span className="sr-only sm:hidden">Search or jump to</span>
-        <kbd className="ml-auto hidden rounded border border-border px-1 font-mono text-[11px] sm:inline">
+        <kbd className="ml-auto hidden shrink-0 rounded border border-border px-1 font-mono text-[11px] whitespace-nowrap sm:inline">
           {isMac() ? '⌘K' : 'Ctrl K'}
         </kbd>
       </button>
