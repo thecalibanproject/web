@@ -257,6 +257,10 @@ describe('Node evals', () => {
     expect(screen.getByRole('tab', { name: 'Tests' })).toHaveAttribute('aria-selected', 'true');
 
     expect(screen.getByText('Not ready to go live')).toBeInTheDocument();
+    // Still offered (the dialog shows why), but it says it would be refused.
+    expect(screen.getByRole('button', { name: 'Make v2 live' })).toHaveAccessibleDescription(
+      'Refused until every requirement below is met.',
+    );
     expect(screen.getByText('Can change things')).toBeInTheDocument();
     const reqs = screen.getByRole('list', { name: 'Requirements' });
     expect(reqs).toHaveTextContent('Quality tests: at least 90% of test cases pass all 3 tries');

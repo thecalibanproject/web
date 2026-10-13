@@ -1,5 +1,5 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { usePermissions } from '@/api/auth';
 import { evalPolicyQuery, evalsQuery, gateQuery, usePutEvalPolicy } from '@/api/queries';
 import type { Eval, Node } from '@/api/types';
@@ -79,6 +79,7 @@ function GateCard({
   const policy = useQuery(evalPolicyQuery(tenantId, name));
   const cannotPublish = deniedReason(usePermissions(), 'nodes.publish', tenantId);
   const [promoting, setPromoting] = useState(false);
+  const notReadyId = useId();
   const g = gate.data;
   const input = { version, evals, gate: g, policy: policy.data?.policy };
   const reqs = requirements(input);
@@ -94,14 +95,25 @@ function GateCard({
         actions={
           version.state === 'published' &&
           !version.live && (
-            <GatedButton
-              size="sm"
-              variant="primary"
-              deniedReason={cannotPublish}
-              onClick={() => setPromoting(true)}
-            >
-              Make v{version.version} live
-            </GatedButton>
+            // Primary only when the check passes; otherwise it stays available
+            // (the dialog shows the control plane's reasons) but says why it
+            // would be refused.
+            <span className="flex flex-wrap items-center justify-end gap-2">
+              {g && !g.allowed && (
+                <span id={notReadyId} className="text-[12px] text-fg-muted">
+                  Refused until every requirement below is met.
+                </span>
+              )}
+              <GatedButton
+                size="sm"
+                variant={g?.allowed ? 'primary' : 'secondary'}
+                deniedReason={cannotPublish}
+                aria-describedby={g && !g.allowed ? notReadyId : undefined}
+                onClick={() => setPromoting(true)}
+              >
+                Make v{version.version} live
+              </GatedButton>
+            </span>
           )
         }
       />
