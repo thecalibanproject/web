@@ -314,14 +314,16 @@ describe('UsagePage', () => {
     const card = await screen.findByRole('region', {
       name: 'Automatic routing billing and margin',
     });
-    expect(card).toHaveTextContent('2 requests asked for caliban/auto, 1 answered from cache');
+    expect(card).toHaveTextContent(
+      '2 requests used automatic routing (caliban/auto), 1 with a reused answer',
+    );
     const value = (label: string) => within(card).getByText(label).nextElementSibling;
     expect(value('Billed')).toHaveTextContent('$0.0024');
     expect(value('Flat price')).toHaveTextContent('$0.0040');
-    expect(value('Cache-hit savings')).toHaveTextContent('$0.0016');
+    expect(value('Saved by reuse')).toHaveTextContent('$0.0016');
     expect(value('Routed model cost')).toHaveTextContent('$0.0005');
     expect(value('Margin')).toHaveTextContent('$0.0019');
-    expect(card).toHaveTextContent('1 cache hit at the discounted price');
+    expect(card).toHaveTextContent('1 reused answer at the discounted price');
     expect(card).toHaveTextContent('A reused answer calls no model and is billed a share');
   });
 
@@ -339,8 +341,8 @@ describe('UsagePage', () => {
     });
     const value = (label: string) => within(card).getByText(label).nextElementSibling;
     expect(value('Billed')).toHaveTextContent('$0.0040');
-    expect(value('Cache-hit savings')).toHaveTextContent('$0.00');
-    expect(card).toHaveTextContent('0 answered from cache');
+    expect(value('Saved by reuse')).toHaveTextContent('$0.00');
+    expect(card).toHaveTextContent('0 with a reused answer');
   });
 
   it('flags a negative margin', async () => {
@@ -406,7 +408,7 @@ describe('UsagePage', () => {
     const card = await screen.findByRole('region', {
       name: 'Automatic routing billing and margin',
     });
-    expect(card).toHaveTextContent('0 requests asked for caliban/auto');
+    expect(card).toHaveTextContent('0 requests used automatic routing');
     expect(within(card).getAllByText('$0.00')).toHaveLength(5);
     expect(screen.getByText('No usage yet')).toBeInTheDocument();
   });

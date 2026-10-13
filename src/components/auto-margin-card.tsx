@@ -17,18 +17,14 @@ export function AutoMarginCard({ totals }: { totals: UsageReport['totals'] }) {
   return (
     <Card role="region" aria-label="Automatic routing billing and margin">
       <CardHeader
-        title={
-          <>
-            <code className="font-mono">caliban/auto</code> billing and margin
-          </>
-        }
-        description={`${formatInt(totals.auto_requests ?? 0)} requests asked for caliban/auto, ${formatInt(hits)} answered from cache`}
+        title="Automatic routing: billing and margin"
+        description={`${formatInt(totals.auto_requests ?? 0)} requests used automatic routing (caliban/auto), ${formatInt(hits)} with a reused answer`}
       />
       <dl className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-3 xl:grid-cols-5">
         <StatTile
           label="Billed"
           value={formatUsd(billed)}
-          detail="Flat price, discounted on cache hits"
+          detail="Flat price, discounted for reused answers"
         />
         <StatTile
           label="Flat price"
@@ -36,9 +32,9 @@ export function AutoMarginCard({ totals }: { totals: UsageReport['totals'] }) {
           detail="Full auto rate for the same tokens"
         />
         <StatTile
-          label="Cache-hit savings"
+          label="Saved by reuse"
           value={formatUsd(totals.auto_saved_usd ?? 0)}
-          detail={`${formatInt(hits)} cache ${hits === 1 ? 'hit' : 'hits'} at the discounted price`}
+          detail={`${formatInt(hits)} reused ${hits === 1 ? 'answer' : 'answers'} at the discounted price`}
         />
         <StatTile
           label="Routed model cost"
