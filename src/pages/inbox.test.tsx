@@ -259,6 +259,23 @@ describe('InboxPage (Approvals)', () => {
     );
   });
 
+  it('keeps Send answer enabled, says an empty answer is missing, and sends with Ctrl+Enter', async () => {
+    const user = userEvent.setup();
+    const { calls } = await openInbox(null);
+    const q = within(card('run_q'));
+    const field = q.getByLabelText('Your answer');
+    await user.click(q.getByRole('button', { name: 'Send answer' }));
+    expect(field).toHaveAccessibleDescription(/Write an answer first/);
+    expect(field).toHaveFocus();
+    expect(answerBody(calls, 'run_q')).toBeUndefined();
+
+    await user.type(field, 'since Monday');
+    await user.keyboard('{Control>}{Enter}{/Control}');
+    await waitFor(() =>
+      expect(answerBody(calls, 'run_q')).toEqual({ answer: 'since Monday', step: 'clarify#0' }),
+    );
+  });
+
   it('says when the conversation no longer waits (someone else answered)', async () => {
     const user = userEvent.setup();
     await openInbox(null, { conflict: true });

@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { authStateQuery } from '@/api/auth';
 import { api, unwrap } from '@/api/client';
 import { Button, buttonClassName, ErrorState, Field, FormError, Input } from '@/components/ui';
@@ -45,10 +45,18 @@ function TokenForm({ redirect, breakGlass }: { redirect?: string; breakGlass: bo
   const [token, setTokenValue] = useState('');
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
+  const [missing, setMissing] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!token.trim()) return;
+    // Submit stays enabled (AGENTS.md, Forms): an empty token is explained, not blocked.
+    if (!token.trim()) {
+      setMissing(true);
+      input.current?.focus();
+      return;
+    }
+    setMissing(false);
     setBusy(true);
     setError(null);
     setToken(token);
@@ -74,20 +82,23 @@ function TokenForm({ redirect, breakGlass }: { redirect?: string; breakGlass: bo
   return (
     <form
       onSubmit={onSubmit}
+      noValidate
       aria-label={breakGlass ? 'Break-glass sign-in' : 'Sign in with the admin token'}
       className="flex flex-col gap-4"
     >
       <Field
         label="Admin token"
         required
+        error={missing ? 'Enter the admin token to sign in.' : null}
         hint={
           breakGlass
             ? 'Emergency access with CALIBAN_ADMIN_TOKEN. Every use is recorded in the audit log. Kept for this browser tab only.'
             : 'The value of CALIBAN_ADMIN_TOKEN. Kept for this browser tab only.'
         }
       >
-        {({ id, describedBy }) => (
+        {({ id, describedBy, invalid }) => (
           <Input
+            ref={input}
             id={id}
             type="password"
             autoComplete="current-password"
@@ -97,19 +108,18 @@ function TokenForm({ redirect, breakGlass }: { redirect?: string; breakGlass: bo
             autoFocus
             required
             aria-describedby={describedBy}
+            aria-invalid={invalid}
             value={token}
-            onChange={(e) => setTokenValue(e.target.value)}
+            onChange={(e) => {
+              setTokenValue(e.target.value);
+              setMissing(false);
+            }}
             className="font-mono"
           />
         )}
       </Field>
       <FormError error={error} />
-      <Button
-        type="submit"
-        variant={breakGlass ? 'secondary' : 'primary'}
-        loading={busy}
-        disabled={!token.trim()}
-      >
+      <Button type="submit" variant={breakGlass ? 'secondary' : 'primary'} loading={busy}>
         {breakGlass ? 'Sign in with the token' : 'Sign in'}
       </Button>
     </form>

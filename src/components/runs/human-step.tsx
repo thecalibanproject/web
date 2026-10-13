@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent } from 'react';
+import { useId, useRef, useState, type FormEvent } from 'react';
 import { usePermissions } from '@/api/auth';
 import { ApiError } from '@/api/client';
 import { useAnswerRun } from '@/api/queries';
@@ -270,7 +270,8 @@ export function HumanStepActions({
   };
   const [text, setText] = useState('');
   const [asJson, setAsJson] = useState(false);
-  const [jsonError, setJsonError] = useState<string | null>(null);
+  const [answerError, setAnswerError] = useState<string | null>(null);
+  const field = useRef<HTMLTextAreaElement>(null);
   const what = actionName(approval);
 
   const send = (value: unknown, done: string, decision: HumanDecision) =>
@@ -366,12 +367,17 @@ export function HumanStepActions({
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
+    if (!text.trim()) {
+      setAnswerError('Write an answer first: the assistant waits for it.');
+      field.current?.focus();
+      return;
+    }
     let value: unknown = text;
     if (asJson) {
       try {
         value = JSON.parse(text) as unknown;
       } catch (err) {
-        setJsonError(`Not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
+        setAnswerError(`Not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
         return;
       }
     }
@@ -389,10 +395,11 @@ export function HumanStepActions({
         hint={
           asJson ? 'Sent as a JSON value.' : 'Sent as text. Your name is recorded with the answer.'
         }
-        error={jsonError}
+        error={answerError}
       >
         {({ id, describedBy, invalid }) => (
           <Textarea
+            ref={field}
             id={id}
             dir="auto"
             aria-describedby={describedBy}
@@ -401,7 +408,14 @@ export function HumanStepActions({
             disabled={Boolean(denied)}
             onChange={(e) => {
               setText(e.target.value);
-              setJsonError(null);
+              setAnswerError(null);
+            }}
+            // Ctrl or Cmd+Enter sends, as in every other text area of the console.
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                e.currentTarget.form?.requestSubmit();
+              }
             }}
             className={asJson ? 'font-mono text-[12px]' : undefined}
           />
@@ -414,7 +428,7 @@ export function HumanStepActions({
           disabled={Boolean(denied)}
           onChange={(e) => {
             setAsJson(e.target.checked);
-            setJsonError(null);
+            setAnswerError(null);
           }}
         />
         <GatedButton
@@ -423,7 +437,6 @@ export function HumanStepActions({
           variant="primary"
           deniedReason={denied}
           loading={answer.isPending}
-          disabled={!text.trim()}
         >
           Send answer
         </GatedButton>
