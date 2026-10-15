@@ -60,7 +60,13 @@ function WaitingCard({
     ? `Needs your approval: ${actionName(item.approval)}`
     : 'The assistant asks a question';
   return (
-    <Card className={approval ? 'border-warn/60' : undefined}>
+    <Card
+      className={
+        approval
+          ? 'flight-approval border-l-4 border-l-warn'
+          : 'flight-question border-l-4 border-l-accent'
+      }
+    >
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2.5">
         <div className="flex min-w-0 flex-wrap items-center gap-2 text-[13px]">
           <Badge tone={approval ? 'warn' : 'info'} dot>

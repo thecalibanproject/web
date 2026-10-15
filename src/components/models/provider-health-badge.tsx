@@ -30,7 +30,7 @@ export function ProviderHealthBadge({ providerId }: { providerId: string }) {
   }
   if (health.isError) {
     return (
-      <Badge tone="warn" dot title={`Health probe failed: ${errorMessage(health.error)}`}>
+      <Badge tone="danger" dot title={`Health probe failed: ${errorMessage(health.error)}`}>
         unknown
         <span className="sr-only">: {errorMessage(health.error)}</span>
       </Badge>

@@ -16,11 +16,12 @@
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run",
+    "test": "node --test scripts/mock/check.mjs && vitest run",
     "test:watch": "vitest",
     "gen:api": "openapi-typescript ../core/api/openapi.yaml -o src/api/schema.d.ts --default-non-nullable false && prettier --write src/api/schema.d.ts",
     "sync:schemas": "node scripts/sync-schemas.mjs",
-    "gen": "pnpm gen:api && pnpm sync:schemas"
+    "gen": "pnpm gen:api && pnpm sync:schemas",
+    "dev:mock": "vite --mode mock"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.1",

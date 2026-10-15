@@ -4,7 +4,10 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createQueryClient } from '@/lib/query-client';
 import { createAppRouter, wireAuth } from '@/router';
+import { guardViewTransitions } from '@/lib/view-transitions';
 import './index.css';
+
+guardViewTransitions(document);
 
 const queryClient = createQueryClient();
 const router = createAppRouter(queryClient);

@@ -13,8 +13,8 @@ import { Badge, type Tone } from './ui';
 const TIER_TONE: Record<TrustTier, Tone> = {
   t0_sovereign: 'ok',
   t1_attested: 'info',
-  t2_contracted: 'warn',
-  t3_public: 'danger',
+  t2_contracted: 'neutral',
+  t3_public: 'neutral',
 };
 
 export function TrustTierBadge({ tier }: { tier: TrustTier }) {
@@ -28,7 +28,7 @@ export function TrustTierBadge({ tier }: { tier: TrustTier }) {
   );
 }
 
-const CACHE_TONE: Record<CacheStatus, Tone> = { hit: 'ok', miss: 'neutral', bypass: 'warn' };
+const CACHE_TONE: Record<CacheStatus, Tone> = { hit: 'ok', miss: 'neutral', bypass: 'neutral' };
 
 const CACHE_LABEL: Record<CacheStatus, string> = {
   hit: 'Reused',
@@ -67,7 +67,7 @@ export function CacheTierBadge({ tier }: { tier: CacheTier }) {
 export function ConfidenceMeter({ value }: { value: number | null | undefined }) {
   if (value == null) return <span className="text-[12px] text-fg-subtle">unknown</span>;
   const pct = Math.max(0, Math.min(1, value));
-  const tone = pct < 0.5 ? 'bg-danger' : pct < 0.8 ? 'bg-warn' : 'bg-ok';
+  const tone = 'bg-accent';
   return (
     <span className="inline-flex items-center gap-2">
       <span

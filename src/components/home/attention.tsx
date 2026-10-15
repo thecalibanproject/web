@@ -26,8 +26,8 @@ function Tile({
       aria-label={title}
       className={cn(
         'flex flex-col gap-1.5 p-4',
-        tone === 'warn' && 'border-warn/60',
-        tone === 'danger' && 'border-danger/60',
+        tone === 'warn' && 'border-l-4 border-l-warn',
+        tone === 'danger' && 'border-l-4 border-l-danger',
       )}
     >
       <h3 className="text-[12.5px] font-medium text-fg-muted">{title}</h3>
@@ -47,7 +47,7 @@ function ApprovalsTile() {
         <p className="text-[13px]">Nothing waits for an approval or an answer.</p>
       ) : (
         <>
-          <p className="text-[22px] font-semibold tabular-nums">{n}</p>
+          <p className="readout text-[32px] leading-10">{n}</p>
           <p className="text-[12.5px] text-fg-muted">
             {w.approvals} approval{w.approvals === 1 ? '' : 's'}, {w.questions} question
             {w.questions === 1 ? '' : 's'}
@@ -77,7 +77,7 @@ function FailedTile({ workspaceId }: { workspaceId: string }) {
         <p className="text-[13px]">No conversation failed.</p>
       ) : (
         <>
-          <p className="text-[22px] font-semibold tabular-nums">
+          <p className="readout text-[32px] leading-10">
             {failed}
             {more && '+'}
           </p>
@@ -109,7 +109,7 @@ function Meter({
   cap: number | null | undefined;
 }) {
   const s = share(spent, cap);
-  const tone = s == null ? 'bg-accent' : s >= 1 ? 'bg-danger' : s >= 0.8 ? 'bg-warn' : 'bg-ok';
+  const tone = s == null ? 'bg-accent' : s >= 1 ? 'bg-warn' : 'bg-ok';
   return (
     <div className="flex flex-col gap-1">
       <p className="flex justify-between gap-2 text-[12.5px]">

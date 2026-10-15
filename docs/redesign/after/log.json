@@ -1,0 +1,1190 @@
+[
+  {
+    "shot": "login",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/login--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "home-fresh",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/home-fresh--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "home-busy",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/home-busy--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "approvals",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/approvals--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-overview",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/assistant-overview--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-setup-form",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/assistant-setup-form--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-setup-form-bottom",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/assistant-setup-form-bottom--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-json",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/assistant-json--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-tests",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/assistant-tests--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-test-run-failing",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/assistant-test-run-failing--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-list",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/assistant-list--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "new-assistant",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/new-assistant--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "conversation-approval",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/conversation-approval--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "save-as-test",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/save-as-test--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "conversations",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/conversations--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "knowledge",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/knowledge--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "knowledge-upload",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/knowledge-upload--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "knowledge-held-back",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/knowledge-held-back--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "data-dictionary",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/data-dictionary--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "privacy-basic",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/privacy-basic--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "privacy-advanced",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/privacy-advanced--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "topics",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/topics--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "help-panel",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/help-panel--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "palette",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/palette--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "empty-assistants",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/empty-assistants--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "empty-knowledge",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/empty-knowledge--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "empty-conversations",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/empty-conversations--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "empty-approvals",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/empty-approvals--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "usage",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/usage--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "models",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/models--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "workspaces",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/workspaces--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "audit",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/audit--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "login",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/login--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "home-fresh",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/home-fresh--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "home-busy",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/home-busy--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "approvals",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/approvals--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-overview",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/assistant-overview--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-setup-form",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/assistant-setup-form--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-setup-form-bottom",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/assistant-setup-form-bottom--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-json",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/assistant-json--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-tests",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/assistant-tests--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-test-run-failing",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/assistant-test-run-failing--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-list",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/assistant-list--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "new-assistant",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/new-assistant--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "conversation-approval",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/conversation-approval--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "save-as-test",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/save-as-test--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "conversations",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/conversations--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "knowledge",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/knowledge--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "knowledge-upload",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/knowledge-upload--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "knowledge-held-back",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/knowledge-held-back--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "data-dictionary",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/data-dictionary--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "privacy-basic",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/privacy-basic--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "privacy-advanced",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/privacy-advanced--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "topics",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/topics--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "help-panel",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/help-panel--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "palette",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/palette--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "empty-assistants",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/empty-assistants--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "empty-knowledge",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/empty-knowledge--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "empty-conversations",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/empty-conversations--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "empty-approvals",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/empty-approvals--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "usage",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/usage--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "models",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/models--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "workspaces",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/workspaces--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "audit",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/audit--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "login",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/login--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "home-fresh",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/home-fresh--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "home-busy",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/home-busy--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "approvals",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/approvals--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-overview",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/assistant-overview--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-setup-form",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/assistant-setup-form--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-setup-form-bottom",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/assistant-setup-form-bottom--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-json",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/assistant-json--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-tests",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/assistant-tests--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-test-run-failing",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/assistant-test-run-failing--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-list",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/assistant-list--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "new-assistant",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/new-assistant--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "conversation-approval",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/conversation-approval--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "save-as-test",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/save-as-test--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "conversations",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/conversations--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "knowledge",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/knowledge--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "knowledge-upload",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/knowledge-upload--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "knowledge-held-back",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/knowledge-held-back--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "data-dictionary",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/data-dictionary--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "privacy-basic",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/privacy-basic--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "privacy-advanced",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/privacy-advanced--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "topics",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/topics--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "help-panel",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/help-panel--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "palette",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/palette--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "empty-assistants",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/empty-assistants--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "empty-knowledge",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/empty-knowledge--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "empty-conversations",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/empty-conversations--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "empty-approvals",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/empty-approvals--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "usage",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/usage--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "models",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/models--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "workspaces",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/workspaces--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "audit",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/audit--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "login",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/login--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "home-fresh",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/home-fresh--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "home-busy",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/home-busy--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "approvals",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/approvals--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-overview",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/assistant-overview--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-setup-form",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/assistant-setup-form--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-setup-form-bottom",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/assistant-setup-form-bottom--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-json",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/assistant-json--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-tests",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/assistant-tests--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-test-run-failing",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/assistant-test-run-failing--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "assistant-list",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/assistant-list--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "new-assistant",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/new-assistant--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "conversation-approval",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/conversation-approval--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "save-as-test",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/save-as-test--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "conversations",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/conversations--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "knowledge",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/knowledge--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "knowledge-upload",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/knowledge-upload--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "knowledge-held-back",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/knowledge-held-back--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "data-dictionary",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/data-dictionary--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "privacy-basic",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/privacy-basic--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "privacy-advanced",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/privacy-advanced--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "topics",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/topics--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "help-panel",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/help-panel--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "palette",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/palette--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "empty-assistants",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/empty-assistants--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "empty-knowledge",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/empty-knowledge--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "empty-conversations",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/empty-conversations--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "empty-approvals",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/empty-approvals--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "usage",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/usage--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "models",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/models--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "workspaces",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/workspaces--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "audit",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/audit--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "approvals-refund",
+    "variant": "desktop-light",
+    "file": "docs/redesign/after/approvals-refund--desktop-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "approvals-refund",
+    "variant": "desktop-dark",
+    "file": "docs/redesign/after/approvals-refund--desktop-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "approvals-refund",
+    "variant": "mobile-light",
+    "file": "docs/redesign/after/approvals-refund--mobile-light.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  },
+  {
+    "shot": "approvals-refund",
+    "variant": "mobile-dark",
+    "file": "docs/redesign/after/approvals-refund--mobile-dark.png",
+    "overflow": 0,
+    "errors": [],
+    "externalRequests": [],
+    "accessibility": []
+  }
+]

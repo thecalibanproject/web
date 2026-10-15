@@ -80,12 +80,12 @@ function NavLink({ item, badge }: { item: NavItem; badge?: number }) {
         to={item.to}
         activeOptions={{ exact: item.to === '/' }}
         title={item.label}
-        className="flex h-8 items-center gap-2.5 rounded-md px-2 text-[13px] whitespace-nowrap text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg data-[status=active]:bg-accent-soft data-[status=active]:font-medium data-[status=active]:text-fg"
+        className="flex h-9 items-center gap-2.5 rounded-md border-l-2 border-transparent px-2 text-[13px] whitespace-nowrap text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg data-[status=active]:bg-accent-soft data-[status=active]:font-medium data-[status=active]:text-accent"
       >
         <Icon width={16} height={16} className="shrink-0" />
         <span className="md:sr-only lg:not-sr-only">{item.label}</span>
         {badge ? (
-          <span className="ml-auto rounded-full bg-warn px-1.5 text-[11px] leading-[18px] font-semibold text-surface tabular-nums md:absolute md:ml-0 md:translate-x-3 md:-translate-y-2 lg:static lg:ml-auto lg:translate-x-0 lg:translate-y-0">
+          <span className="ml-auto rounded-full bg-[#F2B544] px-1.5 text-[11px] leading-[18px] font-semibold text-[#040B1C] tabular-nums md:absolute md:ml-0 md:translate-x-3 md:-translate-y-2 lg:static lg:ml-auto lg:translate-x-0 lg:translate-y-0">
             {badge}
             <span className="sr-only"> waiting</span>
           </span>
@@ -194,7 +194,7 @@ function WorkspaceSwitcher() {
       <span className="sr-only sm:not-sr-only">Workspace</span>
       <Select
         value={ws.id ?? ''}
-        className="w-44 sm:w-52"
+        className="w-36 sm:w-52"
         onChange={(e) => {
           setWorkspace(e.target.value);
           // A page following a `?tenant=` link follows the switcher from now on.
@@ -255,10 +255,10 @@ export function AppShell() {
       </a>
 
       {/* Sidebar: full width ≥lg, icon rail on tablets (md), top bar on phones. */}
-      <aside className="sticky top-0 z-20 flex shrink-0 flex-col border-b border-border bg-surface md:h-dvh md:w-14 md:border-r md:border-b-0 lg:w-56">
-        <div className="flex h-12 items-center gap-2.5 px-3.5 md:h-14">
+      <aside className="scope-rail relative z-20 flex shrink-0 flex-col border-b border-border md:sticky md:top-0 md:h-dvh md:w-14 md:border-r md:border-b-0 lg:w-60">
+        <div className="flex h-12 items-center gap-2.5 px-3.5 md:h-16">
           <LogoMark />
-          <span className="text-[14px] font-semibold tracking-tight md:hidden lg:inline">
+          <span className="font-[B612] text-[16px] font-bold tracking-tight md:hidden lg:inline">
             Caliban
           </span>
         </div>
@@ -288,7 +288,7 @@ export function AppShell() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-12 z-10 flex h-12 items-center gap-2 border-b border-border bg-surface/95 px-4 backdrop-blur md:top-0 md:px-6 lg:px-8">
+        <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b border-border bg-bg/95 px-4 backdrop-blur md:top-0 md:px-6 lg:px-8">
           {!perms.hasNoRole && <WorkspaceSwitcher />}
           <div className="ml-auto flex items-center gap-2">
             {!perms.hasNoRole && <ApprovalsBadge waiting={waiting} />}

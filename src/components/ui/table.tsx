@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/no-noninteractive-tabindex -- Native scroll regions need keyboard focus. */
 import type { HTMLAttributes, TdHTMLAttributes, ThHTMLAttributes } from 'react';
 import { cn } from '@/lib/cn';
 
@@ -8,10 +9,16 @@ export function Table({
   ...rest
 }: HTMLAttributes<HTMLTableElement> & { label?: string }) {
   return (
-    <div className="w-full overflow-x-auto">
+    // Focusable scroll region lets keyboard users reach columns beyond the viewport.
+    <div
+      className="w-full overflow-x-auto"
+      tabIndex={0}
+      role="region"
+      aria-label={label ? `${label}, scroll to see more` : 'Scrollable table'}
+    >
       <table
         aria-label={label}
-        className={cn('w-full border-collapse text-left text-[13px]', className)}
+        className={cn('flight-table w-full border-collapse text-left text-[13px]', className)}
         {...rest}
       />
     </div>
@@ -49,5 +56,5 @@ export function TH({ className, ...rest }: ThHTMLAttributes<HTMLTableCellElement
 }
 
 export function TD({ className, ...rest }: TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className={cn('px-3 py-1.5 align-middle', className)} {...rest} />;
+  return <td className={cn('px-3 py-2.5 align-middle', className)} {...rest} />;
 }
